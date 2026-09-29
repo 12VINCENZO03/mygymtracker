@@ -372,10 +372,11 @@ export default function App() {
           }
 
           ex.exercises.forEach((sub) => {
+            const amrapRepVal = currState.setReps[`${sub.id}-amrap`];
             if (sub.metricType === 'weight' || !sub.metricType) {
               for (let i = 0; i < roundsToCount; i++) {
                 if (ex.structureType === 'amrap' || currState.checkedSets[`${sub.id}-${i}`]) {
-                  const reps = Math.max(0, parseInt(currState.setReps[`${sub.id}-${i}`] || sub.reps || '10') || 0);
+                  const reps = Math.max(0, parseInt((ex.structureType === 'amrap' && amrapRepVal) ? amrapRepVal : (currState.setReps[`${sub.id}-${i}`] || sub.reps || '10')) || 0);
                   const weight = Math.max(0, parseFloat(currState.weights[sub.id]) || 0);
                   tabVol += reps * weight;
                 }
@@ -383,7 +384,7 @@ export default function App() {
             } else if (sub.metricType === 'bodyweight') {
               for (let i = 0; i < roundsToCount; i++) {
                 if (ex.structureType === 'amrap' || currState.checkedSets[`${sub.id}-${i}`]) {
-                  const reps = Math.max(0, parseInt(currState.setReps[`${sub.id}-${i}`] || sub.reps || '10') || 0);
+                  const reps = Math.max(0, parseInt((ex.structureType === 'amrap' && amrapRepVal) ? amrapRepVal : (currState.setReps[`${sub.id}-${i}`] || sub.reps || '10')) || 0);
                   const extraWeight = Math.max(0, parseFloat(currState.weights[sub.id]) || 0);
                   const baseWeight = bw > 0 ? bw : 0;
                   tabVol += reps * (extraWeight + baseWeight);
@@ -392,7 +393,7 @@ export default function App() {
             } else if (sub.metricType === 'time') {
               for (let i = 0; i < roundsToCount; i++) {
                 if (ex.structureType === 'amrap' || currState.checkedSets[`${sub.id}-${i}`]) {
-                  const durationSec = Math.max(0, parseInt(currState.setReps[`${sub.id}-${i}`] ?? String(sub.workSec || 60)) || 60);
+                  const durationSec = Math.max(0, parseInt((ex.structureType === 'amrap' && amrapRepVal) ? amrapRepVal : (currState.setReps[`${sub.id}-${i}`] ?? String(sub.workSec || 60))) || 60);
                   const baseWeight = bw > 0 ? bw : 0;
                   tabVol += baseWeight * (durationSec / TIME_VOLUME_DIVISOR);
                   const rirRaw = currState.setRir[`${sub.id}-${i}`];
@@ -445,6 +446,10 @@ export default function App() {
         if (currState.setRir[key] !== undefined) rirs[idx] = currState.setRir[key];
         if (currState.setRpe[key] !== undefined) rpes[idx] = currState.setRpe[key];
       }
+    }
+    const amrapKey = `${targetId}-amrap`;
+    if (currState.checkedSets[amrapKey] && currState.setReps[amrapKey] !== undefined) {
+      reps['0'] = currState.setReps[amrapKey];
     }
 
     const newEntry = { date: sessionDate, weight: currentWeight, reps, rirs, rpes };
@@ -580,14 +585,15 @@ export default function App() {
               totalSets++;
               const roundExs = ex.exercises.map((sub) => {
                 const setId = `${sub.id}-${j}`;
+                const amrapRepVal = state.setReps[`${sub.id}-amrap`];
                 return {
                   name: sub.name,
                   metricType: sub.metricType,
                   targetReps: sub.reps || sub.workSec,
                   pause: sub.pause,
-                  reps: state.setReps[setId] || sub.reps,
+                  reps: (ex.structureType === 'amrap' && amrapRepVal) ? amrapRepVal : (state.setReps[setId] || sub.reps),
                   weight: state.weights[sub.id] || 0,
-                  duration: state.setReps[setId] || sub.workSec || 60,
+                  duration: (ex.structureType === 'amrap' && amrapRepVal) ? amrapRepVal : (state.setReps[setId] || sub.workSec || 60),
                   rir: state.setRir[setId] !== undefined ? state.setRir[setId] : '',
                   isRest: sub.metricType === 'rest'
                 };

@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { AppState, SupersetExercise } from '../types/gym';
 import { formatTime } from '../utils/storage';
 import { getExerciseCoachAdvice } from '../utils/coach';
@@ -64,6 +64,7 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
 }) => {
   const pressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isLongPressRef = useRef(false);
+  const [, setForceUpdate] = useState(0);
 
   const isEmom = circuit.structureType === 'emom';
   const isAmrap = circuit.structureType === 'amrap';
@@ -534,11 +535,30 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
               {/* Rounds Inputs */}
               <div className="space-y-2.5">
                 {isAmrap ? (
-                  <div className="text-xs font-bold text-zinc-400 flex items-center justify-between p-3 bg-zinc-900/80 rounded-2xl shadow-inner border border-zinc-800/50">
-                    <span>Target: {sub.reps || 10} reps</span>
-                    <span className="text-emerald-400 bg-emerald-950/30 px-2 py-1 rounded-lg border border-emerald-900/50">
-                      Giri: {amrapRoundsCount}
-                    </span>
+                  <div className="bg-zinc-900/80 p-3.5 rounded-2xl shadow-inner border border-zinc-800/50 space-y-2">
+                    <div className="text-xs font-bold text-zinc-400 flex items-center justify-between">
+                      <span>Target: {sub.reps || 10} reps</span>
+                      <span className="text-emerald-400 bg-emerald-950/30 px-2 py-1 rounded-lg border border-emerald-900/50">
+                        Giri completati: {amrapRoundsCount}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 pt-1">
+                      <span className="text-[10px] font-bold text-zinc-500 uppercase">Inserisci reps fatte:</span>
+                      <input
+                        type="text"
+                        disabled={!isWorkoutActive}
+                        value={state.setReps[`${sub.id}-amrap`] || sub.reps || '10'}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          // Aggiorniamo le ripetizioni reali dell'AMRAP nello stato globale
+                          state.setReps[`${sub.id}-amrap`] = val;
+                          state.checkedSets[`${sub.id}-amrap`] = true;
+                          setForceUpdate((prev: number) => prev + 1);
+                        }}
+                        placeholder="es. 12"
+                        className="bg-zinc-950 text-emerald-400 font-black text-xs w-20 p-2 rounded-xl text-center border border-zinc-700 outline-none"
+                      />
+                    </div>
                   </div>
                 ) : (
                   Array.from({ length: totalRounds }).map((_, rIdx) => {
