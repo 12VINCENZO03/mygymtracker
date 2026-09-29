@@ -19,10 +19,8 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-zinc-950 z-[100] flex flex-col animate-in fade-in">
-      <div className="h-[env(safe-area-inset-top)] w-full bg-zinc-950 shrink-0" />
-
       {/* Header */}
-      <div className="p-4 px-5 flex justify-between items-center bg-zinc-950 border-b border-zinc-800/60 sticky top-0 z-10">
+      <div className="header-safe-top p-4 px-5 flex justify-between items-center bg-zinc-950 border-b border-zinc-800/60 sticky top-0 z-10">
         <div className="flex items-center gap-3">
           {selectedSession && (
             <button

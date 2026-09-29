@@ -725,6 +725,7 @@ export default function App() {
     const setId = `${exId}-${setIndex}`;
     const newState = { ...state };
     const isChecked = Boolean(newState.checkedSets[setId]);
+
     if (isChecked) {
       delete newState.checkedSets[setId];
     } else {
@@ -732,22 +733,61 @@ export default function App() {
       if (newState.setReps[setId] === undefined) {
         newState.setReps[setId] = defaultReps;
       }
-      playShortBeep();
-      if (pauseSec > 0) {
-        startRestTimer(pauseSec, () => {
-          if (circuitId) {
-            const circuitEl = document.getElementById(`circuit-${circuitId}`);
-            circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+      let handledCircuitRest = false;
+
+      // 🔴 NUOVO: Riconoscimento intelligente della fine del circuito
+      if (isSub && circuitId) {
+        const currentTab = newState.plan.find((t) => t.id === newState.activeTab);
+        const circuit = currentTab?.exercises.find((e) => e.id === circuitId);
+        
+        if (circuit && circuit.type === 'superset' && circuit.structureType === 'classic') {
+          // Cerca l'ultimo esercizio vero e proprio del circuito (ignorando eventuali blocchi "Pausa" intermedi)
+          const lastRealEx = [...circuit.exercises].reverse().find((e) => e.metricType !== 'rest');
+          
+          if (lastRealEx && lastRealEx.id === exId) {
+            handledCircuitRest = true;
+            const circuitPause = circuit.pause || 90;
+            playShortBeep();
+            
+            // Avvia la pausa grande del circuito
+            if (circuitPause > 0) {
+              startRestTimer(circuitPause, () => {
+                // Al termine del timer, spunta automaticamente il pulsante "Rec. Giro X"
+                setState((prev) => {
+                  if (!prev) return null;
+                  return {
+                    ...prev,
+                    checkedSets: { ...prev.checkedSets, [`${circuitId}-round-${setIndex}`]: true }
+                  };
+                });
+                const circuitEl = document.getElementById(`circuit-${circuitId}`);
+                circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              });
+            }
           }
-        });
+        }
+      }
+
+      // Se non siamo alla fine del circuito, esegui il comportamento normale
+      if (!handledCircuitRest) {
+        playShortBeep();
+        if (pauseSec > 0) {
+          startRestTimer(pauseSec, () => {
+            if (circuitId) {
+              const circuitEl = document.getElementById(`circuit-${circuitId}`);
+              circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          });
+        }
       }
     }
+
     updateExerciseHistory(newState, exId);
     calculateVolumeAndLoad(newState);
     setState(newState);
   };
 
-  // 🔴 BUG FIX: Aggiunti pauseSec e circuitId al Long Press
   const handleLongPressSet = (
     exId: string,
     setIndex: number,
@@ -759,19 +799,47 @@ export default function App() {
     const setId = `${exId}-${setIndex}`;
     const currentVal = state.setReps[setId] ?? defaultReps;
     const input = prompt('Quante ripetizioni hai eseguito davvero?', currentVal);
-
+    
     if (input !== null && input.trim() !== '') {
-      const parsed = Math.max(0, parseInt(input));
+      const parsed = Math.max(0, parseInt(input)); 
       if (!isNaN(parsed)) {
         const newState = { ...state };
         newState.setReps[setId] = parsed.toString();
         newState.checkedSets[setId] = true;
-        updateExerciseHistory(newState, exId);
-        calculateVolumeAndLoad(newState);
-        setState(newState);
 
-        // 🔴 BUG FIX: Avvia il timer di recupero come con il tap rapido
-        if (pauseSec > 0) {
+        let handledCircuitRest = false;
+
+        // 🔴 NUOVO: Stesso riconoscimento intelligente per la pressione prolungata
+        if (circuitId) {
+          const currentTab = newState.plan.find((t) => t.id === newState.activeTab);
+          const circuit = currentTab?.exercises.find((e) => e.id === circuitId);
+          
+          if (circuit && circuit.type === 'superset' && circuit.structureType === 'classic') {
+            const lastRealEx = [...circuit.exercises].reverse().find((e) => e.metricType !== 'rest');
+            
+            if (lastRealEx && lastRealEx.id === exId) {
+              handledCircuitRest = true;
+              const circuitPause = circuit.pause || 90;
+              
+              if (circuitPause > 0) {
+                startRestTimer(circuitPause, () => {
+                  setState((prev) => {
+                    if (!prev) return null;
+                    return {
+                      ...prev,
+                      checkedSets: { ...prev.checkedSets, [`${circuitId}-round-${setIndex}`]: true }
+                    };
+                  });
+                  const circuitEl = document.getElementById(`circuit-${circuitId}`);
+                  circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                });
+              }
+            }
+          }
+        }
+
+        // Timer normale se non è l'ultimo esercizio
+        if (!handledCircuitRest && pauseSec > 0) {
           startRestTimer(pauseSec, () => {
             if (circuitId) {
               const circuitEl = document.getElementById(`circuit-${circuitId}`);
@@ -779,6 +847,10 @@ export default function App() {
             }
           });
         }
+
+        updateExerciseHistory(newState, exId);
+        calculateVolumeAndLoad(newState);
+        setState(newState);
       }
     }
   };

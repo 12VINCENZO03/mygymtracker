@@ -92,10 +92,8 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       />
 
       <div className="fixed top-0 right-0 h-full w-84 max-w-[90vw] bg-zinc-950 z-[90] flex flex-col shadow-2xl border-l border-zinc-800/60 animate-in slide-in-from-right duration-300">
-        <div className="h-[env(safe-area-inset-top)] w-full bg-zinc-950 shrink-0" />
-
         {/* Drawer Header */}
-        <div className="p-5 flex justify-between items-center shrink-0 bg-zinc-950/90 backdrop-blur-md z-10 border-b border-zinc-800/40">
+        <div className="header-safe-top p-5 flex justify-between items-center shrink-0 bg-zinc-950/90 backdrop-blur-md z-10 border-b border-zinc-800/40">
           <h2 className="text-white font-extrabold text-base tracking-tight flex items-center gap-2">
             <i className="fa-solid fa-dumbbell text-emerald-500" />
             MyGym Menu

@@ -11,6 +11,11 @@
   }
 }
 
+/* 🔴 NUOVO: Classe pura per la safe-area degli header fissi */
+.header-safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
 }
