@@ -143,6 +143,7 @@ export const initialDefaultState: AppState = {
     'squat': '90',
     'leg-press': '160'
   },
+  setWeights: {}, // 🔴 NUOVO
   weightHistory: {
     'bench-press': [
       {
@@ -299,6 +300,7 @@ export async function loadGymState(): Promise<AppState> {
   const merged: AppState = {
     ...initialDefaultState,
     ...loadedData,
+    setWeights: loadedData.setWeights || {}, // 🔴 NUOVO
     plan: loadedData.plan && loadedData.plan.length > 0 ? loadedData.plan : initialDefaultState.plan,
     bodyMetrics: { ...initialDefaultState.bodyMetrics, ...(loadedData.bodyMetrics || {}) },
     prs: loadedData.prs || [],

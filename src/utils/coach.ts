@@ -284,18 +284,26 @@ export function getExerciseCoachAdvice(
 
     // Standard weights
     if (isWeightType) {
-      const prevWeight = parseFloat(lastSession.weight) || 0;
-      const validRirs = Object.values(lastSession.rirs || {})
-        .filter((r) => r !== '' && !isNaN(Number(r)))
-        .map(Number);
-      const validReps = Object.values(lastSession.reps || {})
-        .filter((r) => r !== '' && !isNaN(Number(r)))
-        .map(Number);
-      const targetReps = parseInt(targetRepsStr) || 0;
+      const validSetKeys = Object.keys(lastSession.reps || {}).filter((k) => lastSession.reps[k] !== '');
 
-      if (validRirs.length > 0 && validReps.length > 0) {
-        const avgRir = validRirs.reduce((a, b) => a + b, 0) / validRirs.length;
-        const hitReps = targetReps === 0 || validReps.every((r) => r >= targetReps);
+      if (validSetKeys.length > 0) {
+        // 🔴 Identificazione del Top Set
+        let maxW = -1;
+        let topIdx = validSetKeys[0];
+        
+        validSetKeys.forEach((idx) => {
+          const w = parseFloat(lastSession.weights?.[idx] ?? lastSession.weight) || 0;
+          if (w > maxW) {
+            maxW = w;
+            topIdx = idx;
+          }
+        });
+
+        const topWeight = maxW;
+        const topReps = parseInt(lastSession.reps[topIdx]) || 0;
+        const topRir = parseFloat(lastSession.rirs[topIdx]);
+        const targetReps = parseInt(targetRepsStr) || 0;
+        const hitReps = targetReps === 0 || topReps >= targetReps;
         
         let upThreshold = 2.0;
         let downThreshold = 0.5;
@@ -308,77 +316,77 @@ export function getExerciseCoachAdvice(
           downThreshold = 0.0;
         }
 
-        // 🔴 NUOVA LOGICA: Corpo Libero Puro (Senza Zavorra)
-        if (metricType === 'bodyweight' && prevWeight === 0) {
-          const avgReps = validReps.reduce((a, b) => a + b, 0) / validReps.length;
-
-          if (avgRir >= upThreshold && hitReps) {
-            if (avgReps >= 12) {
+        // Corpo Libero Puro
+        if (metricType === 'bodyweight' && topWeight === 0) {
+          if (!isNaN(topRir)) {
+            if (topRir >= upThreshold && hitReps) {
+              if (topReps >= 12) {
+                return {
+                  badge: 'increase',
+                  title: 'Pronto per la Zavorra',
+                  message: `Sul tuo Top Set (${topReps} reps) avevi un margine alto (RIR ${topRir.toFixed(1)}). È il momento di aggiungere una zavorra leggera (es. 2.5-5kg) per spingere la forza.`,
+                  fatigueAlert: fatigueAlert || undefined
+                };
+              } else {
+                return {
+                  badge: 'increase',
+                  title: 'Aumenta le Ripetizioni',
+                  message: `Sul tuo Top Set avevi reps in riserva alte (RIR ${topRir.toFixed(1)}). Prova ad aggiungere 1-2 ripetizioni oggi.`,
+                  fatigueAlert: fatigueAlert || undefined
+                };
+              }
+            } else if (topRir <= downThreshold || !hitReps) {
               return {
-                badge: 'increase',
-                title: 'Pronto per la Zavorra',
-                message: `Margine alto e ripetizioni eccellenti (${avgReps.toFixed(0)} reps). È il momento di aggiungere una zavorra leggera (es. 2.5 - 5kg) per progredire in forza.`,
+                badge: 'maintain',
+                title: 'Consolida le Ripetizioni',
+                message: `Sul Top Set eri al limite (RIR ${topRir.toFixed(1)}). Mantieni queste ripetizioni per consolidare la tecnica.`,
                 fatigueAlert: fatigueAlert || undefined
               };
             } else {
               return {
-                badge: 'increase',
-                title: 'Aumenta le Ripetizioni',
-                message: `Scorsa volta reps in riserva alte (RIR ${avgRir.toFixed(1)}). Prova ad aggiungere 1-2 ripetizioni in più in questa sessione.`,
+                badge: 'maintain',
+                title: 'Volume Calibrato',
+                message: `Ripetizioni del Top Set perfette (RIR ${topRir.toFixed(1)}). Continua così.`,
                 fatigueAlert: fatigueAlert || undefined
               };
             }
-          } else if (avgRir <= downThreshold || !hitReps) {
-            const limitText = !hitReps ? 'target ripetizioni non completato' : `cedimento/limite (RIR ${avgRir.toFixed(1)})`;
-            return {
-              badge: 'maintain',
-              title: 'Consolida le Ripetizioni',
-              message: `Scorsa sessione ${limitText}. Mantieni le stesse ripetizioni per consolidare la tecnica e la resistenza.`,
-              fatigueAlert: fatigueAlert || undefined
-            };
-          } else {
-            return {
-              badge: 'maintain',
-              title: 'Volume Calibrato',
-              message: `Ripetizioni attuali perfette (RIR ${avgRir.toFixed(1)}). Consolida l'esecuzione prima di spingere per chiudere più reps.`,
-              fatigueAlert: fatigueAlert || undefined
-            };
           }
         } 
         
-        // 🔵 LOGICA STANDARD (Pesi o Corpo Libero Zavorrato)
+        // Pesi o Corpo Libero Zavorrato
         else {
-          if (avgRir >= upThreshold && hitReps) {
-            const jump = prevWeight < 20 ? 1 : prevWeight < 50 ? 2.5 : 5;
-            const targetW = prevWeight + jump;
-            return {
-              badge: 'increase',
-              title: 'Progressione Consigliata',
-              message: `Target chiuso con RIR medio ${avgRir.toFixed(1)}. Oggi puoi salire a ${targetW}kg (+${jump}kg).`,
-              fatigueAlert: fatigueAlert || undefined
-            };
-          } else if (avgRir <= downThreshold || !hitReps) {
-            const limitText = !hitReps ? 'target ripetizioni non completato' : `cedimento/limite (RIR ${avgRir.toFixed(1)})`;
-            return {
-              badge: 'maintain',
-              title: state.bodyGoal === 'cut' ? 'Recupera il Target' : 'Consolida il Carico',
-              message: `Scorsa sessione ${limitText}. Mantieni ${prevWeight}kg per consolidare il volume.`,
-              fatigueAlert: fatigueAlert || undefined
-            };
-          } else if (state.bodyGoal === 'cut') {
-            return {
-              badge: 'maintain',
-              title: 'Mantenimento in Cut',
-              message: `In cut, mantenere la forza a ${prevWeight}kg è un ottimo risultato.`,
-              fatigueAlert: fatigueAlert || undefined
-            };
-          } else {
-            return {
-              badge: 'maintain',
-              title: 'Carico Calibrato',
-              message: `Carico attuale adeguato. Consolida ${prevWeight}kg prima di salire ulteriormente.`,
-              fatigueAlert: fatigueAlert || undefined
-            };
+          if (!isNaN(topRir)) {
+            if (topRir >= upThreshold && hitReps) {
+              const jump = topWeight < 20 ? 1 : topWeight < 50 ? 2.5 : 5;
+              const targetW = topWeight + jump;
+              return {
+                badge: 'increase',
+                title: 'Progressione Consigliata',
+                message: `Sul tuo Top Set (${topWeight}kg) avevi margine (RIR ${topRir.toFixed(1)}). Oggi prova ${targetW}kg (+${jump}kg) sul primo set.`,
+                fatigueAlert: fatigueAlert || undefined
+              };
+            } else if (topRir <= downThreshold || !hitReps) {
+              return {
+                badge: 'maintain',
+                title: state.bodyGoal === 'cut' ? 'Recupera il Target' : 'Consolida il Carico',
+                message: `Sul tuo Top Set (${topWeight}kg) eri al limite (RIR ${topRir.toFixed(1)}). Mantieni questo carico per consolidarlo.`,
+                fatigueAlert: fatigueAlert || undefined
+              };
+            } else if (state.bodyGoal === 'cut') {
+              return {
+                badge: 'maintain',
+                title: 'Mantenimento in Cut',
+                message: `In cut, mantenere il Top Set a ${topWeight}kg è un ottimo risultato.`,
+                fatigueAlert: fatigueAlert || undefined
+              };
+            } else {
+              return {
+                badge: 'maintain',
+                title: 'Carico Calibrato',
+                message: `Il tuo Top Set a ${topWeight}kg (RIR ${topRir.toFixed(1)}) è ben calibrato. Consolida prima di salire.`,
+                fatigueAlert: fatigueAlert || undefined
+              };
+            }
           }
         }
       }

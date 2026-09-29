@@ -74,6 +74,7 @@ export interface WorkoutTab {
 export interface WeightHistoryEntry {
   date: string;
   weight: string;
+  weights?: Record<string, string>; // 🔴 NUOVO: Pesi per singola serie
   reps: Record<string, string>;
   rirs: Record<string, string>;
   rpes: Record<string, string>;
@@ -171,6 +172,7 @@ export interface AppState {
   activeTab: string;
   isEditMode: boolean;
   weights: Record<string, string>;
+  setWeights: Record<string, string>; // 🔴 NUOVO: Database pesi granulari
   weightHistory: Record<string, WeightHistoryEntry[]>;
   checkedSets: Record<string, boolean>;
   setRir: Record<string, string>;

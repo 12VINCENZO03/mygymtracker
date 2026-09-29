@@ -161,6 +161,32 @@ export default function App() {
     });
   }, []);
 
+  // 🔴 NUOVO: Salvataggio peso per singola serie
+  const handleSaveSetWeight = useCallback((setId: string, val: string | number) => {
+    const rawStr = String(val).replace(',', '.').trim();
+    let cleanVal = '';
+    if (rawStr !== '') {
+      const parsedVal = parseFloat(rawStr);
+      if (!isNaN(parsedVal)) {
+        cleanVal = Math.max(0, parsedVal).toString();
+      }
+    }
+
+    setState((prev) => {
+      if (!prev) return null;
+      const next = {
+        ...prev,
+        setWeights: { ...prev.setWeights, [setId]: cleanVal }
+      };
+      
+      const exId = setId.split('-')[0];
+      updateExerciseHistory(next, exId);
+      calculateVolumeAndLoad(next);
+      saveGymState(next);
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     if (!state) return;
     (window as unknown as { state: AppState }).state = state;
@@ -268,6 +294,7 @@ export default function App() {
     };
 
     cleanRecord(nextState.checkedSets);
+    cleanRecord(nextState.setWeights);
     cleanRecord(nextState.setReps);
     cleanRecord(nextState.setRir);
     cleanRecord(nextState.setDurations);
@@ -334,7 +361,7 @@ export default function App() {
             for (let i = 0; i < ex.sets; i++) {
               if (currState.checkedSets[`${ex.id}-${i}`]) {
                 const reps = Math.max(0, parseInt(currState.setReps[`${ex.id}-${i}`] || ex.reps) || 0);
-                const weight = Math.max(0, parseFloat(currState.weights[ex.id]) || 0);
+                const weight = Math.max(0, parseFloat(currState.setWeights[`${ex.id}-${i}`] ?? currState.weights[ex.id]) || 0);
                 tabVol += reps * weight;
               }
             }
@@ -342,7 +369,7 @@ export default function App() {
             for (let i = 0; i < ex.sets; i++) {
               if (currState.checkedSets[`${ex.id}-${i}`]) {
                 const reps = Math.max(0, parseInt(currState.setReps[`${ex.id}-${i}`] || ex.reps) || 0);
-                const extraWeight = Math.max(0, parseFloat(currState.weights[ex.id]) || 0);
+                const extraWeight = Math.max(0, parseFloat(currState.setWeights[`${ex.id}-${i}`] ?? currState.weights[ex.id]) || 0);
                 const baseWeight = bw > 0 ? bw : 0;
                 tabVol += reps * (extraWeight + baseWeight);
               }
@@ -436,6 +463,7 @@ export default function App() {
     const reps: Record<string, string> = {};
     const rirs: Record<string, string> = {};
     const rpes: Record<string, string> = {};
+    const weights: Record<string, string> = {}; // 🔴 NUOVO
 
     // Invece di girare su tutto il database, verifichiamo solo le possibili serie (max 30)
     for (let i = 0; i < 30; i++) {
@@ -445,14 +473,17 @@ export default function App() {
         if (currState.setReps[key] !== undefined) reps[idx] = currState.setReps[key];
         if (currState.setRir[key] !== undefined) rirs[idx] = currState.setRir[key];
         if (currState.setRpe[key] !== undefined) rpes[idx] = currState.setRpe[key];
+        // 🔴 Eredita il peso globale se quello specifico è assente per retrocompatibilità
+        weights[idx] = currState.setWeights[key] !== undefined ? currState.setWeights[key] : currentWeight;
       }
     }
     const amrapKey = `${targetId}-amrap`;
     if (currState.checkedSets[amrapKey] && currState.setReps[amrapKey] !== undefined) {
       reps['0'] = currState.setReps[amrapKey];
+      weights['0'] = currState.setWeights[amrapKey] !== undefined ? currState.setWeights[amrapKey] : currentWeight;
     }
 
-    const newEntry = { date: sessionDate, weight: currentWeight, reps, rirs, rpes };
+    const newEntry = { date: sessionDate, weight: currentWeight, weights, reps, rirs, rpes };
     const history = currState.weightHistory[targetId];
 
     if (history.length > 0 && history[0].date === sessionDate) {
@@ -546,7 +577,7 @@ export default function App() {
               completedSets.push({
                 index: i + 1,
                 reps: state.setReps[setId] || ex.reps,
-                weight: state.weights[ex.id] || 0,
+                weight: state.setWeights[setId] ?? state.weights[ex.id] ?? 0,
                 duration: state.setReps[setId] || ex.workSec || 60,
                 rir: state.setRir[setId] !== undefined ? state.setRir[setId] : '',
                 rpe: state.setRpe[setId] !== undefined ? state.setRpe[setId] : ''
@@ -1263,6 +1294,7 @@ export default function App() {
                     onOpenEffortModal={(setId, isRpe) => setEffortTarget({ setId, isRpe })}
                     onRunInlineTimer={handleRunInlineTimer}
                     onSaveWeight={(val) => handleSaveWeight(ex.id, val)}
+                    onSaveSetWeight={handleSaveSetWeight}
                     onToggleSet={(sIdx, targetReps, pauseSec) =>
                       handleToggleSet(ex.id, sIdx, targetReps, pauseSec)
                     }

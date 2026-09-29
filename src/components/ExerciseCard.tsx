@@ -14,6 +14,7 @@ interface ExerciseCardProps {
   onDeleteEx: () => void;
   onMoveEx: (dir: number) => void;
   onSaveWeight: (val: string) => void;
+  onSaveSetWeight: (setId: string, val: string) => void;
   onToggleSet: (setIndex: number, defaultReps: string, pauseSec: number) => void;
   // 🔴 BUG FIX: Aggiunto pauseSec al tipo della prop
   onLongPressSet: (setIndex: number, defaultReps: string, pauseSec: number) => void;
@@ -35,6 +36,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
   onDeleteEx,
   onMoveEx,
   onSaveWeight,
+  onSaveSetWeight,
   onToggleSet,
   onLongPressSet,
   onOpenEffortModal,
@@ -252,30 +254,6 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
         </div>
       )}
 
-      {/* Weight Input */}
-      {ex.metricType !== 'cardio' && (
-        <div className="flex items-center bg-zinc-950/80 rounded-2xl p-2 mb-4 border border-zinc-800/60 shadow-inner transition-colors focus-within:border-emerald-500/50">
-          <div className="px-3 text-zinc-500 text-sm">
-            <i className="fa-solid fa-weight-hanging" />
-          </div>
-          <input
-            type="text"
-            inputMode="decimal"
-            disabled={!isWorkoutActive}
-            value={currentWeight}
-            onChange={(e) => onSaveWeight(e.target.value)}
-            placeholder={
-              ex.metricType === 'bodyweight'
-                ? 'Zavorra aggiuntiva (kg)'
-                : ex.metricType === 'time'
-                ? 'Zavorra opzionale (kg)'
-                : 'Registra carico (kg)'
-            }
-            className="bg-transparent text-white w-full py-2 outline-none font-bold text-sm disabled:opacity-50"
-          />
-        </div>
-      )}
-
       {/* Sets Rows */}
       <div className="space-y-2.5">
         {Array.from({ length: ex.sets }).map((_, setIdx) => {
@@ -284,6 +262,22 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
           const hist = getHistoricalSetData(setIdx);
           const defaultTargetReps = hist?.reps !== undefined ? hist.reps : (ex.reps || '10');
           const actualReps = state.setReps[setId] ?? defaultTargetReps;
+
+          // 🔴 NUOVO: Logica di ereditarietà del peso
+          let displayWeight = state.setWeights?.[setId];
+          if (displayWeight === undefined) {
+            for (let j = setIdx - 1; j >= 0; j--) {
+              const prevId = `${ex.id}-${j}`;
+              if (state.setWeights?.[prevId] !== undefined) {
+                displayWeight = state.setWeights[prevId];
+                break;
+              }
+            }
+            if (displayWeight === undefined) {
+              displayWeight = state.weights[ex.id] || '';
+            }
+          }
+
           // 🔴 BUG FIX: Logica Dinamica per RPE vs RIR
           const isCardio = ex.metricType === 'cardio';
           const currentEffort = isCardio ? state.setRpe[setId] : state.setRir[setId];
@@ -299,6 +293,19 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
               <span className="text-[10px] font-black text-zinc-500 w-12 uppercase tracking-wider bg-zinc-950/80 border border-zinc-800/80 px-2 py-3.5 rounded-2xl text-center shadow-sm">
                 S{setIdx + 1}
               </span>
+
+              {/* 🔴 NUOVO: Input Peso per singola serie */}
+              {ex.metricType !== 'cardio' && (
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  disabled={!isWorkoutActive}
+                  value={displayWeight}
+                  onChange={(e) => onSaveSetWeight(setId, e.target.value)}
+                  placeholder={ex.metricType === 'bodyweight' ? '+kg' : 'kg'}
+                  className="bg-zinc-950/80 text-white w-16 py-3.5 rounded-2xl border border-zinc-800/80 text-center font-bold text-sm shadow-inner outline-none focus:border-emerald-500/50 disabled:opacity-50 transition-colors"
+                />
+              )}
               
               {/* Action Button */}
               {isTimeType ? (
