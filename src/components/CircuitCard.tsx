@@ -21,7 +21,7 @@ interface CircuitCardProps {
   onMoveSubEx: (subId: string, dir: number) => void;
   onSaveWeight: (subId: string, val: string) => void;
   onToggleSubSet: (subId: string, roundIndex: number, defaultReps: string, pauseSec: number) => void;
-  onLongPressSubSet: (subId: string, roundIndex: number, defaultReps: string) => void;
+  onLongPressSubSet: (subId: string, roundIndex: number, defaultReps: string, pauseSec: number) => void;
   onOpenEffortModal: (setId: string, isRpe: boolean) => void;
   onOpenVideo: (url: string) => void;
   onAddAmrapRound: () => void;
@@ -332,11 +332,11 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
   }
 
   // Pointer down/up handler for press / long press
-  const handlePointerDown = (subId: string, roundIdx: number, defaultReps: string) => {
+  const handlePointerDown = (subId: string, roundIdx: number, defaultReps: string, pauseSec: number) => {
     isLongPressRef.current = false;
     pressTimerRef.current = setTimeout(() => {
       isLongPressRef.current = true;
-      onLongPressSubSet(subId, roundIdx, defaultReps);
+      onLongPressSubSet(subId, roundIdx, defaultReps, pauseSec);
     }, 450);
   };
 
@@ -473,7 +473,8 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                   </span>
                   <span className="font-extrabold text-sm text-white">{sub.name}</span>
                 </div>
-                {Boolean(sub.link && sub.link.trim()) && (
+                {/* 🔴 BUG FIX: Icona video solo se c'è un link reale */}
+                {sub.link && sub.link.trim() !== '' && !isEditMode && (
                   <button
                     type="button"
                     onClick={() => onOpenVideo(sub.link!)}
@@ -546,7 +547,13 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                     const hist = state.weightHistory && state.weightHistory[sub.id]?.[0];
                     const defaultTargetReps = hist?.reps?.[rIdx] || (sub.reps || '10');
                     const actualReps = state.setReps[setId] ?? defaultTargetReps;
-                    const currentRir = state.setRir[setId];
+                    // 🔴 BUG FIX: Gestione RPE per il Cardio nei Circuiti
+                    const isCardio = sub.metricType === 'cardio';
+                    const currentEffort = isCardio ? state.setRpe[setId] : state.setRir[setId];
+                    const histEffort = isCardio
+                      ? (hist?.rpes?.[rIdx] ?? (hist as any)?.rpe?.[rIdx])
+                      : (hist?.rirs?.[rIdx] ?? (hist as any)?.rir?.[rIdx]);
+                    const displayEffort = currentEffort !== undefined && currentEffort !== '' ? currentEffort : histEffort;
                     
                     let emomClass = '';
                     if (isEmom) {
@@ -567,7 +574,8 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                         <button
                           type="button"
                           disabled={!isWorkoutActive}
-                          onPointerDown={() => handlePointerDown(sub.id, rIdx, defaultTargetReps)}
+                          // 🔴 BUG FIX: passata la pausa!
+                          onPointerDown={() => handlePointerDown(sub.id, rIdx, defaultTargetReps, sub.pause || 0)}
                           onPointerUp={() => handlePointerUp(sub.id, rIdx, defaultTargetReps, sub.pause || 0)}
                           onPointerLeave={handlePointerCancel}
                           className={`w-28 py-3.5 rounded-2xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
@@ -586,21 +594,24 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                             `${actualReps} reps`
                           )}
                         </button>
+                        {/* 🔴 BUG FIX: Mostra RPE o RIR */}
                         <button
                           type="button"
                           disabled={!isWorkoutActive}
-                          onClick={() => onOpenEffortModal(setId, false)}
+                          onClick={() => onOpenEffortModal(setId, isCardio)}
                           className={`border text-[10px] font-extrabold flex-1 py-3.5 rounded-2xl outline-none uppercase tracking-wider shadow-sm transition-all active:scale-[0.98] ${
-                            currentRir !== undefined && currentRir !== ''
+                            currentEffort !== undefined && currentEffort !== ''
                               ? 'text-zinc-100 border-zinc-500 bg-zinc-700'
+                              : displayEffort !== undefined && displayEffort !== ''
+                              ? 'text-emerald-400 border-dashed border-emerald-700/60 bg-emerald-950/20'
                               : 'text-zinc-400 border-zinc-700/60 bg-zinc-900/50 hover:bg-zinc-800/80'
                           }`}
                         >
-                          {currentRir !== undefined && currentRir !== ''
-                            ? currentRir === '-1'
+                          {displayEffort !== undefined && displayEffort !== ''
+                            ? displayEffort === '-1'
                               ? 'CED'
-                              : `RIR ${currentRir}`
-                            : 'RIR'}
+                              : `${isCardio ? 'RPE' : 'RIR'} ${displayEffort}`
+                            : isCardio ? 'RPE' : 'RIR'}
                         </button>
                       </div>
                     );

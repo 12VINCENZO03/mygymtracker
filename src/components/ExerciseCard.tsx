@@ -15,7 +15,8 @@ interface ExerciseCardProps {
   onMoveEx: (dir: number) => void;
   onSaveWeight: (val: string) => void;
   onToggleSet: (setIndex: number, defaultReps: string, pauseSec: number) => void;
-  onLongPressSet: (setIndex: number, defaultReps: string) => void;
+  // 🔴 BUG FIX: Aggiunto pauseSec al tipo della prop
+  onLongPressSet: (setIndex: number, defaultReps: string, pauseSec: number) => void;
   onOpenEffortModal: (setId: string, isRpe: boolean) => void;
   onOpenVideo: (url: string) => void;
   onRunInlineTimer: (setId: string, durationSec: number, pauseSec: number) => void;
@@ -162,7 +163,8 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
     isLongPressRef.current = false;
     pressTimerRef.current = setTimeout(() => {
       isLongPressRef.current = true;
-      onLongPressSet(setIndex, defaultReps);
+      // 🔴 BUG FIX: Passa la pausa al long press
+      onLongPressSet(setIndex, defaultReps, ex.pause || 0);
     }, 450);
   };
 
@@ -197,7 +199,8 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
           <span className="text-emerald-500 font-black opacity-90">{index}.</span>
           {ex.name}
         </h3>
-        {Boolean(ex.link && ex.link.trim()) && (
+        {/* 🔴 BUG FIX: Icona video solo se il link esiste davvero e non è vuoto */}
+        {ex.link && ex.link.trim() !== '' && !isEditMode && (
           <button
             type="button"
             onClick={() => onOpenVideo(ex.link!)}
@@ -281,9 +284,11 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
           const hist = getHistoricalSetData(setIdx);
           const defaultTargetReps = hist?.reps !== undefined ? hist.reps : (ex.reps || '10');
           const actualReps = state.setReps[setId] ?? defaultTargetReps;
-          const currentRir = state.setRir[setId];
-          const histRir = hist?.rir;
-          const displayRir = currentRir !== undefined && currentRir !== '' ? currentRir : histRir;
+          // 🔴 BUG FIX: Logica Dinamica per RPE vs RIR
+          const isCardio = ex.metricType === 'cardio';
+          const currentEffort = isCardio ? state.setRpe[setId] : state.setRir[setId];
+          const histEffort = isCardio ? hist?.rpe : hist?.rir;
+          const displayEffort = currentEffort !== undefined && currentEffort !== '' ? currentEffort : histEffort;
 
           const isTimeType = ex.metricType === 'time';
           const timerRemaining = activeInlineTimerSec[setId];
@@ -345,24 +350,24 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                 </button>
               )}
 
-              {/* RIR / RPE selector */}
+              {/* 🔴 BUG FIX: RIR / RPE selector dinamico */}
               <button
                 type="button"
                 disabled={!isWorkoutActive}
-                onClick={() => onOpenEffortModal(setId, ex.metricType === 'cardio')}
+                onClick={() => onOpenEffortModal(setId, isCardio)}
                 className={`border text-[10px] font-extrabold flex-1 py-3.5 rounded-2xl outline-none uppercase tracking-wider shadow-sm transition-all active:scale-[0.98] ${
-                  currentRir !== undefined && currentRir !== ''
+                  currentEffort !== undefined && currentEffort !== ''
                     ? 'text-zinc-100 border-zinc-500 bg-zinc-700'
-                    : displayRir !== undefined && displayRir !== ''
+                    : displayEffort !== undefined && displayEffort !== ''
                     ? 'text-emerald-400 border-dashed border-emerald-700/60 bg-emerald-950/20'
                     : 'text-zinc-400 border-zinc-700/60 bg-zinc-900/50 hover:bg-zinc-800/80'
                 }`}
               >
-                {displayRir !== undefined && displayRir !== ''
-                  ? displayRir === '-1'
+                {displayEffort !== undefined && displayEffort !== ''
+                  ? displayEffort === '-1'
                     ? 'CED'
-                    : `RIR ${displayRir}`
-                  : 'RIR'}
+                    : `${isCardio ? 'RPE' : 'RIR'} ${displayEffort}`
+                  : isCardio ? 'RPE' : 'RIR'}
               </button>
             </div>
           );

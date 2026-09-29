@@ -466,6 +466,7 @@ export default function App() {
     initAudio();
     const todayStr = getTodayStr();
     const newState = { ...state };
+
     if (newState.lastSessionDate[tabId] === todayStr) {
       const conf = confirm(
         'Hai già una sessione registrata oggi per questa scheda. Vuoi azzerare i set per iniziarne una nuova?'
@@ -493,8 +494,12 @@ export default function App() {
             }
           }
         });
+      } else {
+        // 🔴 BUG FIX: Se preme annulla, blocchiamo l'avvio della sessione
+        return;
       }
     }
+
     newState.lastSessionDate[tabId] = todayStr;
     newState.activeWorkouts[tabId] = { active: true, startTime: Date.now() };
     await requestWakeLock();
@@ -736,13 +741,21 @@ export default function App() {
     setState(newState);
   };
 
-  const handleLongPressSet = (exId: string, setIndex: number, defaultReps: string) => {
+  // 🔴 BUG FIX: Aggiunti pauseSec e circuitId al Long Press
+  const handleLongPressSet = (
+    exId: string,
+    setIndex: number,
+    defaultReps: string,
+    pauseSec: number,
+    circuitId?: string
+  ) => {
     if (!state) return;
     const setId = `${exId}-${setIndex}`;
     const currentVal = state.setReps[setId] ?? defaultReps;
     const input = prompt('Quante ripetizioni hai eseguito davvero?', currentVal);
+
     if (input !== null && input.trim() !== '') {
-      const parsed = Math.max(0, parseInt(input)); // 🔴 Sanitizzazione rep personali
+      const parsed = Math.max(0, parseInt(input));
       if (!isNaN(parsed)) {
         const newState = { ...state };
         newState.setReps[setId] = parsed.toString();
@@ -750,6 +763,16 @@ export default function App() {
         updateExerciseHistory(newState, exId);
         calculateVolumeAndLoad(newState);
         setState(newState);
+
+        // 🔴 BUG FIX: Avvia il timer di recupero come con il tap rapido
+        if (pauseSec > 0) {
+          startRestTimer(pauseSec, () => {
+            if (circuitId) {
+              const circuitEl = document.getElementById(`circuit-${circuitId}`);
+              circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          });
+        }
       }
     }
   };
@@ -1165,7 +1188,9 @@ export default function App() {
                     onToggleSet={(sIdx, targetReps, pauseSec) =>
                       handleToggleSet(ex.id, sIdx, targetReps, pauseSec)
                     }
-                    onLongPressSet={(sIdx, targetReps) => handleLongPressSet(ex.id, sIdx, targetReps)}
+                    onLongPressSet={(sIdx, targetReps) =>
+                      handleLongPressSet(ex.id, sIdx, targetReps, ex.pause || 0)
+                    }
                     onUpdateEx={(field, val) => {
                       setState((prev) => {
                         if (!prev) return null;
@@ -1272,9 +1297,9 @@ export default function App() {
                     onToggleSubSet={(subId, roundIdx, targetReps, pauseSec) =>
                       handleToggleSet(subId, roundIdx, targetReps, pauseSec, true, ex.id)
                     }
-                    onLongPressSubSet={(subId, roundIdx, targetReps) =>
-                      handleLongPressSet(subId, roundIdx, targetReps)
-                    }
+                    onLongPressSubSet={(subId, roundIdx, targetReps, pauseSec) => {
+                      handleLongPressSet(subId, roundIdx, targetReps, pauseSec, ex.id);
+                    }}
                     onUpdateCircuit={(field, val) => {
                       setState((prev) => {
                         if (!prev) return null;
