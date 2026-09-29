@@ -197,7 +197,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
           <span className="text-emerald-500 font-black opacity-90">{index}.</span>
           {ex.name}
         </h3>
-        {ex.link && (
+        {Boolean(ex.link && ex.link.trim()) && (
           <button
             type="button"
             onClick={() => onOpenVideo(ex.link!)}

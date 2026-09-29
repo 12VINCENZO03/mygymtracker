@@ -473,7 +473,7 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                   </span>
                   <span className="font-extrabold text-sm text-white">{sub.name}</span>
                 </div>
-                {sub.link && (
+                {Boolean(sub.link && sub.link.trim()) && (
                   <button
                     type="button"
                     onClick={() => onOpenVideo(sub.link!)}
