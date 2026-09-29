@@ -1,0 +1,6 @@
+{
+  "name": "MyGym Tracker",
+  "description": "Tracciatore di allenamento completo con gestione schede, progressioni carichi e RIR, timer intelligenti, calcolo BIA e storico progressi.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
