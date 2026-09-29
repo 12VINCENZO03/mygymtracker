@@ -1,92 +1,80 @@
-let audioCtx: AudioContext | null = null;
+let timerSound: HTMLAudioElement | null = null;
+let beepSound: HTMLAudioElement | null = null;
+let audioUnlocked = false;
 
+// Inizializza gli elementi audio puntando alla cartella public/
 export function initAudio() {
-  if (!audioCtx) {
-    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    if (AudioContextClass) {
-      audioCtx = new AudioContextClass();
-      try {
-        const buf = audioCtx.createBuffer(1, 1, 22050);
-        const src = audioCtx.createBufferSource();
-        src.buffer = buf;
-        src.connect(audioCtx.destination);
-        src.start(0);
-      } catch {
-        // ignore
-      }
-    }
+  if (typeof window === 'undefined') return;
+  
+  if (!timerSound) {
+    // Se il tuo file è .m4a, cambia l'estensione qui sotto!
+    timerSound = new Audio('/timer-end.mp3');
+    timerSound.load();
   }
-  if (audioCtx && audioCtx.state === 'suspended') {
-    audioCtx.resume().catch(() => {});
+  
+  if (!beepSound) {
+    beepSound = new Audio('/beep.mp3');
+    beepSound.load();
   }
 }
 
-// Attach listener once
+// Meccanismo di sblocco per iOS: al primo tocco dell'utente
 if (typeof window !== 'undefined') {
-  const handler = () => {
+  const unlockAudio = () => {
     initAudio();
+    if (!audioUnlocked && timerSound && beepSound) {
+      // Trucco iOS: riproduciamo e mettiamo in pausa istantaneamente
+      // Questo dice a Safari: "L'utente ha autorizzato questo suono"
+      timerSound.play().then(() => {
+        timerSound!.pause();
+        timerSound!.currentTime = 0;
+      }).catch(() => {});
+      
+      beepSound.play().then(() => {
+        beepSound!.pause();
+        beepSound!.currentTime = 0;
+      }).catch(() => {});
+      
+      audioUnlocked = true;
+      
+      // Rimuoviamo gli "ascoltatori" perché lo sblocco serve solo una volta
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
+    }
   };
-  window.addEventListener('click', handler, { once: false });
-  window.addEventListener('touchstart', handler, { once: false });
+  
+  window.addEventListener('click', unlockAudio, { once: false });
+  window.addEventListener('touchstart', unlockAudio, { once: false });
 }
 
+// Il suono del fischietto di fine recupero
 export async function playTrumpet() {
+  // Manteniamo la vibrazione per Android
   if (typeof navigator !== 'undefined' && navigator.vibrate) {
-    try {
-      navigator.vibrate([500, 200, 500]);
-    } catch {
-      // ignore
-    }
+    try { navigator.vibrate([500, 200, 500]); } catch {}
   }
-
+  
   initAudio();
-  if (!audioCtx) return;
-  if (audioCtx.state === 'suspended') {
-    try {
-      await audioCtx.resume();
-    } catch {
-      // ignore
-    }
+  if (!timerSound) return;
+  
+  try {
+    timerSound.currentTime = 0;
+    await timerSound.play();
+  } catch (e) {
+    // Fallisce silenziosamente (es. file mancante o iOS che blocca ancora)
+    console.warn("Impossibile riprodurre l'audio di fine timer", e);
   }
-  if (audioCtx.state !== 'running') return;
-
-  const now = audioCtx.currentTime;
-  const playNote = (freq: number, start: number, duration: number) => {
-    if (!audioCtx) return;
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.value = freq;
-
-    gain.gain.setValueAtTime(0, now + start);
-    gain.gain.linearRampToValueAtTime(0.8, now + start + 0.05);
-    gain.gain.setValueAtTime(0.8, now + start + duration - 0.05);
-    gain.gain.linearRampToValueAtTime(0, now + start + duration);
-
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    osc.start(now + start);
-    osc.stop(now + start + duration);
-  };
-
-  playNote(392.00, 0, 0.2);     // G4
-  playNote(523.25, 0.2, 0.2);   // C5
-  playNote(659.25, 0.4, 0.2);   // E5
-  playNote(783.99, 0.6, 0.6);   // G5
 }
 
-export function playShortBeep() {
+// Il suono di spunta della serie
+export async function playShortBeep() {
   initAudio();
-  if (!audioCtx || audioCtx.state !== 'running') return;
-  const now = audioCtx.currentTime;
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  osc.type = 'sine';
-  osc.frequency.value = 880;
-  gain.gain.setValueAtTime(0.3, now);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-  osc.start(now);
-  osc.stop(now + 0.15);
+  if (!beepSound) return;
+  
+  try {
+    beepSound.currentTime = 0;
+    await beepSound.play();
+  } catch (e) {
+    // Fail silently se manca beep.mp3
+  }
 }
