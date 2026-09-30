@@ -2,34 +2,42 @@
 
 export type ExerciseTypeV2 = 'weight' | 'bodyweight' | 'time' | 'cardio' | 'rest';
 
-// 1. IL REGISTRO (Gli esercizi non vengono mai cancellati o duplicati)
+export type PersistenceStatus = 'CLEAN' | 'DIRTY' | 'SAVING' | 'SAVED' | 'ERROR';
+
+// 1. IL REGISTRO PERMANENTE (Identità univoca, mai duplicata)
 export interface ExerciseDefV2 {
-    id: string; // IMMUTABILE (es. generato una volta sola)
-    name: string; // MUTABILE (se domani lo rinomini "Back Squat", l'ID non cambia)
+    id: string; // IMMUTABILE (es. "ex_123456")
+    name: string; // MUTABILE (l'etichetta corrente, rinominabile senza spezzare la storia)
     type: ExerciseTypeV2;
     cardioMachine?: string; // es. 'treadmill', 'rower', 'bike'
+    createdAt?: number;
+    updatedAt?: number;
 }
 
-// 2. IL SINGOLO SET (Una struttura universale che non perde mai dati)
+// 2. IL SINGOLO SET CANONICO
 export interface WorkoutSetV2 {
     id: string; // ID univoco per il set
     index: number;
     reps?: number;
-    weight?: number; // Usato anche come zavorra per il corpo libero
+    weight?: number; // Carico o zavorra per il corpo libero
     durationSec?: number;
     distance?: number;
     speed?: number;
+    incline?: number;
     resistance?: number;
+    cadence?: number;
+    strokeRate?: number;
+    pace?: string;
     rir?: number;
     isCed?: boolean; // Booleano semantico per il "CED" (cedimento)
     rpe?: number;
     customFields?: Record<string, string | number>;
 }
 
-// 3. SNAPSHOT DELL'ESERCIZIO (Copia congelata di quello che hai fatto oggi)
+// 3. SNAPSHOT DELL'ESERCIZIO (Copia congelata di quanto svolto nella sessione)
 export interface ExerciseSnapshotV2 {
-    exerciseId: string; // Riferimento al Registro
-    nameSnapshot: string; // Il nome che l'esercizio aveva OGGI
+    exerciseId: string; // Riferimento permanente al Registro
+    nameSnapshot: string; // Nome congelato al momento della sessione
     type: ExerciseTypeV2;
     sets: WorkoutSetV2[];
 }
@@ -48,23 +56,26 @@ export interface CircuitSnapshotV2 {
 
 export type BlockSnapshotV2 = ExerciseSnapshotV2 | CircuitSnapshotV2;
 
-// 4. LA SESSIONE STORICA (Totalmente indipendente dalla scheda)
+// 4. LA SESSIONE STORICA IMMUTABILE (Totalmente indipendente dalla scheda)
 export interface WorkoutSessionV2 {
     id: string;
-    planId?: string; // 🔴 FASE E: ID della scheda eseguita
-    planVersion?: number; // 🔴 FASE E: Versione esatta in quel momento
+    planId?: string; // ID della scheda eseguita
+    planVersion?: number; // Versione esatta in quel momento
     date: string; // YYYY-MM-DD
-    startedAt: number; // Timestamp
-    completedAt: number; // Timestamp
+    startedAt: number; // Timestamp inizio
+    completedAt: number; // Timestamp fine
     durationStr: string;
     tabNameSnapshot: string;
-    bodyWeightAtSession: number; // 🔴 REGOLA AUREA: Il peso corporeo in questa precisa data
+    tabSubtitleSnapshot?: string;
+    bodyWeightAtSession: number; // Peso corporeo congelato in questa precisa data
     blocks: BlockSnapshotV2[];
 }
 
-// 5. IL NUOVO DATABASE COMPLETO
+// 5. IL DATABASE CANONICO V2
 export interface AppDatabaseV2 {
     schemaVersion: 2;
+    revision: number; // Incrementato ad ogni mutazione per concorrenza multi-tab
+    lastSavedAt: number;
     registry: Record<string, ExerciseDefV2>;
     sessions: WorkoutSessionV2[];
 }

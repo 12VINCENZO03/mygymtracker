@@ -1,6 +1,7 @@
 import React from 'react';
 import { AppState, WorkoutTab } from '../types/gym';
-import { calculateAllVolumeStats, computeCurrentStreak, getGoalCrossInsight } from '../utils/coach';
+import { calculateAllVolumeStatsV2, getGoalCrossInsight } from '../utils/coach';
+import { computeStreakFromSessions, getTabCompletionStats } from '../utils/domain';
 import { getTodayStr } from '../utils/storage';
 
 interface HomeDashboardProps {
@@ -14,7 +15,8 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   onSelectTab,
   onAddFirstTab
 }) => {
-  const stats = calculateAllVolumeStats(state.volumeLog || {});
+  // 🔴 MOTORE V2: Statistiche incrollabili
+  const stats = calculateAllVolumeStatsV2(state.sessionsV2 || []);
   const loadOggi = state.sessionLoadLog ? state.sessionLoadLog[getTodayStr()] || 0 : 0;
   const nonHomeTabs = state.plan.filter((t) => !t.isHome);
 
@@ -49,9 +51,8 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
     let maxTime = 0;
 
     nonHomeTabs.forEach(tab => {
-      const time = state.scheduleHistoryDates?.[tab.id] 
-        ? new Date(state.scheduleHistoryDates[tab.id]).getTime() 
-        : 0;
+      const completion = getTabCompletionStats(state.sessionsV2, tab.id);
+      const time = completion.lastCompletedAt || 0;
       if (time > maxTime) {
         maxTime = time;
         mostRecentTabId = tab.id;
@@ -66,7 +67,9 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
     }
   }
 
-  const streak = computeCurrentStreak(state.streakDates || []);
+  // 🔴 CANONICAL V2: Streak calcolato dallo storico immutabile (filtrato su preferite se presenti)
+  const favoriteTabIds = Object.keys(state.favoriteTabs || {}).filter(k => state.favoriteTabs[k]);
+  const streak = computeStreakFromSessions(state.sessionsV2, favoriteTabIds.length > 0 ? favoriteTabIds : undefined);
   const goalInsight = getGoalCrossInsight(state, stats);
   const lastBia = state.bodyMetricsHistory && state.bodyMetricsHistory[0] ? state.bodyMetricsHistory[0] : null;
   const lastBiaText = lastBia ? `${lastBia.date}` : 'Nessuna';
@@ -128,7 +131,8 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
         <div className="flex overflow-x-auto gap-4 pb-4 hide-scrollbar snap-x px-1">
           {nonHomeTabs.map((tab) => {
             const isRecommended = tab.id === recommendedTabId;
-            const lastDone = state.scheduleHistoryDates?.[tab.id] ? new Date(state.scheduleHistoryDates[tab.id]) : null;
+            const completion = getTabCompletionStats(state.sessionsV2, tab.id);
+            const lastDone = completion.lastCompletedAt ? new Date(completion.lastCompletedAt) : null;
             
             let timeText = 'Mai eseguita';
             if (lastDone) {

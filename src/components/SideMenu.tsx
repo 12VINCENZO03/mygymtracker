@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AppState, BodyGoal } from '../types/gym';
-import { calculateAllVolumeStats } from '../utils/coach';
+import { calculateAllVolumeStatsV2 } from '../utils/coach';
+import { getWorkoutDatesSet } from '../utils/domain';
 import { getTodayStr } from '../utils/storage';
 
 interface SideMenuProps {
@@ -39,7 +40,9 @@ export const SideMenu: React.FC<SideMenuProps> = ({
 
   if (!isOpen) return null;
 
-  const stats = calculateAllVolumeStats(state.volumeLog || {});
+  // 🔴 CANONICAL V2: Statistiche derivate direttamente dallo storico immutabile
+  const stats = calculateAllVolumeStatsV2(state.sessionsV2 || []);
+  const workoutDatesSet = getWorkoutDatesSet(state.sessionsV2);
   const maxVol = Math.max(stats.month, stats.lastMonth, 1);
   const hCur = Math.min(100, Math.round((stats.month / maxVol) * 100));
   const hPrev = Math.min(100, Math.round((stats.lastMonth / maxVol) * 100));
@@ -392,7 +395,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                     {Array.from({ length: daysInMonth }).map((_, i) => {
                       const dayNum = i + 1;
                       const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
-                      const isWorkout = state.allWorkoutDates?.includes(dateStr);
+                      const isWorkout = workoutDatesSet.has(dateStr);
                       const isToday = dateStr === todayStr;
 
                       return (
@@ -425,7 +428,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                 >
                   <div className="flex items-center gap-2">
                     <i className="fa-solid fa-clock-rotate-left text-zinc-400" />
-                    <span>Cronologia Allenamenti ({state.workoutSessionsHistory.length})</span>
+                    <span>Cronologia Allenamenti ({state.sessionsV2?.length || 0})</span>
                   </div>
                   <i className="fa-solid fa-chevron-right text-xs text-zinc-600" />
                 </button>

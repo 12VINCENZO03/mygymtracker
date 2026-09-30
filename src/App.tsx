@@ -3,22 +3,32 @@ import {
   AppState,
   BodyGoal,
   SingleExercise,
-  SupersetExercise,
-  WorkoutSessionSnapshot
+  SupersetExercise
 } from './types/gym';
+import {
+  WorkoutSessionV2,
+  BlockSnapshotV2,
+  CircuitRoundV2,
+  ExerciseSnapshotV2,
+  WorkoutSetV2,
+  ExerciseTypeV2
+} from './types/v2';
 import {
   loadGymState,
   saveGymState,
+  createSafetyBackup,
   getTodayStr,
   generateId,
   exportBackupString,
   importBackupString,
-  TIME_VOLUME_DIVISOR
+  TIME_VOLUME_DIVISOR,
+  onExternalTabUpdate
 } from './utils/storage';
 import { playTrumpet, playShortBeep, initAudio } from './utils/audio';
 import { extractBiaFromPdf, ExtractedBiaData } from './utils/pdfExtractor';
-import { computeCurrentStreak } from './utils/coach';
+import { computeStreakFromSessions } from './utils/domain';
 import { safeSetInterval, safeClearInterval } from './utils/workerTimer';
+import { validateSetData } from './utils/validation';
 
 import { Header } from './components/Header';
 import { SideMenu } from './components/SideMenu';
@@ -66,8 +76,8 @@ export default function App() {
 
   // Summary post-workout modal
   const [summaryData, setSummaryData] = useState<{
-    newSnapshot: WorkoutSessionSnapshot;
-    prevSnapshot: WorkoutSessionSnapshot | null;
+    newSnapshot: WorkoutSessionV2;
+    prevSnapshot: WorkoutSessionV2 | null;
   } | null>(null);
 
   // Toast
@@ -133,6 +143,24 @@ export default function App() {
     });
   }, []);
 
+  // 🔴 CONCORRENZA MULTI-TAB: Ascolto aggiornamenti salvati da altri tab
+  useEffect(() => {
+    const unsubscribe = onExternalTabUpdate(({ revision }) => {
+      loadGymState().then((loaded) => {
+        if (loaded && loaded.revision > (stateRef.current?.revision || 0)) {
+          const isWorkingOut = stateRef.current && Object.values(stateRef.current.activeWorkouts || {}).some(w => w.active);
+          if (isWorkingOut) {
+            showToast('Aggiornamento rilevato da un’altra scheda (preservato il workout attivo in corso).', true);
+            return;
+          }
+          setState(loaded);
+          showToast('Dati sincronizzati da un’altra scheda.');
+        }
+      });
+    });
+    return () => unsubscribe();
+  }, []);
+
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   useEffect(() => {
     if (!state) return;
@@ -153,40 +181,41 @@ export default function App() {
     });
   }, []);
 
-  // FASE 2: Sanitizzazione Input Numerici (Peso Globale)
   const handleSaveWeight = useCallback((id: string, val: string | number) => {
-    const cleanVal = sanitizeNumericInput(val); // 🔴 Usiamo lo scudo protettivo
-    
+    const cleanVal = sanitizeNumericInput(val);
+
     setState((prev) => {
       if (!prev) return null;
-      const next = {
+      // 🔴 FASE I: Immutabilità garantita tramite copia profonda pulita
+      return {
         ...prev,
-        weights: { ...prev.weights, [id]: cleanVal }
+        weights: {
+          ...prev.weights,
+          [id]: cleanVal
+        }
       };
-      updateExerciseHistory(next, id);
-      calculateVolumeAndLoad(next);
-      return next;
     });
   }, []);
 
-  // NUOVO: Salvataggio peso per singola serie e Fix Bug Trattino
   const handleSaveSetWeight = useCallback((setId: string, val: string | number) => {
-    const cleanVal = sanitizeNumericInput(val); // 🔴 Usiamo lo scudo protettivo
-    
+    const cleanVal = sanitizeNumericInput(val);
+
     setState((prev) => {
       if (!prev) return null;
-      const next = {
-        ...prev,
-        setWeights: { ...prev.setWeights, [setId]: cleanVal }
-      };
-      
-      // 🔴 BUG FIX TRATTINO: Troviamo l'ULTIMO trattino (es: "bench-press-0" -> "bench-press")
       const lastDashIndex = setId.lastIndexOf('-');
       const exId = lastDashIndex > 0 ? setId.substring(0, lastDashIndex) : setId;
-      
-      updateExerciseHistory(next, exId);
-      calculateVolumeAndLoad(next);
-      return next;
+
+      const nextState = {
+        ...prev,
+        setWeights: {
+          ...prev.setWeights,
+          [setId]: cleanVal
+        }
+      };
+
+      updateExerciseHistory(nextState, exId);
+      calculateVolumeAndLoad(nextState);
+      return nextState;
     });
   }, []);
 
@@ -207,20 +236,6 @@ export default function App() {
     });
   }, []);
 
-  useEffect(() => {
-    if (!state) return;
-    (window as unknown as { state: AppState }).state = state;
-    (window as unknown as { saveData: () => Promise<void> }).saveData = () => saveGymState(state);
-    (window as unknown as { switchTab: (id: string) => void }).switchTab = (id: string) => {
-      handleSelectTab(id);
-    };
-    (window as unknown as { saveWeight: (id: string, val: string | number) => void }).saveWeight = (
-      id: string,
-      val: string | number
-    ) => {
-      handleSaveWeight(id, val);
-    };
-  }, [state, handleSelectTab, handleSaveWeight]);
 
   // 🔴 1. Mantiene stateRef sempre sincronizzato in modo silenzioso
   useEffect(() => {
@@ -318,8 +333,8 @@ export default function App() {
   // 🔴 FASE 1: Garbage Collector (Dati Orfani)
   const cleanupOrphanDataForId = (nextState: AppState, targetId: string) => {
     delete nextState.weights[targetId];
-    delete nextState.weightHistory[targetId];
-    delete nextState.exerciseNameRegistry[targetId];
+    if (nextState.weightHistory) delete nextState.weightHistory[targetId];
+    if (nextState.exerciseNameRegistry) delete nextState.exerciseNameRegistry[targetId];
 
     const cleanRecord = (record: Record<string, unknown>) => {
       Object.keys(record).forEach((key) => {
@@ -375,182 +390,9 @@ export default function App() {
     }
   };
 
-  // 🔴 FASE 1: Calcolo Volume (Bug Mezzanotte)
-  const calculateVolumeAndLoad = (currState: AppState) => {
-    const bw = parseFloat(String(currState.bodyMetrics?.weight)) || 0;
-    const sessionTotalsByDate: Record<string, { vol: number; load: number }> = {};
-
-    currState.plan.forEach((tab) => {
-      if (tab.isHome) return;
-
-      const sessionDate = currState.lastSessionDate[tab.id] || getTodayStr();
-      if (!sessionTotalsByDate[sessionDate]) {
-        sessionTotalsByDate[sessionDate] = { vol: 0, load: 0 };
-      }
-
-      let tabVol = 0;
-      let tabLoad = 0;
-
-      tab.exercises.forEach((ex) => {
-        if (ex.type === 'single') {
-          if (ex.metricType === 'weight' || !ex.metricType) {
-            for (let i = 0; i < ex.sets; i++) {
-              if (currState.checkedSets[`${ex.id}-${i}`]) {
-                const reps = Math.max(0, parseInt(currState.setReps[`${ex.id}-${i}`] || ex.reps) || 0);
-                const weight = Math.max(0, parseFloat(currState.setWeights[`${ex.id}-${i}`] ?? currState.weights[ex.id]) || 0);
-                tabVol += reps * weight;
-              }
-            }
-          } else if (ex.metricType === 'bodyweight') {
-            for (let i = 0; i < ex.sets; i++) {
-              if (currState.checkedSets[`${ex.id}-${i}`]) {
-                const reps = Math.max(0, parseInt(currState.setReps[`${ex.id}-${i}`] || ex.reps) || 0);
-                const extraWeight = Math.max(0, parseFloat(currState.setWeights[`${ex.id}-${i}`] ?? currState.weights[ex.id]) || 0);
-                const baseWeight = bw > 0 ? bw : 0;
-                tabVol += reps * (extraWeight + baseWeight);
-              }
-            }
-          } else if (ex.metricType === 'time') {
-            for (let i = 0; i < ex.sets; i++) {
-              if (currState.checkedSets[`${ex.id}-${i}`]) {
-                const durationSec = Math.max(0, parseInt(currState.setReps[`${ex.id}-${i}`] ?? String(ex.workSec || 60)) || 60);
-                const baseWeight = bw > 0 ? bw : 0;
-                tabVol += baseWeight * (durationSec / TIME_VOLUME_DIVISOR);
-                const rirRaw = currState.setRir[`${ex.id}-${i}`];
-                const rir = rirRaw !== undefined && rirRaw !== '' ? parseFloat(rirRaw) : 2;
-                tabLoad += durationSec * (10 - rir);
-              }
-            }
-          }
-        } else if (ex.type === 'superset') {
-          let roundsToCount = ex.rounds || 0;
-          if (ex.structureType === 'emom') {
-            roundsToCount = Math.ceil(
-              ((parseFloat(String(ex.emomTotalMin)) || 1) * 60) /
-                (parseFloat(String(ex.emomIntervalSec)) || 60)
-            );
-          }
-          if (ex.structureType === 'amrap') {
-            roundsToCount = currState.amrapRounds[ex.id] || 0;
-          }
-          ex.exercises.forEach((sub) => {
-            const amrapRepVal = currState.setReps[`${sub.id}-amrap`];
-            
-            if (sub.metricType === 'weight' || !sub.metricType) {
-              for (let i = 0; i < roundsToCount; i++) {
-                if (ex.structureType === 'amrap' || currState.checkedSets[`${sub.id}-${i}`]) {
-                  const reps = Math.max(0, parseInt((ex.structureType === 'amrap' && amrapRepVal) ? amrapRepVal : (currState.setReps[`${sub.id}-${i}`] || sub.reps || '10')) || 0);
-                  
-                  // 🔴 BUG FIX PRO: Legge il peso specifico della serie (setWeights) con fallback al peso globale
-                  const setId = `${sub.id}-${i}`;
-                  const weight = Math.max(0, parseFloat(currState.setWeights?.[setId] ?? currState.weights[sub.id]) || 0);
-                  
-                  tabVol += reps * weight;
-                }
-              }
-            } else if (sub.metricType === 'bodyweight') {
-              for (let i = 0; i < roundsToCount; i++) {
-                if (ex.structureType === 'amrap' || currState.checkedSets[`${sub.id}-${i}`]) {
-                  const reps = Math.max(0, parseInt((ex.structureType === 'amrap' && amrapRepVal) ? amrapRepVal : (currState.setReps[`${sub.id}-${i}`] || sub.reps || '10')) || 0);
-                  
-                  // 🔴 Pesi granulari anche per il corpo libero zavorrato nei circuiti
-                  const setId = `${sub.id}-${i}`;
-                  const extraWeight = Math.max(0, parseFloat(currState.setWeights?.[setId] ?? currState.weights[sub.id]) || 0);
-                  
-                  const baseWeight = bw > 0 ? bw : 0;
-                  tabVol += reps * (extraWeight + baseWeight);
-                }
-              }
-            } else if (sub.metricType === 'time') {
-              for (let i = 0; i < roundsToCount; i++) {
-                if (ex.structureType === 'amrap' || currState.checkedSets[`${sub.id}-${i}`]) {
-                  const durationSec = Math.max(0, parseInt((ex.structureType === 'amrap' && amrapRepVal) ? amrapRepVal : (currState.setReps[`${sub.id}-${i}`] ?? String(sub.workSec || 60))) || 60);
-                  const baseWeight = bw > 0 ? bw : 0;
-                  tabVol += baseWeight * (durationSec / TIME_VOLUME_DIVISOR);
-                  const rirRaw = currState.setRir[`${sub.id}-${i}`];
-                  const rir = rirRaw !== undefined && rirRaw !== '' ? parseFloat(rirRaw) : 2;
-                  tabLoad += durationSec * (10 - rir);
-                }
-              }
-            }
-          });
-        }
-      });
-
-      sessionTotalsByDate[sessionDate].vol += tabVol;
-      sessionTotalsByDate[sessionDate].load += tabLoad;
-    });
-
-    Object.entries(sessionTotalsByDate).forEach(([dateStr, totals]) => {
-      currState.volumeLog[dateStr] = Math.round(totals.vol);
-      currState.sessionLoadLog[dateStr] = Math.round(totals.load);
-    });
-  };
-
-  // 🔴 FASE 1: Ottimizzazione History (Zero UI Freeze)
-  const updateExerciseHistory = (currState: AppState, targetId: string) => {
-    if (!currState.weightHistory) currState.weightHistory = {};
-    if (!currState.weightHistory[targetId]) currState.weightHistory[targetId] = [];
-
-    let sessionDate = getTodayStr();
-    for (const tab of currState.plan) {
-      const hasEx = tab.exercises.some(
-        (e) => e.id === targetId || (e.type === 'superset' && e.exercises.some((s) => s.id === targetId))
-      );
-      if (hasEx) {
-        sessionDate = currState.lastSessionDate[tab.id] || getTodayStr();
-        break;
-      }
-    }
-
-    const currentWeight = currState.weights[targetId] || '';
-    const reps: Record<string, string> = {};
-    const rirs: Record<string, string> = {};
-    const rpes: Record<string, string> = {};
-    const weights: Record<string, string> = {}; // 🔴 NUOVO
-
-    // Invece di girare su tutto il database, verifichiamo solo le possibili serie (max 30)
-    for (let i = 0; i < 30; i++) {
-      const key = `${targetId}-${i}`;
-      if (currState.checkedSets[key]) {
-        const idx = String(i);
-        if (currState.setReps[key] !== undefined) reps[idx] = currState.setReps[key];
-        if (currState.setRir[key] !== undefined) rirs[idx] = currState.setRir[key];
-        if (currState.setRpe[key] !== undefined) rpes[idx] = currState.setRpe[key];
-        // 🔴 Eredita il peso globale se quello specifico è assente per retrocompatibilità
-        weights[idx] = currState.setWeights[key] !== undefined ? currState.setWeights[key] : currentWeight;
-      }
-    }
-    const amrapKey = `${targetId}-amrap`;
-    if (currState.checkedSets[amrapKey] && currState.setReps[amrapKey] !== undefined) {
-      reps['0'] = currState.setReps[amrapKey];
-      weights['0'] = currState.setWeights[amrapKey] !== undefined ? currState.setWeights[amrapKey] : currentWeight;
-    }
-
-    const newEntry = { date: sessionDate, weight: currentWeight, weights, reps, rirs, rpes };
-    const history = currState.weightHistory[targetId];
-
-    if (history.length > 0 && history[0].date === sessionDate) {
-      history[0] = { 
-        ...history[0], 
-        weight: currentWeight, 
-        // 🔴 BUG FIX MERGE: Uniamo i vecchi pesi della giornata con quelli appena digitati
-        weights: { ...history[0].weights, ...weights }, 
-        reps, 
-        rirs, 
-        rpes 
-      };
-    } else {
-      // 🔴 BUG FIX: Aggiungiamo la nuova entry SOLO se c'è almeno una spunta (non inseriamo giornate vuote)
-      if (Object.keys(reps).length > 0) {
-        history.unshift(newEntry);
-      }
-    }
-
-    if (currState.deloadActive) {
-      if (!currState.deloadDates.includes(sessionDate)) currState.deloadDates.push(sessionDate);
-    }
-  };
+  // 🔴 CANONICAL V2: Volume, Carico e Storico Esercizio sono derived data calcolati da sessionsV2
+  const calculateVolumeAndLoad = (_currState?: AppState) => {};
+  const updateExerciseHistory = (_currState?: AppState, _targetId?: string) => {};
 
   const handleStartWorkout = async (tabId: string) => {
     if (!state) return;
@@ -585,7 +427,8 @@ export default function App() {
       });
     };
 
-    if (newState.lastSessionDate[tabId] === todayStr) {
+    const hasSessionToday = (newState.sessionsV2 || []).some(s => s.planId === tabId && s.date === todayStr);
+    if (hasSessionToday) {
       const conf = confirm(
         'Hai già una sessione registrata oggi per questa scheda. Vuoi azzerare i set per iniziarne una nuova?'
       );
@@ -599,7 +442,6 @@ export default function App() {
       clearSessionData();
     }
 
-    newState.lastSessionDate[tabId] = todayStr;
     newState.activeWorkouts[tabId] = { active: true, startTime: Date.now() };
     await requestWakeLock();
     setState(newState);
@@ -627,34 +469,62 @@ export default function App() {
 
       let hasCheckedSets = false;
       let totalSets = 0;
-      const snapExercises: WorkoutSessionSnapshot['exercises'] = [];
+      const v2Blocks: BlockSnapshotV2[] = [];
+
+      const newState = { ...state };
+      newState.activeWorkouts[tabId] = { active: false, startTime: null };
+
+      if (!newState.registryV2) newState.registryV2 = {};
+      if (!newState.sessionsV2) newState.sessionsV2 = [];
+
+      const getOrRegisterEx = (name: string, type: any): string => {
+        let regId = Object.keys(newState.registryV2!).find(
+          (k) => newState.registryV2![k].name.trim().toLowerCase() === name.trim().toLowerCase()
+        );
+        if (!regId) {
+          regId = generateId();
+          newState.registryV2![regId] = { id: regId, name: name.trim(), type: type || 'weight' };
+        }
+        return regId;
+      };
 
       currentTab.exercises.forEach((ex) => {
         if (ex.type === 'single') {
-          const completedSets = [];
+          const completedSets: WorkoutSetV2[] = [];
           for (let i = 0; i < ex.sets; i++) {
             const setId = `${ex.id}-${i}`;
             if (state.checkedSets[setId]) {
               hasCheckedSets = true;
               totalSets++;
+              const rawWeight = state.setWeights[setId] ?? state.weights[ex.id];
+              const rawReps = state.setReps[setId] || ex.reps;
+              const rawDuration = state.setDurations[setId] || state.setReps[setId] || ex.workSec || 60;
+              const rawRir = state.setRir[setId];
+              const rawRpe = state.setRpe[setId];
+
+              const validData = validateSetData(
+                parseInt(String(rawReps)) || undefined,
+                parseFloat(String(rawWeight)) || undefined,
+                parseFloat(String(rawDuration)) || undefined,
+                rawRir === '-1' || rawRir === 'CED' ? undefined : parseFloat(String(rawRir)),
+                parseFloat(String(rawRpe)) || undefined
+              );
+
               completedSets.push({
+                id: generateId(),
                 index: i + 1,
-                reps: state.setReps[setId] || ex.reps,
-                weight: state.setWeights[setId] ?? state.weights[ex.id] ?? 0,
-                duration: state.setReps[setId] || ex.workSec || 60,
-                rir: state.setRir[setId] !== undefined ? state.setRir[setId] : '',
-                rpe: state.setRpe[setId] !== undefined ? state.setRpe[setId] : ''
+                ...validData,
+                isCed: rawRir === '-1' || rawRir === 'CED',
+                customFields: newState.setCustomFields?.[`${ex.name}-${i + 1}`] || newState.setCustomFields?.[setId] || undefined
               });
             }
           }
           if (completedSets.length > 0) {
-            snapExercises.push({
-              type: 'single',
-              name: ex.name,
-              metricType: ex.metricType,
-              targetSets: ex.sets,
-              targetReps: ex.reps || ex.workSec,
-              pause: ex.pause,
+            const regId = ex.exerciseId || getOrRegisterEx(ex.name, ex.metricType);
+            v2Blocks.push({
+              exerciseId: regId,
+              nameSnapshot: ex.name,
+              type: ex.metricType || 'weight',
               sets: completedSets
             });
           }
@@ -664,187 +534,135 @@ export default function App() {
             roundsToCount = Math.ceil(((ex.emomTotalMin || 1) * 60) / (ex.emomIntervalSec || 60));
           }
           if (ex.structureType === 'amrap') {
-            roundsToCount = (state.amrapRounds[ex.id] || 0) + 1; // 🔴 Aggiunto +1
+            roundsToCount = (state.amrapRounds[ex.id] || 0) + 1;
           }
 
-          const completedRounds = [];
+          const completedRounds: CircuitRoundV2[] = [];
           for (let j = 0; j < (roundsToCount || 10); j++) {
-            // 🔴 RIMOSSA L'ECCEZIONE AMRAP. Si salva solo se hai messo davvero una spunta.
             const isDone = ex.exercises.some((sub) => state.checkedSets[`${sub.id}-${j}`]) || state.checkedSets[`${ex.id}-round-${j}`];
-            
             if (isDone) {
               hasCheckedSets = true;
               totalSets++;
-              const roundExs = ex.exercises.map((sub) => {
+              const roundExs: ExerciseSnapshotV2[] = ex.exercises.map((sub) => {
                 const setId = `${sub.id}-${j}`;
+                const regId = sub.exerciseId || getOrRegisterEx(sub.name, sub.metricType);
+                const rawWeight = state.setWeights[setId] ?? state.weights[sub.id];
+                const rawReps = state.setReps[setId] || sub.reps;
+                const rawDuration = state.setDurations[setId] || state.setReps[setId] || sub.workSec || 60;
+                const rawRir = state.setRir[setId];
+                const rawRpe = state.setRpe[setId];
+
+                const validData = validateSetData(
+                  parseInt(String(rawReps)) || undefined,
+                  parseFloat(String(rawWeight)) || undefined,
+                  parseFloat(String(rawDuration)) || undefined,
+                  rawRir === '-1' || rawRir === 'CED' ? undefined : parseFloat(String(rawRir)),
+                  parseFloat(String(rawRpe)) || undefined
+                );
+
                 return {
-                  name: sub.name,
-                  metricType: sub.metricType,
-                  targetReps: sub.reps || sub.workSec,
-                  pause: sub.pause,
-                  reps: state.setReps[setId] || sub.reps,
-                  weight: state.setWeights[setId] ?? state.weights[sub.id] ?? 0,
-                  duration: state.setReps[setId] || sub.workSec || 60,
-                  rir: state.setRir[setId] !== undefined ? state.setRir[setId] : '',
-                  isRest: sub.metricType === 'rest'
+                  exerciseId: regId,
+                  nameSnapshot: sub.name,
+                  type: sub.metricType || 'weight',
+                  sets: [{
+                    id: generateId(),
+                    index: 1,
+                    ...validData,
+                    isCed: rawRir === '-1' || rawRir === 'CED',
+                    customFields: newState.setCustomFields?.[`${sub.name}-${j + 1}`] || newState.setCustomFields?.[setId] || undefined
+                  }]
                 };
               });
               completedRounds.push({ roundIndex: j + 1, exercises: roundExs });
             }
           }
           if (completedRounds.length > 0) {
-            snapExercises.push({
-              type: 'superset',
-              name: ex.name,
+            v2Blocks.push({
+              id: generateId(),
+              nameSnapshot: ex.name,
               structureType: ex.structureType,
-              targetRounds: ex.rounds,
-              emomTotalMin: ex.emomTotalMin,
-              emomIntervalSec: ex.emomIntervalSec,
-              amrapTotalMin: ex.amrapTotalMin,
               rounds: completedRounds
             });
           }
         }
       });
 
-      const newState = { ...state };
-      newState.activeWorkouts[tabId] = { active: false, startTime: null };
-
       if (hasCheckedSets) {
-        const snapshot: WorkoutSessionSnapshot = {
-          id: generateId(),
-          date: todayDateStr,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          tabName: currentTab.name,
-          tabSubtitle: currentTab.subtitle,
-          duration: durationStr,
-          totalSets,
-          exercises: snapExercises
-        };
-
-        const prevSnapshot = newState.workoutSessionsHistory.find(
-          (s) => s.tabName === currentTab.name
+        const prevSnapshot = newState.sessionsV2.find(
+          (s) => s.tabNameSnapshot === currentTab.name
         ) || null;
 
-        snapshot.exercises.forEach((snapEx) => {
-          if (snapEx.type === 'single' && (snapEx.metricType === 'weight' || !snapEx.metricType)) {
-            const maxW = Math.max(...snapEx.sets.map((s) => parseFloat(String(s.weight)) || 0));
+        const bwAtSession = parseFloat(String(newState.bodyMetrics?.weight)) || 0;
+        const sessionId = generateId();
+
+        const v2Session: WorkoutSessionV2 = {
+          id: sessionId,
+          planId: currentTab.id,
+          planVersion: currentTab.version || 1,
+          date: todayDateStr,
+          startedAt: workoutState.startTime || Date.now(),
+          completedAt: Date.now(),
+          durationStr,
+          tabNameSnapshot: currentTab.name,
+          tabSubtitleSnapshot: currentTab.subtitle,
+          bodyWeightAtSession: bwAtSession,
+          blocks: v2Blocks
+        };
+
+        // 🔴 MOTORE V2: Aggiornamento Record Personali (PR) tramite ID Permanente
+        v2Blocks.forEach((block) => {
+          if (!('rounds' in block) && (block.type === 'weight' || !block.type)) {
+            const maxW = Math.max(...block.sets.map((s) => s.weight || 0));
             if (maxW > 0) {
-              const key = snapEx.name.trim().toLowerCase();
-              const existingPr = newState.prs.find((p) => p.name.trim().toLowerCase() === key);
+              const permId = block.exerciseId;
+              const existingPr = newState.prs.find((p) =>
+                (permId && p.exerciseId === permId) ||
+                (!p.exerciseId && p.name.trim().toLowerCase() === block.nameSnapshot.trim().toLowerCase())
+              );
+
               if (!existingPr) {
                 newState.prs.push({
                   id: generateId(),
-                  name: snapEx.name,
+                  exerciseId: permId,
+                  name: block.nameSnapshot,
                   weight: String(maxW),
                   history: [{ date: todayDateStr, weight: String(maxW) }]
                 });
               } else if (maxW > (parseFloat(existingPr.weight) || 0)) {
                 existingPr.weight = String(maxW);
+                existingPr.exerciseId = permId || existingPr.exerciseId;
+                existingPr.name = block.nameSnapshot;
                 existingPr.history.unshift({ date: todayDateStr, weight: String(maxW) });
               }
             }
           }
         });
 
-        newState.workoutSessionsHistory.unshift(snapshot);
+        // Salvataggio della sessione canonica V2
+        newState.sessionsV2.unshift(v2Session);
 
-        // --- 🔴 INIZIO MOTORE V2 (FASE C & D): Generazione Snapshot Immutabile ---
-        if (!newState.registryV2) newState.registryV2 = {};
-        if (!newState.sessionsV2) newState.sessionsV2 = [];
+        // 🔴 PULIZIA INTERFACCIA: Svuotiamo le spunte per preparare il prossimo allenamento!
+        newState.checkedSets = {};
+        newState.setReps = {};
+        newState.setWeights = {};
+        newState.setRir = {};
+        newState.setRpe = {};
+        newState.setDurations = {};
+        newState.setCustomFields = {};
 
-        // Funzione per agganciare o creare l'ID permanente nel Registro (FASE C)
-        const getOrRegisterEx = (name: string, type: any) => {
-            let regId = Object.keys(newState.registryV2!).find(k => newState.registryV2![k].name === name);
-            if (!regId) {
-                regId = generateId();
-                newState.registryV2![regId] = { id: regId, name, type };
-            }
-            return regId;
-        };
-
-        // Congelamento assoluto del peso corporeo al momento esatto (FASE D)
-        const bwAtSession = parseFloat(String(newState.bodyMetrics?.weight)) || 0;
-        
-        // Costruzione dinamica dei blocchi V2 leggendo l'allenamento appena concluso
-        const v2Blocks: any[] = snapshot.exercises.map(snapEx => {
-            if (snapEx.type === 'single') {
-                const regId = getOrRegisterEx(snapEx.name, snapEx.metricType);
-                return {
-                    exerciseId: regId,
-                    nameSnapshot: snapEx.name,
-                    type: snapEx.metricType,
-                    sets: snapEx.sets.map(s => ({
-                        id: generateId(),
-                        index: s.index,
-                        reps: parseInt(String(s.reps)) || undefined,
-                        weight: parseFloat(String(s.weight)) || undefined,
-                        durationSec: parseFloat(String(s.duration)) || undefined,
-                        rir: s.rir === '-1' || s.rir === 'CED' ? undefined : parseFloat(String(s.rir)),
-                        isCed: s.rir === '-1' || s.rir === 'CED',
-                        rpe: parseFloat(String(s.rpe)) || undefined,
-                    }))
-                };
-            } else {
-                return {
-                    id: generateId(),
-                    nameSnapshot: snapEx.name,
-                    structureType: snapEx.structureType,
-                    rounds: snapEx.rounds.map(r => ({
-                        roundIndex: r.roundIndex,
-                        exercises: r.exercises.map(sub => {
-                            const regId = getOrRegisterEx(sub.name, sub.metricType);
-                            return {
-                                exerciseId: regId,
-                                nameSnapshot: sub.name,
-                                type: sub.metricType,
-                                sets: [{
-                                    id: generateId(),
-                                    index: 1,
-                                    reps: parseInt(String(sub.reps)) || undefined,
-                                    weight: parseFloat(String(sub.weight)) || undefined,
-                                    durationSec: parseFloat(String(sub.duration)) || undefined,
-                                    rir: sub.rir === '-1' || sub.rir === 'CED' ? undefined : parseFloat(String(sub.rir)),
-                                    isCed: sub.rir === '-1' || sub.rir === 'CED',
-                                    rpe: parseFloat(String(sub.rpe)) || undefined,
-                                }]
-                            };
-                        })
-                    }))
-                };
-            }
-        });
-
-        // Creazione della sessione V2 finale
-        const v2Session = {
-            id: snapshot.id,
-            planId: currentTab.id,
-            planVersion: currentTab.version || 1,
-            date: snapshot.date,
-            startedAt: workoutState.startTime || Date.now(),
-            completedAt: Date.now(),
-            durationStr: snapshot.duration,
-            tabNameSnapshot: snapshot.tabName,
-            bodyWeightAtSession: bwAtSession, // Salvato per sempre!
-            blocks: v2Blocks
-        };
-
-        // Salviamo la sessione in cima allo storico V2
-        newState.sessionsV2.unshift(v2Session as any);
-        // --- 🔴 FINE MOTORE V2 ---
-        if (!newState.allWorkoutDates.includes(todayDateStr)) {
+        if (newState.allWorkoutDates && !newState.allWorkoutDates.includes(todayDateStr)) {
           newState.allWorkoutDates.push(todayDateStr);
         }
-        if (newState.favoriteTabs[tabId] && !newState.streakDates.includes(todayDateStr)) {
+        if (newState.streakDates && newState.favoriteTabs[tabId] && !newState.streakDates.includes(todayDateStr)) {
           newState.streakDates.push(todayDateStr);
         }
-        newState.scheduleHistoryDates[tabId] = new Date().toISOString();
-        newState.schedaCompletions[tabId] = (newState.schedaCompletions[tabId] || 0) + 1;
+        if (newState.scheduleHistoryDates) newState.scheduleHistoryDates[tabId] = new Date().toISOString();
+        if (newState.schedaCompletions) newState.schedaCompletions[tabId] = (newState.schedaCompletions[tabId] || 0) + 1;
 
         calculateVolumeAndLoad(newState);
-        await saveGymState(newState); // 🔴 Aspettiamo il database
+        await saveGymState(newState);
         setState(newState);
-        setSummaryData({ newSnapshot: snapshot, prevSnapshot });
+        setSummaryData({ newSnapshot: v2Session, prevSnapshot });
       } else {
         await saveGymState(newState);
         setState(newState);
@@ -1190,7 +1008,7 @@ export default function App() {
     }
   };
 
-  const handleImportBackup = () => {
+  const handleImportBackup = async () => {
     const code = prompt('Incolla il codice di backup (GYM2::... oppure JSON):');
     if (!code) return;
 
@@ -1199,7 +1017,7 @@ export default function App() {
       const parsed = importBackupString(code);
       
       // 2. 🔴 Estrae le informazioni per il popup intelligente
-      const allenamenti = parsed.workoutSessionsHistory?.length || 0;
+      const allenamenti = parsed.sessionsV2?.length || (parsed as any).workoutSessionsHistory?.length || 0;
       const dataBackup = parsed.lastBackupDate || 'sconosciuta';
       
       // 3. Mostra l'avviso di sicurezza all'utente
@@ -1207,13 +1025,18 @@ export default function App() {
         return; // L'utente ha annullato
       }
 
-      // 4. Salva i dati
+      // 4. Crea uno snapshot di sicurezza dello stato corrente prima del ripristino
+      if (state) {
+        await createSafetyBackup(state, `Snapshot automatico pre-ripristino backup (${dataBackup})`);
+      }
+
+      // 5. Salva i dati canonici
       setState(parsed);
-      saveGymState(parsed);
+      await saveGymState(parsed);
       showToast('Dati ripristinati con successo! 🚀');
       setIsSyncModalOpen(false);
-    } catch {
-      showToast('Codice di backup non valido o corrotto.', true);
+    } catch (e: any) {
+      showToast(e?.message || 'Codice di backup non valido o corrotto.', true);
     }
   };
 
@@ -1228,7 +1051,7 @@ export default function App() {
 
   const currentTab = state.plan.find((t) => t.id === state.activeTab) || state.plan[0];
   const isHomeTab = Boolean(currentTab.isHome);
-  const streak = computeCurrentStreak(state.streakDates || []);
+  const streak = computeStreakFromSessions(state.sessionsV2);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans pb-16">

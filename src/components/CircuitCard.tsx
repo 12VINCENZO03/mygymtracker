@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { AppState, SupersetExercise } from '../types/gym';
 import { formatTime } from '../utils/storage';
 import { getExerciseCoachAdvice } from '../utils/coach';
+import { getLastExercisePerformance, getHistoricalSetDataV2 } from '../utils/domain';
 
 interface CircuitCardProps {
   circuit: SupersetExercise;
@@ -460,9 +461,11 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
             );
           }
 
-          const currentWeight = state.weights[sub.id] || (state.weightHistory[sub.id]?.[0]?.weight ?? '');
+          // 🔴 CANONICAL V2: Ultima prestazione letta dalle sessioni storiche immutabili
+          const lastSubPerf = getLastExercisePerformance(state.sessionsV2, sub.exerciseId, sub.name);
+          const currentWeight = state.weights[sub.id] || (lastSubPerf?.weight !== undefined ? String(lastSubPerf.weight) : '');
           const letter = String.fromCharCode(65 + sIdx);
-          const coachAdvice = getExerciseCoachAdvice(state, sub.id, sub.reps || '10', sub.metricType, true);
+          const coachAdvice = getExerciseCoachAdvice(state, sub.id, sub.reps || '10', sub.metricType, true, sub.name, sub.exerciseId);
 
           return (
             <div key={sub.id} className="bg-zinc-950/50 p-4 rounded-3xl border border-zinc-800/60 shadow-sm">
@@ -536,8 +539,8 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                 {Array.from({ length: totalRounds }).map((_, rIdx) => {
                   const setId = `${sub.id}-${rIdx}`;
                   const isChecked = Boolean(state.checkedSets[setId]);
-                  const hist = state.weightHistory && state.weightHistory[sub.id]?.[0];
-                  const defaultTargetReps = hist?.reps?.[rIdx] || (sub.reps || '10');
+                  const histSet = getHistoricalSetDataV2(state.sessionsV2, rIdx + 1, sub.exerciseId, sub.name);
+                  const defaultTargetReps = histSet?.reps !== undefined ? String(histSet.reps) : (sub.reps || '10');
                   const actualReps = state.setReps[setId] ?? defaultTargetReps;
 
                   let displayWeight = state.setWeights?.[setId];
@@ -549,8 +552,8 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                         break;
                       }
                     }
-                    if (displayWeight === undefined && hist?.weights?.[rIdx] !== undefined && hist.weights[rIdx] !== '') {
-                      displayWeight = hist.weights[rIdx];
+                    if (displayWeight === undefined && histSet?.weight !== undefined && histSet.weight !== '') {
+                      displayWeight = String(histSet.weight);
                     }
                     if (displayWeight === undefined) {
                       displayWeight = state.weights[sub.id] || '';
@@ -560,9 +563,7 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                   // 🔴 BUG FIX: Gestione RPE per il Cardio nei Circuiti
                   const isCardio = sub.metricType === 'cardio';
                   const currentEffort = isCardio ? state.setRpe[setId] : state.setRir[setId];
-                  const histEffort = isCardio
-                    ? (hist?.rpes?.[rIdx] ?? (hist as any)?.rpe?.[rIdx])
-                    : (hist?.rirs?.[rIdx] ?? (hist as any)?.rir?.[rIdx]);
+                  const histEffort = isCardio ? histSet?.rpe : histSet?.rir;
                   const displayEffort = currentEffort !== undefined && currentEffort !== '' ? currentEffort : histEffort;
                   
                   const prefillData = {

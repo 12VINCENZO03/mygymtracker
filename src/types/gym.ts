@@ -21,6 +21,7 @@ export interface CardioBlock {
 
 export interface SingleExercise {
   id: string;
+  exerciseId?: string; // 🔴 CANONICAL V2: ID permanente collegato al Registro
   type: 'single';
   name: string;
   sets: number;
@@ -37,6 +38,7 @@ export interface SingleExercise {
 
 export interface SubExercise {
   id: string;
+  exerciseId?: string; // 🔴 CANONICAL V2: ID permanente collegato al Registro
   name: string;
   reps?: string;
   pause?: number;
@@ -100,7 +102,8 @@ export interface BodyMetricHistoryEntry {
 
 export interface PRRecord {
   id: string;
-  name: string;
+  exerciseId?: string; // 🔴 MOTORE V2: ID permanente collegato al Registro
+  name: string; // Usato solo come etichetta visiva
   weight: string;
   history: Array<{ date: string; weight: string }>;
 }
@@ -175,8 +178,7 @@ export interface AppState {
   activeTab: string;
   isEditMode: boolean;
   weights: Record<string, string>;
-  setWeights: Record<string, string>; // 🔴 NUOVO: Database pesi granulari
-  weightHistory: Record<string, WeightHistoryEntry[]>;
+  setWeights: Record<string, string>;
   checkedSets: Record<string, boolean>;
   setRir: Record<string, string>;
   setReps: Record<string, string>;
@@ -190,23 +192,17 @@ export interface AppState {
   bodyMetrics: BodyMetrics;
   bodyMetricsHistory: BodyMetricHistoryEntry[];
   favoriteTabs: Record<string, boolean>;
-  scheduleHistoryDates: Record<string, string>;
-  streakDates: string[];
-  volumeLog: Record<string, number>;
-  sessionLoadLog: Record<string, number>;
-  allWorkoutDates: string[];
-  schedaCompletions: Record<string, number>;
-  currentEffortSelection: { setId: string; targetId: string; isRpe: boolean } | null;
-  exerciseNameRegistry: Record<string, string>;
-  lastBackupDate: string | null;
-  workoutSessionsHistory: WorkoutSessionSnapshot[];
-  lastSessionDate: Record<string, string>;
   amrapRounds: Record<string, number>;
   bodyGoal: BodyGoal;
   deloadActive: boolean;
   deloadDates: string[];
-  // 🔴 MOTORE V2
-  schemaVersion?: number;
-  registryV2?: Record<string, ExerciseDefV2>;
-  sessionsV2?: WorkoutSessionV2[];
+  currentEffortSelection: { setId: string; targetId: string; isRpe: boolean } | null;
+  lastBackupDate: string | null;
+  
+  // 🔴 CANONICAL V2 ENGINE (L'UNICA CASA DEI DATI)
+  schemaVersion: number;
+  revision: number;
+  lastSavedAt?: number;
+  registryV2: Record<string, ExerciseDefV2>;
+  sessionsV2: WorkoutSessionV2[];
 }

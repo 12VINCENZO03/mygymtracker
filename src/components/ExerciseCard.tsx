@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { AppState, SingleExercise } from '../types/gym';
 import { getExerciseCoachAdvice } from '../utils/coach';
+import { getLastExercisePerformance, getHistoricalSetDataV2 } from '../utils/domain';
 
 interface ExerciseCardProps {
   ex: SingleExercise;
@@ -48,21 +49,14 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
   const pressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isLongPressRef = useRef(false);
 
-  const getHistoricalSetData = (setIdx: number) => {
-    const history = state.weightHistory && state.weightHistory[ex.id];
-    if (!history || history.length === 0) return null;
-    const entry = history[0];
-    const sId = setIdx.toString();
-    return {
-      reps: entry.reps ? entry.reps[sId] : undefined,
-      rir: entry.rirs ? entry.rirs[sId] : undefined,
-      rpe: entry.rpes ? entry.rpes[sId] : undefined,
-      weight: entry.weights ? entry.weights[sId] : undefined // 🔴 Letto dallo storico
-    };
-  };
+  // 🔴 CANONICAL V2: Ultima prestazione letta dalle sessioni storiche immutabili
+  const lastPerf = getLastExercisePerformance(state.sessionsV2, ex.exerciseId, ex.name);
+  const currentWeight = state.weights[ex.id] || (lastPerf?.weight !== undefined ? String(lastPerf.weight) : '');
+  const coachAdvice = getExerciseCoachAdvice(state, ex.id, ex.reps, ex.metricType, false, ex.name, ex.exerciseId);
 
-  const currentWeight = state.weights[ex.id] || (state.weightHistory[ex.id]?.[0]?.weight ?? '');
-  const coachAdvice = getExerciseCoachAdvice(state, ex.id, ex.reps, ex.metricType);
+  const getHistoricalSetData = (setIdx: number) => {
+    return getHistoricalSetDataV2(state.sessionsV2, setIdx + 1, ex.exerciseId, ex.name);
+  };
 
   if (isEditMode) {
     return (
@@ -319,7 +313,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
               }
             }
             if (displayWeight === undefined && hist?.weight !== undefined && hist.weight !== '') {
-              displayWeight = hist.weight;
+              displayWeight = String(hist.weight);
             }
             if (displayWeight === undefined) {
               displayWeight = state.weights[ex.id] || '';

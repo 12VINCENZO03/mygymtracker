@@ -1,11 +1,12 @@
+// src/components/SummaryModal.tsx
 import React, { useEffect } from 'react';
 import confetti from 'canvas-confetti';
-import { WorkoutSessionSnapshot } from '../types/gym';
+import { WorkoutSessionV2 } from '../types/v2';
 
 interface SummaryModalProps {
   isOpen: boolean;
-  newSnapshot: WorkoutSessionSnapshot | null;
-  previousSnapshot: WorkoutSessionSnapshot | null;
+  newSnapshot: WorkoutSessionV2 | null;
+  previousSnapshot: WorkoutSessionV2 | null;
   onClose: () => void;
 }
 
@@ -31,7 +32,17 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({
 
   if (!isOpen || !newSnapshot) return null;
 
-  let comparisonItems: Array<{
+  // Calcolo totale serie per la sessione V2
+  let totalSetsCount = 0;
+  newSnapshot.blocks.forEach(b => {
+    if ('rounds' in b) {
+      b.rounds.forEach(r => r.exercises.forEach(sub => totalSetsCount += sub.sets.length));
+    } else {
+      totalSetsCount += b.sets.length;
+    }
+  });
+
+  const comparisonItems: Array<{
     title: string;
     description: string;
     type: 'pr' | 'better' | 'worse' | 'neutral';
@@ -44,30 +55,35 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({
       type: 'better'
     });
   } else {
-    newSnapshot.exercises.forEach((nEx) => {
-      if (nEx.type === 'single') {
-        const oEx = previousSnapshot.exercises.find((e) => e.name === nEx.name && e.type === 'single');
-        if (oEx && oEx.type === 'single') {
-          const nMaxW = Math.max(...nEx.sets.map((s) => parseFloat(String(s.weight)) || 0));
-          const oMaxW = Math.max(...oEx.sets.map((s) => parseFloat(String(s.weight)) || 0));
-          const nTotReps = nEx.sets.reduce((sum, s) => sum + (parseInt(s.reps || '0') || 0), 0);
-          const oTotReps = oEx.sets.reduce((sum, s) => sum + (parseInt(s.reps || '0') || 0), 0);
+    // Confronto blocchi V2 (esercizi singoli)
+    newSnapshot.blocks.forEach((nBlock) => {
+      if (!('rounds' in nBlock)) {
+        // Blocco singolo
+        const oBlock = previousSnapshot.blocks.find(
+          (b) => !('rounds' in b) && (b.exerciseId === nBlock.exerciseId || b.nameSnapshot === nBlock.nameSnapshot)
+        );
+
+        if (oBlock && !('rounds' in oBlock)) {
+          const nMaxW = Math.max(...nBlock.sets.map((s) => s.weight || 0));
+          const oMaxW = Math.max(...oBlock.sets.map((s) => s.weight || 0));
+          const nTotReps = nBlock.sets.reduce((sum, s) => sum + (s.reps || 0), 0);
+          const oTotReps = oBlock.sets.reduce((sum, s) => sum + (s.reps || 0), 0);
 
           if (nMaxW > oMaxW && nMaxW > 0) {
             comparisonItems.push({
-              title: `${nEx.name} — Nuovo Record!`,
+              title: `${nBlock.nameSnapshot} — Nuovo Record!`,
               description: `Carico massimo aumentato di +${(nMaxW - oMaxW).toFixed(1)}kg (ora ${nMaxW}kg)`,
               type: 'pr'
             });
           } else if (nMaxW === oMaxW && nTotReps > oTotReps) {
             comparisonItems.push({
-              title: `${nEx.name} — Più Volume!`,
+              title: `${nBlock.nameSnapshot} — Più Volume!`,
               description: `Completate +${nTotReps - oTotReps} ripetizioni complessive a parità di carico`,
               type: 'better'
             });
-          } else if (nMaxW < oMaxW) {
+          } else if (nMaxW < oMaxW && nMaxW > 0) {
             comparisonItems.push({
-              title: `${nEx.name} — Carico Inferiore`,
+              title: `${nBlock.nameSnapshot} — Carico Inferiore`,
               description: `Carico massimo ridotto di -${(oMaxW - nMaxW).toFixed(1)}kg rispetto alla scorsa sessione`,
               type: 'worse'
             });
@@ -99,7 +115,7 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({
           </div>
           <h3 className="text-white font-black text-xl">Allenamento Completato!</h3>
           <p className="text-xs text-zinc-400 mt-1">
-            {newSnapshot.tabName} • Durata: {newSnapshot.duration} • Serie: {newSnapshot.totalSets}
+            {newSnapshot.tabNameSnapshot} • Durata: {newSnapshot.durationStr} • Serie: {totalSetsCount}
           </p>
         </div>
 

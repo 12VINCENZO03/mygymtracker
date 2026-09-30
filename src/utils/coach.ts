@@ -1,3 +1,4 @@
+import { WorkoutSessionV2 } from '../types/v2';
 import { AppState, MetricType, WeightHistoryEntry } from '../types/gym';
 import { getTodayStr } from './storage';
 
@@ -13,6 +14,78 @@ export interface VolumeStats {
   hasLastMonth: boolean;
   hasLastYear: boolean;
 }
+
+// --- 🔴 MOTORE V2: Calcolo del volume storicizzato perfetto (FASE F) ---
+export function calculateVolumeFromSessionV2(session: WorkoutSessionV2): number {
+  let vol = 0;
+  const bw = session.bodyWeightAtSession || 0; // Il peso di quel giorno esatto!
+
+  session.blocks.forEach(block => {
+    if ('rounds' in block) {
+      block.rounds.forEach(r => r.exercises.forEach(sub => {
+        sub.sets.forEach(set => {
+          const reps = set.reps || 0;
+          const w = set.weight || 0;
+          if (sub.type === 'weight' || !sub.type) vol += reps * w;
+          else if (sub.type === 'bodyweight') vol += reps * (w + bw);
+          else if (sub.type === 'time') vol += bw * ((set.durationSec || 60) / 10);
+        });
+      }));
+    } else {
+      block.sets.forEach(set => {
+        const reps = set.reps || 0;
+        const w = set.weight || 0;
+        if (block.type === 'weight' || !block.type) vol += reps * w;
+        else if (block.type === 'bodyweight') vol += reps * (w + bw);
+        else if (block.type === 'time') vol += bw * ((set.durationSec || 60) / 10);
+      });
+    }
+  });
+  return vol;
+}
+
+export function calculateAllVolumeStatsV2(sessionsV2: WorkoutSessionV2[]): VolumeStats {
+  const d = new Date();
+  const todayStr = getTodayStr();
+  const stats: VolumeStats = {
+    today: 0, week: 0, lastWeek: 0, month: 0, lastMonth: 0, year: 0, lastYear: 0,
+    hasLastWeek: false, hasLastMonth: false, hasLastYear: false
+  };
+
+  const currentWeekStart = new Date(d);
+  currentWeekStart.setDate(d.getDate() - d.getDay() + (d.getDay() === 0 ? -6 : 1));
+  currentWeekStart.setHours(0, 0, 0, 0);
+  const lastWeekStart = new Date(currentWeekStart);
+  lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+  const lastWeekEnd = new Date(currentWeekStart);
+  lastWeekEnd.setDate(lastWeekEnd.getDate() - 1);
+  const currentMonth = d.getMonth();
+  const currentYear = d.getFullYear();
+  const lastMonthDate = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+  const lastMonth = lastMonthDate.getMonth();
+  const lastMonthYear = lastMonthDate.getFullYear();
+  const lastYear = currentYear - 1;
+
+  sessionsV2.forEach(session => {
+    const vol = calculateVolumeFromSessionV2(session);
+    if (vol === 0) return;
+
+    if (session.date === todayStr) stats.today += vol;
+
+    const parts = session.date.split('-');
+    const logDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    
+    if (logDate >= currentWeekStart) stats.week += vol;
+    if (logDate >= lastWeekStart && logDate <= lastWeekEnd) { stats.lastWeek += vol; stats.hasLastWeek = true; }
+    if (logDate.getFullYear() === currentYear && logDate.getMonth() === currentMonth) stats.month += vol;
+    if (logDate.getFullYear() === lastMonthYear && logDate.getMonth() === lastMonth) { stats.lastMonth += vol; stats.hasLastMonth = true; }
+    if (logDate.getFullYear() === currentYear) stats.year += vol;
+    if (logDate.getFullYear() === lastYear) { stats.lastYear += vol; stats.hasLastYear = true; }
+  });
+
+  return stats;
+}
+// -----------------------------------------------------------------
 
 export function calculateAllVolumeStats(volumeLog: Record<string, number>): VolumeStats {
   const d = new Date();
@@ -156,16 +229,84 @@ export interface CoachAdvice {
   fatigueAlert?: string;
 }
 
+export function extractExerciseHistoryFromSessions(
+  sessions: WorkoutSessionV2[] | undefined,
+  exerciseId?: string,
+  exerciseName?: string
+): WeightHistoryEntry[] {
+  if (!sessions) return [];
+  const entries: WeightHistoryEntry[] = [];
+  const targetName = exerciseName ? exerciseName.trim().toLowerCase() : '';
+
+  for (const session of sessions) {
+    for (const block of session.blocks) {
+      if ('rounds' in block) {
+        for (const round of block.rounds) {
+          for (const sub of round.exercises) {
+            const matchId = exerciseId && sub.exerciseId === exerciseId;
+            const matchName = targetName && sub.nameSnapshot.trim().toLowerCase() === targetName;
+            if (matchId || (!exerciseId && matchName)) {
+              const reps: Record<string, string> = {};
+              const weights: Record<string, string> = {};
+              const rirs: Record<string, string> = {};
+              const rpes: Record<string, string> = {};
+              let primaryW = '0';
+              sub.sets.forEach((s) => {
+                const sId = String(s.index - 1);
+                if (s.reps !== undefined) reps[sId] = String(s.reps);
+                if (s.weight !== undefined) {
+                  weights[sId] = String(s.weight);
+                  primaryW = String(s.weight);
+                }
+                if (s.rir !== undefined) rirs[sId] = String(s.rir);
+                if (s.isCed) rirs[sId] = 'CED';
+                if (s.rpe !== undefined) rpes[sId] = String(s.rpe);
+              });
+              entries.push({ date: session.date, weight: primaryW, weights, reps, rirs, rpes });
+            }
+          }
+        }
+      } else {
+        const matchId = exerciseId && block.exerciseId === exerciseId;
+        const matchName = targetName && block.nameSnapshot.trim().toLowerCase() === targetName;
+        if (matchId || (!exerciseId && matchName)) {
+          const reps: Record<string, string> = {};
+          const weights: Record<string, string> = {};
+          const rirs: Record<string, string> = {};
+          const rpes: Record<string, string> = {};
+          let primaryW = '0';
+          block.sets.forEach((s) => {
+            const sId = String(s.index - 1);
+            if (s.reps !== undefined) reps[sId] = String(s.reps);
+            if (s.weight !== undefined) {
+              weights[sId] = String(s.weight);
+              primaryW = String(s.weight);
+            }
+            if (s.rir !== undefined) rirs[sId] = String(s.rir);
+            if (s.isCed) rirs[sId] = 'CED';
+            if (s.rpe !== undefined) rpes[sId] = String(s.rpe);
+          });
+          entries.push({ date: session.date, weight: primaryW, weights, reps, rirs, rpes });
+        }
+      }
+    }
+  }
+  return entries;
+}
+
 export function getExerciseCoachAdvice(
   state: AppState,
   exId: string,
   targetRepsStr: string,
   metricType: MetricType,
-  isCircuit = false
+  isCircuit = false,
+  exName?: string,
+  permanentExId?: string
 ): CoachAdvice | null {
   try {
     const isWeightType = metricType === 'weight' || metricType === 'bodyweight' || !metricType;
-    const rawHistory = state.weightHistory && state.weightHistory[exId] ? state.weightHistory[exId] : [];
+    // 🔴 CANONICAL V2: Estraiamo lo storico reale dalle sessioni immutabili
+    const rawHistory = extractExerciseHistoryFromSessions(state.sessionsV2, permanentExId || exId, exName);
     const deloadDates = state.deloadDates || [];
     const history = isWeightType && deloadDates.length > 0
       ? rawHistory.filter((h) => !deloadDates.includes(h.date))

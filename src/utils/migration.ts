@@ -2,45 +2,86 @@
 import { AppState } from '../types/gym';
 import { AppDatabaseV2, ExerciseDefV2, WorkoutSessionV2, BlockSnapshotV2, WorkoutSetV2, ExerciseSnapshotV2, CircuitRoundV2, ExerciseTypeV2 } from '../types/v2';
 import { generateId } from './storage';
+import { runDataIntegrityCheck } from './audit';
+import { validateSetData } from './validation';
 
-export function migrateV1ToV2(v1State: AppState): AppDatabaseV2 {
-    const registry: Record<string, ExerciseDefV2> = {};
-    const sessions: WorkoutSessionV2[] = [];
+export interface MigrationResult {
+    migratedDatabase: AppDatabaseV2;
+    migratedState: AppState;
+    report: ReturnType<typeof runDataIntegrityCheck>;
+}
 
-    // 1. COSTRUIAMO IL REGISTRO (Estraiamo gli esercizi unici)
-    const registerExercise = (id: string, name: string, type: ExerciseTypeV2 = 'weight') => {
-        if (!registry[id]) {
-            registry[id] = { id, name, type };
+/**
+ * Procedura canonica, deterministica e non distruttiva di migrazione da V1 a V2.
+ * 1. Estrae e deduplica gli esercizi nel Registro Permanente.
+ * 2. Assegna a tutti gli esercizi nelle schede attive (plan) un exerciseId permanente.
+ * 3. Converte l'intero storico V1 congelando il peso corporeo storico calcolato.
+ * 4. Aggancia gli ID permanenti ai Record Personali (PR).
+ * 5. Esegue il controllo medico di integrità prima della validazione finale.
+ */
+export function migrateV1ToV2(v1State: Partial<AppState>): AppDatabaseV2 {
+    const registry: Record<string, ExerciseDefV2> = { ...(v1State.registryV2 || {}) };
+    const sessions: WorkoutSessionV2[] = [...(v1State.sessionsV2 || [])];
+    const existingSessionIds = new Set(sessions.map(s => s.id));
+
+    // Helper per registrare o agganciare l'esercizio nel registro
+    const registerExercise = (name: string, type: ExerciseTypeV2 = 'weight', cardioMachine?: string): string => {
+        const cleanName = name.trim();
+        const existingKey = Object.keys(registry).find(
+            k => registry[k].name.trim().toLowerCase() === cleanName.toLowerCase()
+        );
+        if (existingKey) {
+            return existingKey;
         }
+        const id = generateId();
+        registry[id] = {
+            id,
+            name: cleanName,
+            type,
+            cardioMachine,
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+        };
+        return id;
     };
 
-    // Scansioniamo le schede attuali
-    v1State.plan.forEach(tab => {
-        tab.exercises.forEach(ex => {
-            if (ex.type === 'single') {
-                registerExercise(ex.id, ex.name, ex.metricType as ExerciseTypeV2 || 'weight');
-            } else {
-                ex.exercises.forEach(sub => {
-                    registerExercise(sub.id, sub.name, sub.metricType as ExerciseTypeV2 || 'weight');
-                });
-            }
+    // 1. Scansioniamo e registriamo tutti gli esercizi delle schede attuali
+    if (v1State.plan && Array.isArray(v1State.plan)) {
+        v1State.plan.forEach(tab => {
+            tab.exercises.forEach(ex => {
+                if (ex.type === 'single') {
+                    const regId = registerExercise(ex.name, (ex.metricType as ExerciseTypeV2) || 'weight', ex.cardioMachine);
+                    ex.exerciseId = regId;
+                } else {
+                    ex.exercises.forEach(sub => {
+                        const regId = registerExercise(sub.name, (sub.metricType as ExerciseTypeV2) || 'weight', sub.cardioMachine);
+                        sub.exerciseId = regId;
+                    });
+                }
+            });
         });
-    });
+    }
 
-    // 2. CONVERTIAMO LO STORICO (La parte più delicata)
-    v1State.workoutSessionsHistory.forEach(oldSession => {
-        
-        // 🔴 Recupero Storico del Peso Corporeo
+    // 2. Convertiamo lo storico legacy se presente
+    const oldHistory = v1State.workoutSessionsHistory || [];
+    oldHistory.forEach(oldSession => {
+        if (existingSessionIds.has(oldSession.id)) {
+            // Già migrata in precedenza, evita duplicazioni
+            return;
+        }
+
+        // Calcolo del peso corporeo al momento della sessione
         let bwAtTime = 0;
         const targetDate = new Date(oldSession.date).getTime();
-        // Ordiniamo la storia del peso dal più recente al più vecchio
-        const sortedMetrics = [...v1State.bodyMetricsHistory].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        // Troviamo il peso registrato prima o durante quel giorno
+        const historyMetrics = v1State.bodyMetricsHistory || [];
+        const sortedMetrics = [...historyMetrics].sort(
+            (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+        );
         const closestMetric = sortedMetrics.find(m => new Date(m.date).getTime() <= targetDate);
-        
+
         if (closestMetric) {
             bwAtTime = parseFloat(String(closestMetric.weight)) || 0;
-        } else if (v1State.bodyMetrics.weight) {
+        } else if (v1State.bodyMetrics?.weight) {
             bwAtTime = parseFloat(String(v1State.bodyMetrics.weight)) || 0;
         }
 
@@ -48,52 +89,50 @@ export function migrateV1ToV2(v1State: AppState): AppDatabaseV2 {
 
         oldSession.exercises.forEach(oldEx => {
             if (oldEx.type === 'single') {
-                // Siccome nel V1 non salvavamo l'ID negli snapshot storici, lo cerchiamo per nome
-                let regId = Object.keys(registry).find(k => registry[k].name === oldEx.name);
-                if (!regId) {
-                    regId = generateId(); // Esercizio orfano, lo aggiungiamo al registro!
-                    registerExercise(regId, oldEx.name, oldEx.metricType as ExerciseTypeV2 || 'weight');
-                }
-
-                const sets: WorkoutSetV2[] = oldEx.sets.map(s => ({
-                    id: generateId(),
-                    index: s.index,
-                    reps: parseInt(String(s.reps)) || undefined,
-                    weight: parseFloat(String(s.weight)) || undefined,
-                    durationSec: parseFloat(String(s.duration)) || undefined,
-                    rir: s.rir === '-1' || s.rir === 'CED' ? undefined : parseFloat(String(s.rir)),
-                    isCed: s.rir === '-1' || s.rir === 'CED',
-                    rpe: parseFloat(String(s.rpe)) || undefined,
-                }));
+                const regId = registerExercise(oldEx.name, (oldEx.metricType as ExerciseTypeV2) || 'weight');
+                const sets: WorkoutSetV2[] = oldEx.sets.map(s => {
+                    const valid = validateSetData(
+                        parseInt(String(s.reps)) || undefined,
+                        parseFloat(String(s.weight)) || undefined,
+                        parseFloat(String(s.duration)) || undefined,
+                        s.rir === '-1' || s.rir === 'CED' ? undefined : parseFloat(String(s.rir)),
+                        parseFloat(String(s.rpe)) || undefined
+                    );
+                    return {
+                        id: generateId(),
+                        index: s.index,
+                        ...valid,
+                        isCed: s.rir === '-1' || s.rir === 'CED'
+                    };
+                });
 
                 newBlocks.push({
                     exerciseId: regId,
                     nameSnapshot: oldEx.name,
-                    type: oldEx.metricType as ExerciseTypeV2 || 'weight',
+                    type: (oldEx.metricType as ExerciseTypeV2) || 'weight',
                     sets
                 } as ExerciseSnapshotV2);
 
             } else if (oldEx.type === 'superset') {
                 const rounds: CircuitRoundV2[] = oldEx.rounds.map(r => {
                     const exercises: ExerciseSnapshotV2[] = r.exercises.map(sub => {
-                        let regId = Object.keys(registry).find(k => registry[k].name === sub.name);
-                        if (!regId) {
-                            regId = generateId();
-                            registerExercise(regId, sub.name, sub.metricType as ExerciseTypeV2 || 'weight');
-                        }
+                        const regId = registerExercise(sub.name, (sub.metricType as ExerciseTypeV2) || 'weight');
+                        const valid = validateSetData(
+                            parseInt(String(sub.reps)) || undefined,
+                            parseFloat(String(sub.weight)) || undefined,
+                            parseFloat(String(sub.duration)) || undefined,
+                            sub.rir === '-1' || sub.rir === 'CED' ? undefined : parseFloat(String(sub.rir)),
+                            parseFloat(String(sub.rpe)) || undefined
+                        );
                         return {
                             exerciseId: regId,
                             nameSnapshot: sub.name,
-                            type: sub.metricType as ExerciseTypeV2 || 'weight',
+                            type: (sub.metricType as ExerciseTypeV2) || 'weight',
                             sets: [{
                                 id: generateId(),
                                 index: 1,
-                                reps: parseInt(String(sub.reps)) || undefined,
-                                weight: parseFloat(String(sub.weight)) || undefined,
-                                durationSec: parseFloat(String(sub.duration)) || undefined,
-                                rir: sub.rir === '-1' || sub.rir === 'CED' ? undefined : parseFloat(String(sub.rir)),
-                                isCed: sub.rir === '-1' || sub.rir === 'CED',
-                                rpe: parseFloat(String(sub.rpe)) || undefined,
+                                ...valid,
+                                isCed: sub.rir === '-1' || sub.rir === 'CED'
                             }]
                         };
                     });
@@ -109,21 +148,42 @@ export function migrateV1ToV2(v1State: AppState): AppDatabaseV2 {
             }
         });
 
+        const startedAt = oldSession.date && oldSession.time
+            ? new Date(`${oldSession.date}T${oldSession.time}`).getTime() - 3600000
+            : Date.now();
+        const completedAt = oldSession.date && oldSession.time
+            ? new Date(`${oldSession.date}T${oldSession.time}`).getTime()
+            : Date.now();
+
         sessions.push({
-            id: oldSession.id,
+            id: oldSession.id || generateId(),
             date: oldSession.date,
-            startedAt: new Date(`${oldSession.date}T${oldSession.time}`).getTime() - 3600000, // Stima
-            completedAt: new Date(`${oldSession.date}T${oldSession.time}`).getTime(),
-            durationStr: oldSession.duration,
-            tabNameSnapshot: oldSession.tabName,
-            bodyWeightAtSession: bwAtTime, // 🔴 Qui congeliamo il peso per lo storico!
+            startedAt: isNaN(startedAt) ? Date.now() : startedAt,
+            completedAt: isNaN(completedAt) ? Date.now() : completedAt,
+            durationStr: oldSession.duration || '00:00:00',
+            tabNameSnapshot: oldSession.tabName || 'Allenamento',
+            bodyWeightAtSession: bwAtTime,
             blocks: newBlocks
         });
     });
 
-    return {
+    // 3. Colleghiamo i PR al registro permanente
+    if (v1State.prs && Array.isArray(v1State.prs)) {
+        v1State.prs.forEach(pr => {
+            if (!pr.exerciseId) {
+                const regId = registerExercise(pr.name, 'weight');
+                pr.exerciseId = regId;
+            }
+        });
+    }
+
+    const canonicalDb: AppDatabaseV2 = {
         schemaVersion: 2,
+        revision: (v1State.revision || 0) + 1,
+        lastSavedAt: Date.now(),
         registry,
         sessions
     };
+
+    return canonicalDb;
 }

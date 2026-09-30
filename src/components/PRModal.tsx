@@ -30,6 +30,7 @@ export const PRModal: React.FC<PRModalProps> = ({
     if (!newName.trim() || !newWeight.trim()) return;
     const item: PRRecord = {
       id: generateId(),
+      exerciseId: undefined, // 🔴 Supporto per il formato V2 sull'inserimento manuale
       name: newName.trim(),
       weight: newWeight.trim(),
       history: [{ date: getTodayStr(), weight: newWeight.trim() }]
