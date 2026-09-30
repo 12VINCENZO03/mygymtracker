@@ -133,91 +133,30 @@ export const initialDefaultState: AppState = {
   plan: defaultWorkoutPlan,
   activeTab: 'home',
   isEditMode: false,
-  weights: {
-    'bench-press': '75',
-    'incline-db-press': '24',
-    'lateral-raises': '8',
-    'triceps-pushdown': '20',
-    'lat-machine': '60',
-    'cable-row': '55',
-    'biceps-curl': '14',
-    'squat': '90',
-    'leg-press': '160'
-  },
-  setWeights: {}, // 🔴 NUOVO
-  weightHistory: {
-    'bench-press': [
-      {
-        date: getPastDateStr(3),
-        weight: '75',
-        reps: { '0': '8', '1': '8', '2': '8', '3': '8' },
-        rirs: { '0': '2.5', '1': '2', '2': '1.5', '3': '1' },
-        rpes: {}
-      }
-    ]
-  },
+  weights: {},
+  setWeights: {},
+  weightHistory: {},
   checkedSets: {},
   setRir: {},
   setReps: {},
   setDurations: {},
   setRpe: {},
   setCustomFields: {},
-  prs: [
-    { id: 'pr-1', name: 'Panca Piana Bilanciere', weight: '90', history: [{ date: getPastDateStr(14), weight: '90' }] },
-    { id: 'pr-2', name: 'Squat', weight: '120', history: [{ date: getPastDateStr(21), weight: '120' }] }
-  ],
+  prs: [], // 🔴 Nessun record finto
   activeWorkouts: {},
-  bodyMetrics: { weight: '76.5', height: '178', fm: '13.5', ffm: '66.2' },
-  bodyMetricsHistory: [
-    { date: getPastDateStr(30), weight: '78.0', height: '178', fm: '15.0', ffm: '66.3' },
-    { date: getPastDateStr(1), weight: '76.5', height: '178', fm: '13.5', ffm: '66.2' }
-  ],
-  favoriteTabs: { 'scheda-push': true, 'scheda-pull': true },
-  scheduleHistoryDates: { 'scheda-push': new Date(Date.now() - 3 * 86400000).toISOString() },
-  streakDates: [getPastDateStr(3), getPastDateStr(1)],
-  volumeLog: {
-    [getPastDateStr(3)]: 6800,
-    [getPastDateStr(1)]: 7200
-  },
-  sessionLoadLog: {
-    [getPastDateStr(3)]: 480,
-    [getPastDateStr(1)]: 510
-  },
-  allWorkoutDates: [getPastDateStr(3), getPastDateStr(1)],
-  schedaCompletions: { 'scheda-push': 3, 'scheda-pull': 2 },
+  bodyMetrics: { weight: '', height: '', fm: '', ffm: '' },
+  bodyMetricsHistory: [], // 🔴 Nessuno storico finto
+  favoriteTabs: {},
+  scheduleHistoryDates: {},
+  streakDates: [],
+  volumeLog: {},
+  sessionLoadLog: {},
+  allWorkoutDates: [],
+  schedaCompletions: {},
   currentEffortSelection: null,
-  exerciseNameRegistry: {
-    'bench-press': 'Panca Piana Bilanciere',
-    'squat': 'Squat con Bilanciere'
-  },
-  lastBackupDate: getPastDateStr(2),
-  workoutSessionsHistory: [
-    {
-      id: 'mock-session-1',
-      date: getPastDateStr(3),
-      time: '18:30',
-      tabName: 'Petto & Tricipiti',
-      tabSubtitle: 'Push Day',
-      duration: '52m',
-      totalSets: 10,
-      exercises: [
-        {
-          type: 'single',
-          name: 'Panca Piana Bilanciere',
-          metricType: 'weight',
-          targetSets: 4,
-          targetReps: '8',
-          pause: 120,
-          sets: [
-            { index: 1, reps: '8', weight: '75', rir: '2.5' },
-            { index: 2, reps: '8', weight: '75', rir: '2' },
-            { index: 3, reps: '8', weight: '75', rir: '1.5' },
-            { index: 4, reps: '8', weight: '75', rir: '1' }
-          ]
-        }
-      ]
-    }
-  ],
+  exerciseNameRegistry: {},
+  lastBackupDate: null,
+  workoutSessionsHistory: [], // 🔴 Nessun allenamento di prova
   lastSessionDate: {},
   amrapRounds: {},
   bodyGoal: 'recomp',

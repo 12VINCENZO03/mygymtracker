@@ -1144,7 +1144,7 @@ export default function App() {
 
   const currentTab = state.plan.find((t) => t.id === state.activeTab) || state.plan[0];
   const isHomeTab = Boolean(currentTab.isHome);
-  const streak = computeCurrentStreak(state.allWorkoutDates || []);
+  const streak = computeCurrentStreak(state.streakDates || []);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans pb-16">
@@ -1803,15 +1803,23 @@ export default function App() {
             const hist = [...prev.bodyMetricsHistory];
             const todayStr = getTodayStr();
             const existingIdx = hist.findIndex((h) => h.date === todayStr);
+
+            // 🔴 BUG FIX BIA: Se mi peso e basta, NON copio la FM del mese scorso.
+            const oldEntry = existingIdx >= 0 ? hist[existingIdx] : null;
             const entry = {
               date: todayStr,
-              weight: updated.weight,
-              height: updated.height,
-              fm: updated.fm,
-              ffm: updated.ffm
+              weight: m.weight !== undefined ? m.weight : (oldEntry?.weight || ''),
+              height: m.height !== undefined ? m.height : (oldEntry?.height || prev.bodyMetrics.height),
+              fm: m.fm !== undefined ? m.fm : (oldEntry?.fm || ''), // Niente falsi positivi!
+              ffm: m.ffm !== undefined ? m.ffm : (oldEntry?.ffm || '')
             };
+            
             if (existingIdx >= 0) hist[existingIdx] = entry;
             else hist.unshift(entry);
+            
+            // 🔴 BUG FIX: Ordiniamo lo storico in modo decrescente (dal più recente)
+            hist.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            
             return { ...prev, bodyMetrics: updated, bodyMetricsHistory: hist };
           });
         }}

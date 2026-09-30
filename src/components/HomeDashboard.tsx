@@ -66,7 +66,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
     }
   }
 
-  const streak = computeCurrentStreak(state.allWorkoutDates || []);
+  const streak = computeCurrentStreak(state.streakDates || []);
   const goalInsight = getGoalCrossInsight(state, stats);
   const lastBia = state.bodyMetricsHistory && state.bodyMetricsHistory[0] ? state.bodyMetricsHistory[0] : null;
   const lastBiaText = lastBia ? `${lastBia.date}` : 'Nessuna';

@@ -69,18 +69,53 @@ export function calculateAllVolumeStats(volumeLog: Record<string, number>): Volu
 }
 
 export function computeCurrentStreak(workoutDates: string[]): number {
+  // 1. Raccogliamo le date univoche
   const dates = new Set(workoutDates || []);
   if (dates.size === 0) return 0;
-  const fmt = (dt: Date) =>
-    `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
-  const cursor = new Date();
-  cursor.setHours(0, 0, 0, 0);
-  if (!dates.has(fmt(cursor))) cursor.setDate(cursor.getDate() - 1);
+
+  // 2. Funzione per trovare l'inizio della settimana (Lunedì a mezzanotte)
+  const getMonday = (d: Date) => {
+    const date = new Date(d);
+    const day = date.getDay() || 7; // Rendiamo la domenica 7 invece di 0
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() - day + 1);
+    return date.getTime();
+  };
+
+  // 3. Raggruppiamo gli allenamenti per settimana
+  const weekCounts: Record<number, Set<string>> = {};
+  dates.forEach(dStr => {
+    const d = new Date(dStr);
+    const mondayTime = getMonday(d);
+    if (!weekCounts[mondayTime]) weekCounts[mondayTime] = new Set();
+    weekCounts[mondayTime].add(dStr);
+  });
+
   let streak = 0;
-  while (dates.has(fmt(cursor))) {
-    streak++;
-    cursor.setDate(cursor.getDate() - 1);
+  let currentMonday = getMonday(new Date());
+
+  // 4. Se questa settimana non ha ancora 4 allenamenti, controlliamo la settimana scorsa
+  if ((weekCounts[currentMonday]?.size || 0) < 4) {
+     const lastWeek = new Date(currentMonday);
+     lastWeek.setDate(lastWeek.getDate() - 7);
+     
+     if ((weekCounts[lastWeek.getTime()]?.size || 0) >= 4) {
+         // La settimana scorsa era valida, partiamo da lì a contare!
+         currentMonday = lastWeek.getTime();
+     } else {
+         // Se nemmeno la settimana scorsa ha 4 allenamenti, la serie è persa
+         return 0;
+     }
   }
+
+  // 5. Contiamo all'indietro tutte le settimane consecutive con almeno 4 allenamenti
+  while ((weekCounts[currentMonday]?.size || 0) >= 4) {
+    streak++;
+    const prevWeek = new Date(currentMonday);
+    prevWeek.setDate(prevWeek.getDate() - 7);
+    currentMonday = prevWeek.getTime();
+  }
+
   return streak;
 }
 
