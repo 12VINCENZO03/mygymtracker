@@ -70,6 +70,7 @@ export interface WorkoutTab {
   name: string;
   subtitle?: string;
   isHome?: boolean;
+  version?: number; // 🔴 FASE E: Plan Versioning
   exercises: ExerciseItem[];
 }
 

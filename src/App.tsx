@@ -818,6 +818,8 @@ export default function App() {
         // Creazione della sessione V2 finale
         const v2Session = {
             id: snapshot.id,
+            planId: currentTab.id,
+            planVersion: currentTab.version || 1,
             date: snapshot.date,
             startedAt: workoutState.startTime || Date.now(),
             completedAt: Date.now(),
@@ -1342,7 +1344,17 @@ export default function App() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setState((prev) => (prev ? { ...prev, isEditMode: false } : null))}
+                  onClick={() => setState((prev) => {
+                    if (!prev) return null;
+                    return {
+                      ...prev,
+                      isEditMode: false,
+                      // 🔴 FASE E: Incrementiamo la versione della scheda appena modificata
+                      plan: prev.plan.map(t =>
+                        t.id === currentTab.id ? { ...t, version: (t.version || 1) + 1 } : t
+                      )
+                    };
+                  })}
                   className="bg-emerald-500 text-zinc-950 px-4 py-2 rounded-xl text-xs font-bold outline-none active:scale-95 transition-transform"
                 >
                   Fatto ✓
@@ -2012,7 +2024,7 @@ export default function App() {
       {/* History Modal */}
       <HistoryModal
         isOpen={isHistoryModalOpen}
-        history={state.workoutSessionsHistory}
+        historyV2={state.sessionsV2 || []}
         onClose={() => setIsHistoryModalOpen(false)}
       />
 

@@ -51,6 +51,8 @@ export type BlockSnapshotV2 = ExerciseSnapshotV2 | CircuitSnapshotV2;
 // 4. LA SESSIONE STORICA (Totalmente indipendente dalla scheda)
 export interface WorkoutSessionV2 {
     id: string;
+    planId?: string; // 🔴 FASE E: ID della scheda eseguita
+    planVersion?: number; // 🔴 FASE E: Versione esatta in quel momento
     date: string; // YYYY-MM-DD
     startedAt: number; // Timestamp
     completedAt: number; // Timestamp
