@@ -20,8 +20,8 @@ interface CircuitCardProps {
   onDeleteSubEx: (subId: string) => void;
   onMoveSubEx: (subId: string, dir: number) => void;
   onSaveWeight: (subId: string, val: string) => void;
-  onToggleSubSet: (subId: string, roundIndex: number, defaultReps: string, pauseSec: number) => void;
-  onLongPressSubSet: (subId: string, roundIndex: number, defaultReps: string, pauseSec: number) => void;
+  onToggleSubSet: (subId: string, roundIndex: number, pauseSec: number, prefill: { reps: string; weight: string; rir?: string; rpe?: string }) => void;
+  onLongPressSubSet: (subId: string, roundIndex: number, pauseSec: number, prefill: { reps: string; weight: string; rir?: string; rpe?: string }) => void;
   onOpenEffortModal: (setId: string, isRpe: boolean) => void;
   onOpenVideo: (url: string) => void;
   onAddAmrapRound: () => void;
@@ -333,21 +333,21 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
   }
 
   // Pointer down/up handler for press / long press
-  const handlePointerDown = (subId: string, roundIdx: number, defaultReps: string, pauseSec: number) => {
+  const handlePointerDown = (subId: string, roundIdx: number, pauseSec: number, prefillData: any) => {
     isLongPressRef.current = false;
     pressTimerRef.current = setTimeout(() => {
       isLongPressRef.current = true;
-      onLongPressSubSet(subId, roundIdx, defaultReps, pauseSec);
+      onLongPressSubSet(subId, roundIdx, pauseSec, prefillData);
     }, 450);
   };
 
-  const handlePointerUp = (subId: string, roundIdx: number, defaultReps: string, pauseSec: number) => {
+  const handlePointerUp = (subId: string, roundIdx: number, pauseSec: number, prefillData: any) => {
     if (pressTimerRef.current) {
       clearTimeout(pressTimerRef.current);
       pressTimerRef.current = null;
     }
     if (!isLongPressRef.current) {
-      onToggleSubSet(subId, roundIdx, defaultReps, pauseSec);
+      onToggleSubSet(subId, roundIdx, pauseSec, prefillData);
     }
   };
 
@@ -567,6 +567,24 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                     const hist = state.weightHistory && state.weightHistory[sub.id]?.[0];
                     const defaultTargetReps = hist?.reps?.[rIdx] || (sub.reps || '10');
                     const actualReps = state.setReps[setId] ?? defaultTargetReps;
+
+                    let displayWeight = state.setWeights?.[setId];
+                    if (displayWeight === undefined) {
+                      for (let j = rIdx - 1; j >= 0; j--) {
+                        const prevId = `${sub.id}-${j}`;
+                        if (state.setWeights?.[prevId] !== undefined) {
+                          displayWeight = state.setWeights[prevId];
+                          break;
+                        }
+                      }
+                      if (displayWeight === undefined && hist?.weights?.[rIdx] !== undefined && hist.weights[rIdx] !== '') {
+                        displayWeight = hist.weights[rIdx];
+                      }
+                      if (displayWeight === undefined) {
+                        displayWeight = state.weights[sub.id] || '';
+                      }
+                    }
+
                     // 🔴 BUG FIX: Gestione RPE per il Cardio nei Circuiti
                     const isCardio = sub.metricType === 'cardio';
                     const currentEffort = isCardio ? state.setRpe[setId] : state.setRir[setId];
@@ -574,6 +592,13 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                       ? (hist?.rpes?.[rIdx] ?? (hist as any)?.rpe?.[rIdx])
                       : (hist?.rirs?.[rIdx] ?? (hist as any)?.rir?.[rIdx]);
                     const displayEffort = currentEffort !== undefined && currentEffort !== '' ? currentEffort : histEffort;
+                    
+                    const prefillData = {
+                      reps: actualReps,
+                      weight: displayWeight,
+                      rir: !isCardio && displayEffort !== undefined && displayEffort !== '' ? String(displayEffort) : undefined,
+                      rpe: isCardio && displayEffort !== undefined && displayEffort !== '' ? String(displayEffort) : undefined
+                    };
                     
                     let emomClass = '';
                     if (isEmom) {
@@ -594,9 +619,8 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                         <button
                           type="button"
                           disabled={!isWorkoutActive}
-                          // 🔴 BUG FIX: passata la pausa!
-                          onPointerDown={() => handlePointerDown(sub.id, rIdx, defaultTargetReps, sub.pause || 0)}
-                          onPointerUp={() => handlePointerUp(sub.id, rIdx, defaultTargetReps, sub.pause || 0)}
+                          onPointerDown={() => handlePointerDown(sub.id, rIdx, sub.pause || 0, prefillData)}
+                          onPointerUp={() => handlePointerUp(sub.id, rIdx, sub.pause || 0, prefillData)}
                           onPointerLeave={handlePointerCancel}
                           className={`w-28 py-3.5 rounded-2xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
                             isChecked

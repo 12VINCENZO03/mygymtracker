@@ -15,12 +15,11 @@ interface ExerciseCardProps {
   onMoveEx: (dir: number) => void;
   onSaveWeight: (val: string) => void;
   onSaveSetWeight: (setId: string, val: string) => void;
-  onToggleSet: (setIndex: number, defaultReps: string, pauseSec: number) => void;
-  // 🔴 BUG FIX: Aggiunto pauseSec al tipo della prop
-  onLongPressSet: (setIndex: number, defaultReps: string, pauseSec: number) => void;
+  onToggleSet: (setIndex: number, pauseSec: number, prefill: { reps: string; weight: string; rir?: string; rpe?: string }) => void;
+  onLongPressSet: (setIndex: number, pauseSec: number, prefill: { reps: string; weight: string; rir?: string; rpe?: string }) => void;
   onOpenEffortModal: (setId: string, isRpe: boolean) => void;
   onOpenVideo: (url: string) => void;
-  onRunInlineTimer: (setId: string, durationSec: number, pauseSec: number) => void;
+  onRunInlineTimer: (setId: string, durationSec: number, pauseSec: number, prefill: { weight: string; rir?: string; rpe?: string }) => void;
   activeInlineTimerSec: Record<string, number>;
 }
 
@@ -55,7 +54,8 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
     return {
       reps: entry.reps ? entry.reps[sId] : undefined,
       rir: entry.rirs ? entry.rirs[sId] : undefined,
-      rpe: entry.rpes ? entry.rpes[sId] : undefined
+      rpe: entry.rpes ? entry.rpes[sId] : undefined,
+      weight: entry.weights ? entry.weights[sId] : undefined // 🔴 Letto dallo storico
     };
   };
 
@@ -161,22 +161,21 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
     );
   }
 
-  const handlePointerDown = (setIndex: number, defaultReps: string) => {
+  const handlePointerDown = (setIndex: number, prefillData: any) => {
     isLongPressRef.current = false;
     pressTimerRef.current = setTimeout(() => {
       isLongPressRef.current = true;
-      // 🔴 BUG FIX: Passa la pausa al long press
-      onLongPressSet(setIndex, defaultReps, ex.pause || 0);
+      onLongPressSet(setIndex, ex.pause || 0, prefillData);
     }, 450);
   };
 
-  const handlePointerUp = (setIndex: number, defaultReps: string, pauseSec: number) => {
+  const handlePointerUp = (setIndex: number, pauseSec: number, prefillData: any) => {
     if (pressTimerRef.current) {
       clearTimeout(pressTimerRef.current);
       pressTimerRef.current = null;
     }
     if (!isLongPressRef.current) {
-      onToggleSet(setIndex, defaultReps, pauseSec);
+      onToggleSet(setIndex, pauseSec, prefillData);
     }
   };
 
@@ -273,6 +272,9 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                 break;
               }
             }
+            if (displayWeight === undefined && hist?.weight !== undefined && hist.weight !== '') {
+              displayWeight = hist.weight;
+            }
             if (displayWeight === undefined) {
               displayWeight = state.weights[ex.id] || '';
             }
@@ -287,6 +289,14 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
           const isTimeType = ex.metricType === 'time';
           const timerRemaining = activeInlineTimerSec[setId];
           const isTimerRunning = timerRemaining !== undefined && timerRemaining > 0;
+
+          // 🔴 Prepariamo i dati esatti visualizzati in questo momento per il salvataggio
+          const prefillData = {
+            reps: actualReps,
+            weight: displayWeight,
+            rir: !isCardio && displayEffort !== undefined && displayEffort !== '' ? String(displayEffort) : undefined,
+            rpe: isCardio && displayEffort !== undefined && displayEffort !== '' ? String(displayEffort) : undefined
+          };
 
           return (
             <div key={setIdx} className="flex items-center gap-2.5">
@@ -314,7 +324,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                   disabled={!isWorkoutActive}
                   onClick={() => {
                     const dur = Math.max(0, parseInt(actualReps) || ex.workSec || 60);
-                    onRunInlineTimer(setId, dur, ex.pause || 0);
+                    onRunInlineTimer(setId, dur, ex.pause || 0, prefillData);
                   }}
                   className={`w-28 py-3.5 rounded-2xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm active:scale-[0.98] ${
                     isChecked
@@ -336,8 +346,8 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                 <button
                   type="button"
                   disabled={!isWorkoutActive}
-                  onPointerDown={() => handlePointerDown(setIdx, defaultTargetReps)}
-                  onPointerUp={() => handlePointerUp(setIdx, defaultTargetReps, ex.pause || 0)}
+                  onPointerDown={() => handlePointerDown(setIdx, prefillData)}
+                  onPointerUp={() => handlePointerUp(setIdx, ex.pause || 0, prefillData)}
                   onPointerLeave={handlePointerCancel}
                   className={`w-28 py-3.5 rounded-2xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
                     isChecked

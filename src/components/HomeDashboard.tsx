@@ -41,30 +41,29 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
     );
   }
 
-  // Recommended routine: find oldest completed favorite
-  let oldestFav: WorkoutTab | null = null;
-  let oldestTime = Date.now();
+  // Trova l'ultima scheda eseguita per consigliare dinamicamente la successiva
+  let recommendedTabId = nonHomeTabs[0]?.id;
+  
+  if (nonHomeTabs.length > 0) {
+    let mostRecentTabId: string | null = null;
+    let maxTime = 0;
 
-  for (const tab of state.plan) {
-    if (!tab.isHome && state.favoriteTabs && state.favoriteTabs[tab.id]) {
-      const lastDone = state.scheduleHistoryDates && state.scheduleHistoryDates[tab.id]
-        ? new Date(state.scheduleHistoryDates[tab.id]).getTime()
+    nonHomeTabs.forEach(tab => {
+      const time = state.scheduleHistoryDates?.[tab.id] 
+        ? new Date(state.scheduleHistoryDates[tab.id]).getTime() 
         : 0;
-      if (lastDone <= oldestTime) {
-        oldestTime = lastDone;
-        oldestFav = tab;
+      if (time > maxTime) {
+        maxTime = time;
+        mostRecentTabId = tab.id;
       }
+    });
+
+    // Se c'è uno storico, suggeriamo la scheda successiva nell'elenco (in modo ciclico)
+    if (mostRecentTabId) {
+      const currentIndex = nonHomeTabs.findIndex(t => t.id === mostRecentTabId);
+      const nextIndex = (currentIndex + 1) % nonHomeTabs.length;
+      recommendedTabId = nonHomeTabs[nextIndex].id;
     }
-  }
-
-  const recommendedTab: WorkoutTab | null = oldestFav;
-
-  let timeText = 'Mai eseguita';
-  if (recommendedTab && oldestTime > 0) {
-    const diffDays = Math.floor((Date.now() - oldestTime) / (1000 * 60 * 60 * 24));
-    if (diffDays === 0) timeText = 'Oggi';
-    else if (diffDays === 1) timeText = 'Ieri';
-    else timeText = `${diffDays} giorni fa`;
   }
 
   const streak = computeCurrentStreak(state.allWorkoutDates || []);
@@ -117,36 +116,74 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
         </div>
       )}
 
-      {/* Recommended Routine Card */}
-      {recommendedTab && (
-        <div className="bg-emerald-950/20 border border-emerald-900/40 p-4 rounded-2xl shadow-sm">
-          <div className="text-[10px] uppercase font-extrabold text-emerald-400 tracking-wider mb-2 flex items-center gap-1.5">
-            <i className="fa-solid fa-rotate text-[10px]" /> Rotazione Consigliata
-          </div>
-          <div className="flex justify-between items-center gap-3">
-            <div>
-              <div className="font-extrabold text-white text-sm">
-                {recommendedTab.name}{' '}
-                {recommendedTab.subtitle && (
-                  <span className="text-xs text-zinc-400 font-normal ml-1">({recommendedTab.subtitle})</span>
-                )}
-              </div>
-              <div className="text-[11px] text-zinc-400 mt-1 flex items-center gap-1.5">
-                <i className="fa-regular fa-clock text-zinc-500" />
-                Ultima esecuzione:{' '}
-                <span className="text-zinc-200 font-semibold">{timeText}</span>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => onSelectTab(recommendedTab.id)}
-              className="bg-emerald-500 hover:bg-emerald-400 transition text-zinc-950 px-5 py-2.5 rounded-xl text-xs font-bold outline-none shadow-sm active:scale-95 shrink-0"
-            >
-              Inizia
-            </button>
-          </div>
+      {/* Carousel Schede */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-3 px-1">
+          <h2 className="text-white font-extrabold text-sm flex items-center gap-2">
+            <i className="fa-solid fa-layer-group text-emerald-500" /> Le tue Schede
+          </h2>
         </div>
-      )}
+        
+        {/* Contenitore scorrevole in orizzontale */}
+        <div className="flex overflow-x-auto gap-4 pb-4 hide-scrollbar snap-x px-1">
+          {nonHomeTabs.map((tab) => {
+            const isRecommended = tab.id === recommendedTabId;
+            const lastDone = state.scheduleHistoryDates?.[tab.id] ? new Date(state.scheduleHistoryDates[tab.id]) : null;
+            
+            let timeText = 'Mai eseguita';
+            if (lastDone) {
+               const diffDays = Math.floor((Date.now() - lastDone.getTime()) / (1000 * 60 * 60 * 24));
+               if (diffDays === 0) timeText = 'Oggi';
+               else if (diffDays === 1) timeText = 'Ieri';
+               else timeText = `${diffDays} giorni fa`;
+            }
+
+            return (
+              <div 
+                key={tab.id} 
+                className={`shrink-0 w-64 snap-center rounded-3xl p-5 border shadow-sm relative overflow-hidden transition-all ${
+                  isRecommended 
+                    ? 'bg-emerald-950/30 border-emerald-500/50 ring-1 ring-emerald-500/20' 
+                    : 'bg-zinc-900/60 border-zinc-800/60'
+                }`}
+              >
+                {/* Effetto luce superiore per la consigliata */}
+                {isRecommended && (
+                  <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]" />
+                )}
+                
+                <div className="flex justify-between items-start mb-3">
+                  <div className={`text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-md ${
+                    isRecommended ? 'bg-emerald-500 text-zinc-950' : 'bg-zinc-800 text-zinc-400'
+                  }`}>
+                    {isRecommended ? '🔥 Consigliata Oggi' : 'Scheda'}
+                  </div>
+                </div>
+                
+                <h3 className="text-white font-black text-lg leading-tight mb-1 truncate">{tab.name}</h3>
+                <p className="text-zinc-400 text-xs truncate mb-4">{tab.subtitle || 'Nessun sottotitolo'}</p>
+                
+                <div className="flex items-center justify-between mt-auto">
+                  <div className="text-[10px] text-zinc-500 flex items-center gap-1.5 font-medium">
+                    <i className="fa-regular fa-clock" /> {timeText}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onSelectTab(tab.id)}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 outline-none ${
+                      isRecommended 
+                        ? 'bg-emerald-500 text-zinc-950 hover:bg-emerald-400' 
+                        : 'bg-zinc-800 text-zinc-200 hover:bg-zinc-700'
+                    }`}
+                  >
+                    Apri
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
 
       {/* Streak & BIA Cards */}
       <div className="grid grid-cols-2 gap-3">

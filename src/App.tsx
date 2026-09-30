@@ -18,6 +18,7 @@ import {
 import { playTrumpet, playShortBeep, initAudio } from './utils/audio';
 import { extractBiaFromPdf, ExtractedBiaData } from './utils/pdfExtractor';
 import { computeCurrentStreak } from './utils/coach';
+import { safeSetInterval, safeClearInterval } from './utils/workerTimer';
 
 import { Header } from './components/Header';
 import { SideMenu } from './components/SideMenu';
@@ -60,11 +61,11 @@ export default function App() {
   const [restTimerSeconds, setRestTimerSeconds] = useState(0);
   const [isRestTimerActive, setIsRestTimerActive] = useState(false);
   const restTimerCallbackRef = useRef<(() => void) | null>(null);
-  const restTimerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const restTimerIntervalRef = useRef<number | null>(null);
 
   // Inline Timers (for time-based exercises like plank)
   const [activeInlineTimers, setActiveInlineTimers] = useState<Record<string, number>>({});
-  const inlineTimerIntervalsRef = useRef<Record<string, NodeJS.Timeout>>({});
+  const inlineTimerIntervalsRef = useRef<Record<string, number>>({});
 
   // Master Timers (for EMOM / AMRAP)
   const [activeMasterTimer, setActiveMasterTimer] = useState<{
@@ -75,7 +76,7 @@ export default function App() {
     activeEmomRound?: number;
     totalRounds?: number;
   } | null>(null);
-  const masterTimerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const masterTimerIntervalRef = useRef<number | null>(null);
 
   // Live Workout duration
   const [workoutLiveSec, setWorkoutLiveSec] = useState(0);
@@ -212,8 +213,19 @@ export default function App() {
         saveGymState(state);
       }
     };
+
+    // NUOVO: Rete di sicurezza per iOS quando l'app viene "killata"
+    const handlePageHide = () => {
+      if (state) saveGymState(state);
+    };
+
     document.addEventListener('visibilitychange', handleVis);
-    return () => document.removeEventListener('visibilitychange', handleVis);
+    window.addEventListener('pagehide', handlePageHide);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVis);
+      window.removeEventListener('pagehide', handlePageHide);
+    };
   }, [state, requestWakeLock]);
 
   const activeTabId = state?.activeTab || 'home';
@@ -230,13 +242,13 @@ export default function App() {
       setWorkoutLiveSec(diff >= 0 ? diff : 0);
     };
     updateTimer();
-    const intv = setInterval(updateTimer, 1000);
-    return () => clearInterval(intv);
+    const intv = safeSetInterval(updateTimer, 1000);
+    return () => safeClearInterval(intv);
   }, [isWorkoutActive, currentWorkout?.startTime]);
 
   const skipRestTimer = useCallback(() => {
     if (restTimerIntervalRef.current) {
-      clearInterval(restTimerIntervalRef.current);
+      safeClearInterval(restTimerIntervalRef.current);
       restTimerIntervalRef.current = null;
     }
     setIsRestTimerActive(false);
@@ -251,17 +263,17 @@ export default function App() {
   const startRestTimer = useCallback(
     (seconds: number, onFinished?: () => void) => {
       if (restTimerIntervalRef.current) {
-        clearInterval(restTimerIntervalRef.current);
+        safeClearInterval(restTimerIntervalRef.current);
       }
       const dur = seconds > 0 ? seconds : 90;
       setRestTimerSeconds(dur);
       setIsRestTimerActive(true);
       restTimerCallbackRef.current = onFinished || null;
       const endTime = Date.now() + dur * 1000;
-      restTimerIntervalRef.current = setInterval(() => {
+      restTimerIntervalRef.current = safeSetInterval(() => {
         const remaining = Math.ceil((endTime - Date.now()) / 1000);
         if (remaining <= 0) {
-          if (restTimerIntervalRef.current) clearInterval(restTimerIntervalRef.current);
+          if (restTimerIntervalRef.current) safeClearInterval(restTimerIntervalRef.current);
           restTimerIntervalRef.current = null;
           setIsRestTimerActive(false);
           setRestTimerSeconds(0);
@@ -306,7 +318,7 @@ export default function App() {
       Object.keys(updated).forEach((k) => {
         if (k.startsWith(`${targetId}-`)) {
           if (inlineTimerIntervalsRef.current[k]) {
-            clearInterval(inlineTimerIntervalsRef.current[k]);
+            safeClearInterval(inlineTimerIntervalsRef.current[k]);
             delete inlineTimerIntervalsRef.current[k];
           }
           delete updated[k];
@@ -332,7 +344,7 @@ export default function App() {
     // 🔴 FASE 2: Pulizia Timer Fantasma
     if (activeMasterTimer?.circuitId === circuit.id) {
       if (masterTimerIntervalRef.current) {
-        clearInterval(masterTimerIntervalRef.current);
+        safeClearInterval(masterTimerIntervalRef.current);
         masterTimerIntervalRef.current = null;
       }
       setActiveMasterTimer(null);
@@ -503,37 +515,45 @@ export default function App() {
     const todayStr = getTodayStr();
     const newState = { ...state };
 
+    const tab = newState.plan.find((t) => t.id === tabId);
+
+    // Funzione centralizzata per azzerare i dati della sessione
+    const clearSessionData = () => {
+      tab?.exercises.forEach((ex) => {
+        if (ex.type === 'single') {
+          for (let i = 0; i < ex.sets; i++) {
+            delete newState.checkedSets[`${ex.id}-${i}`];
+            delete newState.setReps[`${ex.id}-${i}`];
+            delete newState.setRir[`${ex.id}-${i}`];
+            delete newState.setRpe[`${ex.id}-${i}`];
+          }
+        } else if (ex.type === 'superset') {
+          delete newState.amrapRounds[ex.id];
+          for (let j = 0; j < 50; j++) {
+            delete newState.checkedSets[`${ex.id}-round-${j}`];
+            ex.exercises.forEach((sub) => {
+              delete newState.checkedSets[`${sub.id}-${j}`];
+              delete newState.setReps[`${sub.id}-${j}`];
+              delete newState.setRir[`${sub.id}-${j}`];
+              delete newState.setRpe[`${sub.id}-${j}`];
+            });
+          }
+        }
+      });
+    };
+
     if (newState.lastSessionDate[tabId] === todayStr) {
       const conf = confirm(
         'Hai già una sessione registrata oggi per questa scheda. Vuoi azzerare i set per iniziarne una nuova?'
       );
       if (conf) {
-        const tab = newState.plan.find((t) => t.id === tabId);
-        tab?.exercises.forEach((ex) => {
-          if (ex.type === 'single') {
-            for (let i = 0; i < ex.sets; i++) {
-              delete newState.checkedSets[`${ex.id}-${i}`];
-              delete newState.setReps[`${ex.id}-${i}`];
-              delete newState.setRir[`${ex.id}-${i}`];
-              delete newState.setRpe[`${ex.id}-${i}`];
-            }
-          } else if (ex.type === 'superset') {
-            delete newState.amrapRounds[ex.id];
-            for (let j = 0; j < 50; j++) {
-              delete newState.checkedSets[`${ex.id}-round-${j}`];
-              ex.exercises.forEach((sub) => {
-                delete newState.checkedSets[`${sub.id}-${j}`];
-                delete newState.setReps[`${sub.id}-${j}`];
-                delete newState.setRir[`${sub.id}-${j}`];
-                delete newState.setRpe[`${sub.id}-${j}`];
-              });
-            }
-          }
-        });
+        clearSessionData();
       } else {
-        // 🔴 BUG FIX: Se preme annulla, blocchiamo l'avvio della sessione
         return;
       }
+    } else {
+      // 🔴 È un giorno diverso: azzeriamo tutto automaticamente
+      clearSessionData();
     }
 
     newState.lastSessionDate[tabId] = todayStr;
@@ -746,8 +766,8 @@ export default function App() {
   const handleToggleSet = (
     exId: string,
     setIndex: number,
-    defaultReps: string,
     pauseSec: number,
+    prefill: { reps: string; weight: string; rir?: string; rpe?: string },
     isSub = false,
     circuitId?: string
   ) => {
@@ -761,30 +781,28 @@ export default function App() {
       delete newState.checkedSets[setId];
     } else {
       newState.checkedSets[setId] = true;
-      if (newState.setReps[setId] === undefined) {
-        newState.setReps[setId] = defaultReps;
-      }
+      // 🔴 Congeliamo i dati visivi pre-compilati nello stato effettivo
+      if (newState.setReps[setId] === undefined) newState.setReps[setId] = prefill.reps;
+      if (newState.setWeights[setId] === undefined) newState.setWeights[setId] = prefill.weight;
+      if (prefill.rir !== undefined && newState.setRir[setId] === undefined) newState.setRir[setId] = prefill.rir;
+      if (prefill.rpe !== undefined && newState.setRpe[setId] === undefined) newState.setRpe[setId] = prefill.rpe;
 
       let handledCircuitRest = false;
 
-      // 🔴 NUOVO: Riconoscimento intelligente della fine del circuito
       if (isSub && circuitId) {
         const currentTab = newState.plan.find((t) => t.id === newState.activeTab);
         const circuit = currentTab?.exercises.find((e) => e.id === circuitId);
-        
+                 
         if (circuit && circuit.type === 'superset' && circuit.structureType === 'classic') {
-          // Cerca l'ultimo esercizio vero e proprio del circuito (ignorando eventuali blocchi "Pausa" intermedi)
           const lastRealEx = [...circuit.exercises].reverse().find((e) => e.metricType !== 'rest');
-          
+                     
           if (lastRealEx && lastRealEx.id === exId) {
             handledCircuitRest = true;
             const circuitPause = circuit.pause || 90;
             playShortBeep();
-            
-            // Avvia la pausa grande del circuito
+                         
             if (circuitPause > 0) {
               startRestTimer(circuitPause, () => {
-                // Al termine del timer, spunta automaticamente il pulsante "Rec. Giro X"
                 setState((prev) => {
                   if (!prev) return null;
                   return {
@@ -800,7 +818,6 @@ export default function App() {
         }
       }
 
-      // Se non siamo alla fine del circuito, esegui il comportamento normale
       if (!handledCircuitRest) {
         playShortBeep();
         if (pauseSec > 0) {
@@ -822,36 +839,39 @@ export default function App() {
   const handleLongPressSet = (
     exId: string,
     setIndex: number,
-    defaultReps: string,
     pauseSec: number,
+    prefill: { reps: string; weight: string; rir?: string; rpe?: string },
     circuitId?: string
   ) => {
     if (!state) return;
     const setId = `${exId}-${setIndex}`;
-    const currentVal = state.setReps[setId] ?? defaultReps;
+    const currentVal = state.setReps[setId] ?? prefill.reps;
     const input = prompt('Quante ripetizioni hai eseguito davvero?', currentVal);
-    
+         
     if (input !== null && input.trim() !== '') {
       const parsed = Math.max(0, parseInt(input)); 
       if (!isNaN(parsed)) {
         const newState = { ...state };
         newState.setReps[setId] = parsed.toString();
+        // 🔴 Congeliamo i pesi e gli sforzi pre-compilati insieme alle nuove reps
+        if (newState.setWeights[setId] === undefined) newState.setWeights[setId] = prefill.weight;
+        if (prefill.rir !== undefined && newState.setRir[setId] === undefined) newState.setRir[setId] = prefill.rir;
+        if (prefill.rpe !== undefined && newState.setRpe[setId] === undefined) newState.setRpe[setId] = prefill.rpe;
         newState.checkedSets[setId] = true;
 
         let handledCircuitRest = false;
 
-        // 🔴 NUOVO: Stesso riconoscimento intelligente per la pressione prolungata
         if (circuitId) {
           const currentTab = newState.plan.find((t) => t.id === newState.activeTab);
           const circuit = currentTab?.exercises.find((e) => e.id === circuitId);
-          
+                     
           if (circuit && circuit.type === 'superset' && circuit.structureType === 'classic') {
             const lastRealEx = [...circuit.exercises].reverse().find((e) => e.metricType !== 'rest');
-            
+                             
             if (lastRealEx && lastRealEx.id === exId) {
               handledCircuitRest = true;
               const circuitPause = circuit.pause || 90;
-              
+                                 
               if (circuitPause > 0) {
                 startRestTimer(circuitPause, () => {
                   setState((prev) => {
@@ -869,7 +889,6 @@ export default function App() {
           }
         }
 
-        // Timer normale se non è l'ultimo esercizio
         if (!handledCircuitRest && pauseSec > 0) {
           startRestTimer(pauseSec, () => {
             if (circuitId) {
@@ -886,12 +905,17 @@ export default function App() {
     }
   };
 
-  const handleRunInlineTimer = (setId: string, durationSec: number, pauseSec: number) => {
+  const handleRunInlineTimer = (
+    setId: string, 
+    durationSec: number, 
+    pauseSec: number, 
+    prefill: { weight: string; rir?: string; rpe?: string }
+  ) => {
     if (!state) return;
     initAudio();
     if (activeInlineTimers[setId]) {
       if (inlineTimerIntervalsRef.current[setId]) {
-        clearInterval(inlineTimerIntervalsRef.current[setId]);
+        safeClearInterval(inlineTimerIntervalsRef.current[setId]);
         delete inlineTimerIntervalsRef.current[setId];
       }
       setActiveInlineTimers((prev) => {
@@ -903,10 +927,10 @@ export default function App() {
     }
     setActiveInlineTimers((prev) => ({ ...prev, [setId]: durationSec }));
     const endTime = Date.now() + durationSec * 1000;
-    inlineTimerIntervalsRef.current[setId] = setInterval(() => {
+    inlineTimerIntervalsRef.current[setId] = safeSetInterval(() => {
       const remaining = Math.ceil((endTime - Date.now()) / 1000);
       if (remaining <= 0) {
-        clearInterval(inlineTimerIntervalsRef.current[setId]);
+        safeClearInterval(inlineTimerIntervalsRef.current[setId]);
         delete inlineTimerIntervalsRef.current[setId];
         setActiveInlineTimers((prev) => {
           const next = { ...prev };
@@ -918,6 +942,11 @@ export default function App() {
           if (!prev) return null;
           const nextState = { ...prev };
           nextState.checkedSets[setId] = true;
+          // 🔴 Congeliamo i dati al termine del timer
+          if (nextState.setReps[setId] === undefined) nextState.setReps[setId] = String(durationSec);
+          if (nextState.setWeights[setId] === undefined) nextState.setWeights[setId] = prefill.weight;
+          if (prefill.rir !== undefined && nextState.setRir[setId] === undefined) nextState.setRir[setId] = prefill.rir;
+          if (prefill.rpe !== undefined && nextState.setRpe[setId] === undefined) nextState.setRpe[setId] = prefill.rpe;
           return nextState;
         });
         if (pauseSec > 0) startRestTimer(pauseSec);
@@ -929,7 +958,7 @@ export default function App() {
 
   const handleStartEmom = (circuitId: string, totalMin: number, intervalSec: number) => {
     if (activeMasterTimer && activeMasterTimer.circuitId === circuitId) {
-      if (masterTimerIntervalRef.current) clearInterval(masterTimerIntervalRef.current);
+      if (masterTimerIntervalRef.current) safeClearInterval(masterTimerIntervalRef.current);
       masterTimerIntervalRef.current = null;
       setActiveMasterTimer(null);
       return;
@@ -946,13 +975,13 @@ export default function App() {
       totalRounds,
       intervalSec
     });
-    masterTimerIntervalRef.current = setInterval(() => {
+    masterTimerIntervalRef.current = safeSetInterval(() => {
       const remaining = Math.ceil((roundEndTime - Date.now()) / 1000);
       if (remaining <= 0) {
         playTrumpet();
         currentRound++;
         if (currentRound >= totalRounds) {
-          if (masterTimerIntervalRef.current) clearInterval(masterTimerIntervalRef.current);
+          if (masterTimerIntervalRef.current) safeClearInterval(masterTimerIntervalRef.current);
           masterTimerIntervalRef.current = null;
           setActiveMasterTimer(null);
           showToast('EMOM Completato con successo! 🎉');
@@ -975,7 +1004,7 @@ export default function App() {
 
   const handleStartAmrap = (circuitId: string, totalMin: number) => {
     if (activeMasterTimer && activeMasterTimer.circuitId === circuitId) {
-      if (masterTimerIntervalRef.current) clearInterval(masterTimerIntervalRef.current);
+      if (masterTimerIntervalRef.current) safeClearInterval(masterTimerIntervalRef.current);
       masterTimerIntervalRef.current = null;
       setActiveMasterTimer(null);
       return;
@@ -988,10 +1017,10 @@ export default function App() {
       type: 'amrap',
       remainingSec: duration
     });
-    masterTimerIntervalRef.current = setInterval(() => {
+    masterTimerIntervalRef.current = safeSetInterval(() => {
       const remaining = Math.ceil((endTime - Date.now()) / 1000);
       if (remaining <= 0) {
-        if (masterTimerIntervalRef.current) clearInterval(masterTimerIntervalRef.current);
+        if (masterTimerIntervalRef.current) safeClearInterval(masterTimerIntervalRef.current);
         masterTimerIntervalRef.current = null;
         setActiveMasterTimer(null);
         playTrumpet();
@@ -1292,14 +1321,16 @@ export default function App() {
                     activeInlineTimerSec={activeInlineTimers}
                     onOpenVideo={(url) => setVideoModalUrl(url)}
                     onOpenEffortModal={(setId, isRpe) => setEffortTarget({ setId, isRpe })}
-                    onRunInlineTimer={handleRunInlineTimer}
+                    onRunInlineTimer={(setId, dur, pauseSec, prefill) => 
+                      handleRunInlineTimer(setId, dur, pauseSec, prefill)
+                    }
                     onSaveWeight={(val) => handleSaveWeight(ex.id, val)}
                     onSaveSetWeight={handleSaveSetWeight}
-                    onToggleSet={(sIdx, targetReps, pauseSec) =>
-                      handleToggleSet(ex.id, sIdx, targetReps, pauseSec)
+                    onToggleSet={(sIdx, pauseSec, prefill) =>
+                      handleToggleSet(ex.id, sIdx, pauseSec, prefill)
                     }
-                    onLongPressSet={(sIdx, targetReps) =>
-                      handleLongPressSet(ex.id, sIdx, targetReps, ex.pause || 0)
+                    onLongPressSet={(sIdx, pauseSec, prefill) =>
+                      handleLongPressSet(ex.id, sIdx, pauseSec, prefill)
                     }
                     onUpdateEx={(field, val) => {
                       setState((prev) => {
@@ -1404,11 +1435,11 @@ export default function App() {
                       }
                     }}
                     onSaveWeight={(subId, val) => handleSaveWeight(subId, val)}
-                    onToggleSubSet={(subId, roundIdx, targetReps, pauseSec) =>
-                      handleToggleSet(subId, roundIdx, targetReps, pauseSec, true, ex.id)
+                    onToggleSubSet={(subId, roundIdx, pauseSec, prefill) =>
+                      handleToggleSet(subId, roundIdx, pauseSec, prefill, true, ex.id)
                     }
-                    onLongPressSubSet={(subId, roundIdx, targetReps, pauseSec) => {
-                      handleLongPressSet(subId, roundIdx, targetReps, pauseSec, ex.id);
+                    onLongPressSubSet={(subId, roundIdx, pauseSec, prefill) => {
+                      handleLongPressSet(subId, roundIdx, pauseSec, prefill, ex.id);
                     }}
                     onUpdateCircuit={(field, val) => {
                       setState((prev) => {
