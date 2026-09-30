@@ -748,6 +748,88 @@ export default function App() {
         });
 
         newState.workoutSessionsHistory.unshift(snapshot);
+
+        // --- 🔴 INIZIO MOTORE V2 (FASE C & D): Generazione Snapshot Immutabile ---
+        if (!newState.registryV2) newState.registryV2 = {};
+        if (!newState.sessionsV2) newState.sessionsV2 = [];
+
+        // Funzione per agganciare o creare l'ID permanente nel Registro (FASE C)
+        const getOrRegisterEx = (name: string, type: any) => {
+            let regId = Object.keys(newState.registryV2!).find(k => newState.registryV2![k].name === name);
+            if (!regId) {
+                regId = generateId();
+                newState.registryV2![regId] = { id: regId, name, type };
+            }
+            return regId;
+        };
+
+        // Congelamento assoluto del peso corporeo al momento esatto (FASE D)
+        const bwAtSession = parseFloat(String(newState.bodyMetrics?.weight)) || 0;
+        
+        // Costruzione dinamica dei blocchi V2 leggendo l'allenamento appena concluso
+        const v2Blocks: any[] = snapshot.exercises.map(snapEx => {
+            if (snapEx.type === 'single') {
+                const regId = getOrRegisterEx(snapEx.name, snapEx.metricType);
+                return {
+                    exerciseId: regId,
+                    nameSnapshot: snapEx.name,
+                    type: snapEx.metricType,
+                    sets: snapEx.sets.map(s => ({
+                        id: generateId(),
+                        index: s.index,
+                        reps: parseInt(String(s.reps)) || undefined,
+                        weight: parseFloat(String(s.weight)) || undefined,
+                        durationSec: parseFloat(String(s.duration)) || undefined,
+                        rir: s.rir === '-1' || s.rir === 'CED' ? undefined : parseFloat(String(s.rir)),
+                        isCed: s.rir === '-1' || s.rir === 'CED',
+                        rpe: parseFloat(String(s.rpe)) || undefined,
+                    }))
+                };
+            } else {
+                return {
+                    id: generateId(),
+                    nameSnapshot: snapEx.name,
+                    structureType: snapEx.structureType,
+                    rounds: snapEx.rounds.map(r => ({
+                        roundIndex: r.roundIndex,
+                        exercises: r.exercises.map(sub => {
+                            const regId = getOrRegisterEx(sub.name, sub.metricType);
+                            return {
+                                exerciseId: regId,
+                                nameSnapshot: sub.name,
+                                type: sub.metricType,
+                                sets: [{
+                                    id: generateId(),
+                                    index: 1,
+                                    reps: parseInt(String(sub.reps)) || undefined,
+                                    weight: parseFloat(String(sub.weight)) || undefined,
+                                    durationSec: parseFloat(String(sub.duration)) || undefined,
+                                    rir: sub.rir === '-1' || sub.rir === 'CED' ? undefined : parseFloat(String(sub.rir)),
+                                    isCed: sub.rir === '-1' || sub.rir === 'CED',
+                                    rpe: parseFloat(String(sub.rpe)) || undefined,
+                                }]
+                            };
+                        })
+                    }))
+                };
+            }
+        });
+
+        // Creazione della sessione V2 finale
+        const v2Session = {
+            id: snapshot.id,
+            date: snapshot.date,
+            startedAt: workoutState.startTime || Date.now(),
+            completedAt: Date.now(),
+            durationStr: snapshot.duration,
+            tabNameSnapshot: snapshot.tabName,
+            bodyWeightAtSession: bwAtSession, // Salvato per sempre!
+            blocks: v2Blocks
+        };
+
+        // Salviamo la sessione in cima allo storico V2
+        newState.sessionsV2.unshift(v2Session as any);
+        // --- 🔴 FINE MOTORE V2 ---
         if (!newState.allWorkoutDates.includes(todayDateStr)) {
           newState.allWorkoutDates.push(todayDateStr);
         }

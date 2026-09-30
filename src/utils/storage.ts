@@ -1,6 +1,7 @@
 import LZString from 'lz-string';
 import { AppState, WorkoutTab } from '../types/gym';
 import { storageWorker } from './storageWorker';
+import { migrateV1ToV2 } from './migration';
 
 export const TIME_VOLUME_DIVISOR = 10;
 
@@ -325,6 +326,20 @@ export function normalizeState(parsed: any): AppState {
     scheduleHistoryDates: parsed.scheduleHistoryDates || {},
     deloadDates: parsed.deloadDates || []
   };
+
+  // 🔴 MOTORE V2: Auto-Migrazione Silenziosa all'avvio
+  if (!normalized.schemaVersion || normalized.schemaVersion < 2) {
+    try {
+      console.log("Migrazione V2 in background avviata...");
+      const v2Data = migrateV1ToV2(normalized);
+      normalized.registryV2 = v2Data.registry;
+      normalized.sessionsV2 = v2Data.sessions;
+      normalized.schemaVersion = 2;
+      console.log("Migrazione V2 completata e salvata nello stato.");
+    } catch (e) {
+      console.error("Errore durante la migrazione V2", e);
+    }
+  }
 
   return normalized;
 }

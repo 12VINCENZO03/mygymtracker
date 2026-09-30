@@ -1,3 +1,5 @@
+import { ExerciseDefV2, WorkoutSessionV2 } from './v2';
+
 export type MetricType = 'weight' | 'bodyweight' | 'time' | 'cardio' | 'rest';
 
 export type CircuitStructure = 'classic' | 'emom' | 'amrap';
@@ -202,4 +204,8 @@ export interface AppState {
   bodyGoal: BodyGoal;
   deloadActive: boolean;
   deloadDates: string[];
+  // 🔴 MOTORE V2
+  schemaVersion?: number;
+  registryV2?: Record<string, ExerciseDefV2>;
+  sessionsV2?: WorkoutSessionV2[];
 }
