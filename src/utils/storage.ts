@@ -1,5 +1,6 @@
 import LZString from 'lz-string';
 import { AppState, WorkoutTab } from '../types/gym';
+import { storageWorker } from './storageWorker';
 
 export const TIME_VOLUME_DIVISOR = 10;
 
@@ -230,7 +231,10 @@ export function getTodayStr(): string {
 }
 
 export function getPastDateStr(daysAgo: number): string {
-  const d = new Date(Date.now() - daysAgo * 86400000);
+  const d = new Date();
+  // Sottraiamo i giorni usando direttamente i metodi di calendario nativi di JavaScript.
+  // In questo modo evitiamo qualsiasi problema legato all'ora legale o ai millisecondi sballati.
+  d.setDate(d.getDate() - daysAgo);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
@@ -253,13 +257,17 @@ export function initDB(): Promise<IDBDatabase> {
       return reject(new Error('IndexedDB non supportato'));
     }
     if (idbDatabase) return resolve(idbDatabase);
-    const req = indexedDB.open('MyGymDB', 1);
+    
+    // 🔴 Versione 2: allineata con il Web Worker
+    const req = indexedDB.open('MyGymDB', 2);
+    
     req.onupgradeneeded = (e) => {
       const db = (e.target as IDBOpenDBRequest).result;
-      if (!db.objectStoreNames.contains('store')) {
-        db.createObjectStore('store');
-      }
+      if (!db.objectStoreNames.contains('store')) db.createObjectStore('store');
+      if (!db.objectStoreNames.contains('sessions')) db.createObjectStore('sessions');
+      if (!db.objectStoreNames.contains('weightsHistory')) db.createObjectStore('weightsHistory');
     };
+    
     req.onsuccess = (e) => {
       idbDatabase = (e.target as IDBOpenDBRequest).result;
       resolve(idbDatabase);
@@ -273,74 +281,113 @@ export async function loadGymState(): Promise<AppState> {
   try {
     const db = await initDB();
     loadedData = await new Promise((resolve, reject) => {
-      const tx = db.transaction('store', 'readonly');
-      const req = tx.objectStore('store').get('state');
-      req.onsuccess = (e) => resolve((e.target as IDBRequest).result);
-      req.onerror = (e) => reject((e.target as IDBRequest).error);
+      const tx = db.transaction(['store', 'sessions', 'weightsHistory'], 'readonly');
+      
+      let stateData: any = null;
+      let sessionsData: any = null;
+      let weightsData: any = null;
+
+      // Leggiamo i dati spezzati dai tre cassetti
+      const reqState = tx.objectStore('store').get('state');
+      reqState.onsuccess = () => stateData = reqState.result;
+
+      const reqSessions = tx.objectStore('sessions').get('history');
+      reqSessions.onsuccess = () => sessionsData = reqSessions.result;
+
+      const reqWeights = tx.objectStore('weightsHistory').get('history');
+      reqWeights.onsuccess = () => weightsData = reqWeights.result;
+
+      tx.oncomplete = () => {
+        if (stateData) {
+            // Ricomponiamo il puzzle per l'app
+            stateData.workoutSessionsHistory = sessionsData || [];
+            stateData.weightHistory = weightsData || {};
+            resolve(stateData);
+        } else {
+            resolve(null);
+        }
+      };
+      tx.onerror = (e) => reject((e.target as IDBRequest).error);
     });
   } catch (err) {
-    console.warn('IDB get failed, falling back to localStorage', err);
+    console.warn('Lettura DB fallita, avvio da zero o da cache', err);
   }
 
-  if (!loadedData && typeof window !== 'undefined') {
-    try {
-      const localStr = localStorage.getItem('gymTrackerData');
-      if (localStr) {
-        loadedData = JSON.parse(localStr);
-      }
-    } catch {
-      // ignore
-    }
-  }
-
+  // 🔴 Rimosso il localStorage mirror pesante su consiglio del report
+  
   if (!loadedData) {
     return JSON.parse(JSON.stringify(initialDefaultState));
   }
 
-  const merged: AppState = {
-    ...initialDefaultState,
-    ...loadedData,
-    setWeights: loadedData.setWeights || {}, // 🔴 NUOVO
-    plan: loadedData.plan && loadedData.plan.length > 0 ? loadedData.plan : initialDefaultState.plan,
-    bodyMetrics: { ...initialDefaultState.bodyMetrics, ...(loadedData.bodyMetrics || {}) },
-    prs: loadedData.prs || [],
-    bodyMetricsHistory: loadedData.bodyMetricsHistory || [],
-    workoutSessionsHistory: loadedData.workoutSessionsHistory || [],
-    volumeLog: loadedData.volumeLog || {},
-    sessionLoadLog: loadedData.sessionLoadLog || {},
-    streakDates: loadedData.streakDates || [],
-    allWorkoutDates: loadedData.allWorkoutDates || [],
-    schedaCompletions: loadedData.schedaCompletions || {},
-    amrapRounds: loadedData.amrapRounds || {},
-    lastSessionDate: loadedData.lastSessionDate || {},
-    exerciseNameRegistry: loadedData.exerciseNameRegistry || {},
-    favoriteTabs: loadedData.favoriteTabs || {},
-    scheduleHistoryDates: loadedData.scheduleHistoryDates || {},
-    deloadDates: loadedData.deloadDates || []
-  };
-
-  return merged;
+  // Usiamo il normalizzatore anche per il caricamento iniziale!
+  return normalizeState(loadedData);
 }
 
 export async function saveGymState(state: AppState): Promise<void> {
   if (typeof window === 'undefined') return;
   try {
-    const plain = JSON.parse(JSON.stringify(state));
-    try {
-      localStorage.setItem('gymTrackerData', JSON.stringify(plain));
-    } catch (e) {
-      console.warn('LocalStorage save failed', e);
+    if (storageWorker) {
+      // 🔴 Affidiamo il salvataggio al Worker. 
+      // Zero lag visivo, il clone viene fatto in automatico dal browser in background!
+      storageWorker.postMessage({ action: 'save', payload: state, id: Date.now() });
+    } else {
+      // Metodo di emergenza se il worker non fosse disponibile
+      const plain = JSON.parse(JSON.stringify(state));
+      const db = await initDB();
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(['store', 'sessions', 'weightsHistory'], 'readwrite');
+        
+        const sessions = plain.workoutSessionsHistory || [];
+        const weights = plain.weightHistory || {};
+        
+        delete plain.workoutSessionsHistory;
+        delete plain.weightHistory;
+
+        tx.objectStore('store').put(plain, 'state');
+        tx.objectStore('sessions').put(sessions, 'history');
+        tx.objectStore('weightsHistory').put(weights, 'history');
+        
+        tx.oncomplete = () => resolve();
+        tx.onerror = (e) => reject((e.target as IDBRequest).error);
+      });
     }
-    const db = await initDB();
-    await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction('store', 'readwrite');
-      const req = tx.objectStore('store').put(plain, 'state');
-      req.onsuccess = () => resolve();
-      req.onerror = (e) => reject((e.target as IDBRequest).error);
-    });
   } catch (err) {
     console.error('Failed to save gym state', err);
   }
+}
+
+// 🔴 NUOVA FUNZIONE: "La Dogana". Controlla e ripara i dati in ingresso.
+export function normalizeState(parsed: any): AppState {
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error('Formato dati non valido');
+  }
+
+  // Forza la struttura unendo i dati caricati con i default.
+  // Così, se nel backup vecchio manca "setWeights" o "setCustomFields", vengono creati vuoti senza crashare!
+  const normalized: AppState = {
+    ...initialDefaultState,
+    ...parsed,
+    setWeights: parsed.setWeights || {},
+    setCustomFields: parsed.setCustomFields || {}, // Protezione per il cardio avanzato
+    plan: parsed.plan && parsed.plan.length > 0 ? parsed.plan : initialDefaultState.plan,
+    bodyMetrics: { ...initialDefaultState.bodyMetrics, ...(parsed.bodyMetrics || {}) },
+    prs: parsed.prs || [],
+    bodyMetricsHistory: parsed.bodyMetricsHistory || [],
+    workoutSessionsHistory: parsed.workoutSessionsHistory || [],
+    volumeLog: parsed.volumeLog || {},
+    sessionLoadLog: parsed.sessionLoadLog || {},
+    streakDates: parsed.streakDates || [],
+    allWorkoutDates: parsed.allWorkoutDates || [],
+    schedaCompletions: parsed.schedaCompletions || {},
+    amrapRounds: parsed.amrapRounds || {},
+    lastSessionDate: parsed.lastSessionDate || {},
+    exerciseNameRegistry: parsed.exerciseNameRegistry || {},
+    favoriteTabs: parsed.favoriteTabs || {},
+    scheduleHistoryDates: parsed.scheduleHistoryDates || {},
+    deloadDates: parsed.deloadDates || []
+  };
+
+  return normalized;
 }
 
 export function exportBackupString(state: AppState): string {
@@ -352,6 +399,7 @@ export function exportBackupString(state: AppState): string {
 export function importBackupString(input: string): AppState {
   const trimmed = input.trim();
   let parsed: unknown;
+  
   if (trimmed.startsWith('GYM2::')) {
     const decompressed = LZString.decompressFromBase64(trimmed.substring(6));
     if (!decompressed) throw new Error('Dati compressi non validi');
@@ -361,10 +409,7 @@ export function importBackupString(input: string): AppState {
   } else {
     throw new Error('Formato backup non riconosciuto');
   }
-
-  if (!parsed || typeof parsed !== 'object') {
-    throw new Error('Dati non validi');
-  }
-
-  return parsed as AppState;
+  
+  // Applichiamo la normalizzazione prima di restituire i dati
+  return normalizeState(parsed);
 }

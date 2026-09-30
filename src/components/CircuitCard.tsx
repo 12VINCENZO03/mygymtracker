@@ -64,7 +64,6 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
 }) => {
   const pressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isLongPressRef = useRef(false);
-  const [, setForceUpdate] = useState(0);
 
   const isEmom = circuit.structureType === 'emom';
   const isAmrap = circuit.structureType === 'amrap';
@@ -534,133 +533,105 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
 
               {/* Rounds Inputs */}
               <div className="space-y-2.5">
-                {isAmrap ? (
-                  <div className="bg-zinc-900/80 p-3.5 rounded-2xl shadow-inner border border-zinc-800/50 space-y-2">
-                    <div className="text-xs font-bold text-zinc-400 flex items-center justify-between">
-                      <span>Target: {sub.reps || 10} reps</span>
-                      <span className="text-emerald-400 bg-emerald-950/30 px-2 py-1 rounded-lg border border-emerald-900/50">
-                        Giri completati: {amrapRoundsCount}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 pt-1">
-                      <span className="text-[10px] font-bold text-zinc-500 uppercase">Inserisci reps fatte:</span>
-                      <input
-                        type="text"
-                        disabled={!isWorkoutActive}
-                        value={state.setReps[`${sub.id}-amrap`] || sub.reps || '10'}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          // Aggiorniamo le ripetizioni reali dell'AMRAP nello stato globale
-                          state.setReps[`${sub.id}-amrap`] = val;
-                          state.checkedSets[`${sub.id}-amrap`] = true;
-                          setForceUpdate((prev: number) => prev + 1);
-                        }}
-                        placeholder="es. 12"
-                        className="bg-zinc-950 text-emerald-400 font-black text-xs w-20 p-2 rounded-xl text-center border border-zinc-700 outline-none"
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  Array.from({ length: totalRounds }).map((_, rIdx) => {
-                    const setId = `${sub.id}-${rIdx}`;
-                    const isChecked = Boolean(state.checkedSets[setId]);
-                    const hist = state.weightHistory && state.weightHistory[sub.id]?.[0];
-                    const defaultTargetReps = hist?.reps?.[rIdx] || (sub.reps || '10');
-                    const actualReps = state.setReps[setId] ?? defaultTargetReps;
+                {Array.from({ length: totalRounds }).map((_, rIdx) => {
+                  const setId = `${sub.id}-${rIdx}`;
+                  const isChecked = Boolean(state.checkedSets[setId]);
+                  const hist = state.weightHistory && state.weightHistory[sub.id]?.[0];
+                  const defaultTargetReps = hist?.reps?.[rIdx] || (sub.reps || '10');
+                  const actualReps = state.setReps[setId] ?? defaultTargetReps;
 
-                    let displayWeight = state.setWeights?.[setId];
+                  let displayWeight = state.setWeights?.[setId];
+                  if (displayWeight === undefined) {
+                    for (let j = rIdx - 1; j >= 0; j--) {
+                      const prevId = `${sub.id}-${j}`;
+                      if (state.setWeights?.[prevId] !== undefined) {
+                        displayWeight = state.setWeights[prevId];
+                        break;
+                      }
+                    }
+                    if (displayWeight === undefined && hist?.weights?.[rIdx] !== undefined && hist.weights[rIdx] !== '') {
+                      displayWeight = hist.weights[rIdx];
+                    }
                     if (displayWeight === undefined) {
-                      for (let j = rIdx - 1; j >= 0; j--) {
-                        const prevId = `${sub.id}-${j}`;
-                        if (state.setWeights?.[prevId] !== undefined) {
-                          displayWeight = state.setWeights[prevId];
-                          break;
-                        }
-                      }
-                      if (displayWeight === undefined && hist?.weights?.[rIdx] !== undefined && hist.weights[rIdx] !== '') {
-                        displayWeight = hist.weights[rIdx];
-                      }
-                      if (displayWeight === undefined) {
-                        displayWeight = state.weights[sub.id] || '';
-                      }
+                      displayWeight = state.weights[sub.id] || '';
                     }
+                  }
 
-                    // 🔴 BUG FIX: Gestione RPE per il Cardio nei Circuiti
-                    const isCardio = sub.metricType === 'cardio';
-                    const currentEffort = isCardio ? state.setRpe[setId] : state.setRir[setId];
-                    const histEffort = isCardio
-                      ? (hist?.rpes?.[rIdx] ?? (hist as any)?.rpe?.[rIdx])
-                      : (hist?.rirs?.[rIdx] ?? (hist as any)?.rir?.[rIdx]);
-                    const displayEffort = currentEffort !== undefined && currentEffort !== '' ? currentEffort : histEffort;
-                    
-                    const prefillData = {
-                      reps: actualReps,
-                      weight: displayWeight,
-                      rir: !isCardio && displayEffort !== undefined && displayEffort !== '' ? String(displayEffort) : undefined,
-                      rpe: isCardio && displayEffort !== undefined && displayEffort !== '' ? String(displayEffort) : undefined
-                    };
-                    
-                    let emomClass = '';
-                    if (isEmom) {
-                      if (activeEmomRound === -1 || rIdx > activeEmomRound) {
-                        emomClass = 'emom-locked';
-                      } else if (rIdx === activeEmomRound) {
-                        emomClass = 'emom-active';
-                      } else {
-                        emomClass = 'opacity-60';
-                      }
+                  // 🔴 BUG FIX: Gestione RPE per il Cardio nei Circuiti
+                  const isCardio = sub.metricType === 'cardio';
+                  const currentEffort = isCardio ? state.setRpe[setId] : state.setRir[setId];
+                  const histEffort = isCardio
+                    ? (hist?.rpes?.[rIdx] ?? (hist as any)?.rpe?.[rIdx])
+                    : (hist?.rirs?.[rIdx] ?? (hist as any)?.rir?.[rIdx]);
+                  const displayEffort = currentEffort !== undefined && currentEffort !== '' ? currentEffort : histEffort;
+                  
+                  const prefillData = {
+                    reps: actualReps,
+                    weight: displayWeight,
+                    rir: !isCardio && displayEffort !== undefined && displayEffort !== '' ? String(displayEffort) : undefined,
+                    rpe: isCardio && displayEffort !== undefined && displayEffort !== '' ? String(displayEffort) : undefined
+                  };
+                  
+                  let emomClass = '';
+                  if (isEmom) {
+                    if (activeEmomRound === -1 || rIdx > activeEmomRound) {
+                      emomClass = 'emom-locked';
+                    } else if (rIdx === activeEmomRound) {
+                      emomClass = 'emom-active';
+                    } else {
+                      emomClass = 'opacity-60';
                     }
+                  }
 
-                    return (
-                      <div key={rIdx} className={`flex items-center gap-2.5 ${emomClass}`}>
-                        <span className="text-[10px] font-black text-zinc-500 w-12 uppercase bg-zinc-950/80 border border-zinc-800/80 px-2 py-3.5 rounded-2xl text-center shadow-sm">
-                          G{rIdx + 1}
-                        </span>
-                        <button
-                          type="button"
-                          disabled={!isWorkoutActive}
-                          onPointerDown={() => handlePointerDown(sub.id, rIdx, sub.pause || 0, prefillData)}
-                          onPointerUp={() => handlePointerUp(sub.id, rIdx, sub.pause || 0, prefillData)}
-                          onPointerLeave={handlePointerCancel}
-                          className={`w-28 py-3.5 rounded-2xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
-                            isChecked
-                              ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-emerald-500/20'
-                              : 'bg-zinc-800/80 text-zinc-200 border-zinc-700/60 hover:bg-zinc-700'
-                          }`}
-                        >
-                          {isChecked ? (
-                            actualReps !== defaultTargetReps ? (
-                              `${actualReps} reps`
-                            ) : (
-                              <i className="fa-solid fa-check text-lg" />
-                            )
-                          ) : (
+                  return (
+                    <div key={rIdx} className={`flex items-center gap-2.5 ${emomClass}`}>
+                      <span className="text-[10px] font-black text-zinc-500 w-12 uppercase bg-zinc-950/80 border border-zinc-800/80 px-2 py-3.5 rounded-2xl text-center shadow-sm">
+                        G{rIdx + 1}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={!isWorkoutActive}
+                        onPointerDown={() => handlePointerDown(sub.id, rIdx, sub.pause || 0, prefillData)}
+                        onPointerUp={() => handlePointerUp(sub.id, rIdx, sub.pause || 0, prefillData)}
+                        onPointerLeave={handlePointerCancel}
+                        className={`w-28 py-3.5 rounded-2xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
+                          isChecked
+                            ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-emerald-500/20'
+                            : 'bg-zinc-800/80 text-zinc-200 border-zinc-700/60 hover:bg-zinc-700'
+                        }`}
+                      >
+                        {isChecked ? (
+                          actualReps !== defaultTargetReps ? (
                             `${actualReps} reps`
-                          )}
-                        </button>
-                        {/* 🔴 BUG FIX: Mostra RPE o RIR */}
-                        <button
-                          type="button"
-                          disabled={!isWorkoutActive}
-                          onClick={() => onOpenEffortModal(setId, isCardio)}
-                          className={`border text-[10px] font-extrabold flex-1 py-3.5 rounded-2xl outline-none uppercase tracking-wider shadow-sm transition-all active:scale-[0.98] ${
-                            currentEffort !== undefined && currentEffort !== ''
-                              ? 'text-zinc-100 border-zinc-500 bg-zinc-700'
-                              : displayEffort !== undefined && displayEffort !== ''
-                              ? 'text-emerald-400 border-dashed border-emerald-700/60 bg-emerald-950/20'
-                              : 'text-zinc-400 border-zinc-700/60 bg-zinc-900/50 hover:bg-zinc-800/80'
-                          }`}
-                        >
-                          {displayEffort !== undefined && displayEffort !== ''
-                            ? displayEffort === '-1'
-                              ? 'CED'
-                              : `${isCardio ? 'RPE' : 'RIR'} ${displayEffort}`
-                            : isCardio ? 'RPE' : 'RIR'}
-                        </button>
-                      </div>
-                    );
-                  })
-                )}
+                          ) : (
+                            <i className="fa-solid fa-check text-lg" />
+                          )
+                        ) : (
+                          `${actualReps} reps`
+                        )}
+                      </button>
+                      {/* 🔴 BUG FIX: Mostra RPE o RIR */}
+                      <button
+                        type="button"
+                        disabled={!isWorkoutActive}
+                        onClick={() => onOpenEffortModal(setId, isCardio)}
+                        className={`border text-[10px] font-extrabold flex-1 py-3.5 rounded-2xl outline-none uppercase tracking-wider shadow-sm transition-all active:scale-[0.98] ${
+                          currentEffort !== undefined && currentEffort !== ''
+                            ? 'text-zinc-100 border-zinc-500 bg-zinc-700'
+                            : displayEffort !== undefined && displayEffort !== ''
+                            ? 'text-emerald-400 border-dashed border-emerald-700/60 bg-emerald-950/20'
+                            : 'text-zinc-400 border-zinc-700/60 bg-zinc-900/50 hover:bg-zinc-800/80'
+                        }`}
+                      >
+                        {displayEffort !== undefined && displayEffort !== ''
+                          ? displayEffort === '-1'
+                            ? 'CED'
+                            : `${isCardio ? 'RPE' : 'RIR'} ${displayEffort}`
+                          : isCardio ? 'RPE' : 'RIR'}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );

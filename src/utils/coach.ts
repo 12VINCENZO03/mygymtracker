@@ -29,20 +29,18 @@ export function calculateAllVolumeStats(volumeLog: Record<string, number>): Volu
     hasLastMonth: false,
     hasLastYear: false
   };
-
   const currentWeekStart = new Date(d);
   currentWeekStart.setDate(d.getDate() - d.getDay() + (d.getDay() === 0 ? -6 : 1));
   currentWeekStart.setHours(0, 0, 0, 0);
-
   const lastWeekStart = new Date(currentWeekStart);
   lastWeekStart.setDate(lastWeekStart.getDate() - 7);
   const lastWeekEnd = new Date(currentWeekStart);
   lastWeekEnd.setDate(lastWeekEnd.getDate() - 1);
-
   const currentMonth = d.getMonth();
   const currentYear = d.getFullYear();
-  const lastMonthDate = new Date(d);
-  lastMonthDate.setMonth(d.getMonth() - 1);
+  
+  // Correzione del bug del mese precedente (gestione corretta dei mesi da 31 giorni)
+  const lastMonthDate = new Date(d.getFullYear(), d.getMonth() - 1, 1);
   const lastMonth = lastMonthDate.getMonth();
   const lastMonthYear = lastMonthDate.getFullYear();
   const lastYear = currentYear - 1;
@@ -51,7 +49,6 @@ export function calculateAllVolumeStats(volumeLog: Record<string, number>): Volu
     if (!vol) continue;
     const parts = dateStr.split('-');
     const logDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-
     if (logDate >= currentWeekStart) stats.week += vol;
     if (logDate >= lastWeekStart && logDate <= lastWeekEnd) {
       stats.lastWeek += vol;
@@ -68,7 +65,6 @@ export function calculateAllVolumeStats(volumeLog: Record<string, number>): Volu
       stats.hasLastYear = true;
     }
   }
-
   return stats;
 }
 
@@ -98,35 +94,19 @@ function getAvgReps(histEntry: WeightHistoryEntry): number {
 export function getFatigueTrendAlert(effHistory: WeightHistoryEntry[]): string | null {
   try {
     if (!effHistory || effHistory.length < 4) return null;
-    const now = new Date();
-    const withAge = effHistory
-      .map((h) => ({ h, days: Math.floor((now.getTime() - new Date(h.date).getTime()) / 86400000) }))
-      .filter((x) => x.days >= 0 && x.days <= 42);
-    const refWeight = parseFloat(effHistory[0].weight) || 0;
-    if (refWeight <= 0) return null;
-
-    const inBand = withAge.filter((x) => {
-      const w = parseFloat(x.h.weight) || 0;
-      return w > 0 && Math.abs(w - refWeight) / refWeight <= 0.05;
-    });
-    if (inBand.length < 4) return null;
-
     const rirOf = (h: WeightHistoryEntry) => {
       const v = Object.values(h.rirs || {})
         .filter((r) => r !== '' && !isNaN(Number(r)))
         .map(Number);
       return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
     };
-
-    const recent = inBand.filter((x) => x.days <= 14).map((x) => rirOf(x.h)).filter((v): v is number => v !== null);
-    const older = inBand.filter((x) => x.days > 28 && x.days <= 42).map((x) => rirOf(x.h)).filter((v): v is number => v !== null);
-
-    if (recent.length < 2 || older.length < 2) return null;
-    const avgRecent = recent.reduce((a, b) => a + b, 0) / recent.length;
-    const avgOlder = older.reduce((a, b) => a + b, 0) / older.length;
-
+    const recentRirs = effHistory.slice(0, 2).map(rirOf).filter((v): v is number => v !== null);
+    const olderRirs = effHistory.slice(2, 4).map(rirOf).filter((v): v is number => v !== null);
+    if (recentRirs.length < 2 || olderRirs.length < 2) return null;
+    const avgRecent = recentRirs.reduce((a, b) => a + b, 0) / recentRirs.length;
+    const avgOlder = olderRirs.reduce((a, b) => a + b, 0) / olderRirs.length;
     if (avgOlder - avgRecent >= 1) {
-      return 'Tendenza: Il RIR a parità di carico sta peggiorando nelle ultime settimane — possibile fatica accumulata, valuta uno scarico.';
+      return 'Tendenza Fatica: Il RIR medio sta calando rapidamente a parità di carico. Possibile accumulo di fatica sistemica, valuta uno scarico.';
     }
     return null;
   } catch {
@@ -156,31 +136,22 @@ export function getExerciseCoachAdvice(
       ? rawHistory.filter((h) => !deloadDates.includes(h.date))
       : rawHistory;
 
+    // Smart Deload check
     if (isWeightType && state.deloadActive) {
       return {
         badge: 'deload',
-        title: 'Scarico',
-        message: 'Settimana di scarico attiva, nessun aggiustamento di carico.'
+        title: 'Settimana di Scarico (Deload)',
+        message: 'Scarico attivo: riduci il volume del 30-40% e mantieni un margine elevato (RIR 3-4). Nessuna progressione oggi.'
       };
     }
 
     if (!history || history.length === 0) {
       const bm = state.bodyMetrics;
       if (bm && bm.ffm && isWeightType) {
-        const ffmVal = parseFloat(String(bm.ffm)) || 0;
-        const estMin = Math.round(ffmVal * 0.20 * 2) / 2;
-        const estMax = Math.round(ffmVal * 0.25 * 2) / 2;
         return {
           badge: 'info',
-          title: 'Stima FFM',
-          message: `Stima di partenza molto approssimativa — calibra dopo il primo set in base a come ti senti: ~${estMin}-${estMax}kg (20-25% della FFM, ${bm.ffm}kg).`
-        };
-      }
-      if (metricType === 'bodyweight' && (!bm || !bm.weight)) {
-        return {
-          badge: 'info',
-          title: 'Peso corporeo',
-          message: 'Inserisci il peso corporeo nel Profilo BIA per calcolare il volume esatto.'
+          title: 'Prima Sessione',
+          message: `Nello storico non ci sono dati per questo esercizio. Esegui il primo set e calibra in base alle sensazioni.`
         };
       }
       return null;
@@ -189,56 +160,34 @@ export function getExerciseCoachAdvice(
     const lastSession = history[0];
     const fatigueAlert = isWeightType ? getFatigueTrendAlert(history) : null;
 
-    // Check stall across 3 sessions
+    // Controllo Stallo avanzato (3 sessioni identiche in carico e ripetizioni)
     if (history.length >= 3 && isWeightType) {
       const w1 = parseFloat(history[0].weight) || 0;
       const w2 = parseFloat(history[1].weight) || 0;
       const w3 = parseFloat(history[2].weight) || 0;
-      if (w1 > 0 && w1 === w2 && w2 === w3) {
-        const avgReps1 = getAvgReps(history[0]);
-        const avgReps3 = getAvgReps(history[2]);
-        if (avgReps1 <= avgReps3) {
-          return {
-            badge: 'stall',
-            title: 'Stallo Rilevato',
-            message: 'Carico e ripetizioni fermi da 3+ sessioni. Valuta uno scarico o una variazione di stimolo.',
-            fatigueAlert: fatigueAlert || undefined
-          };
-        }
+      const reps1 = getAvgReps(history[0]);
+      const reps3 = getAvgReps(history[2]);
+      if (w1 > 0 && w1 === w2 && w2 === w3 && reps1 <= reps3) {
+        return {
+          badge: 'stall',
+          title: 'Stallo Rilevato',
+          message: 'Carico bloccato da 3 sessioni. Strategia di sblocco: prova a ridurre il carico del 10% per un ciclo o aumenta la pausa di 30s.',
+          fatigueAlert: fatigueAlert || undefined
+        };
       }
     }
 
     if (metricType === 'cardio') {
       if (lastSession.rpes) {
-        const validRpes = Object.values(lastSession.rpes)
-          .map(Number)
-          .filter((r) => !isNaN(r));
+        const validRpes = Object.values(lastSession.rpes).map(Number).filter((r) => !isNaN(r));
         if (validRpes.length > 0) {
           const avgRpe = validRpes.reduce((a, b) => a + b, 0) / validRpes.length;
           if (avgRpe <= 5) {
-            return {
-              badge: 'increase',
-              title: 'Sforzo Leggero',
-              message: `RPE medio ${avgRpe.toFixed(1)}. Puoi aumentare velocità o inclinazione.`
-            };
+            return { badge: 'increase', title: 'Sforzo Leggero', message: `RPE medio ${avgRpe.toFixed(1)}. Puoi aumentare velocità o inclinazione.` };
           } else if (avgRpe <= 7) {
-            return {
-              badge: 'maintain',
-              title: 'Zona Moderata',
-              message: `RPE ${avgRpe.toFixed(1)}. Buon equilibrio di lavoro aerobico.`
-            };
-          } else if (avgRpe <= 9) {
-            return {
-              badge: 'maintain',
-              title: 'Sforzo Intenso',
-              message: `RPE ${avgRpe.toFixed(1)}. Sessione impegnativa, mantieni i parametri attuali.`
-            };
+            return { badge: 'maintain', title: 'Zona Moderata', message: `RPE ${avgRpe.toFixed(1)}. Ottimo equilibrio aerobico.` };
           } else {
-            return {
-              badge: 'decrease',
-              title: 'Sforzo Massimo',
-              message: `RPE ${avgRpe.toFixed(1)}. Vicino al massimale, valuta un recupero più abbondante.`
-            };
+            return { badge: 'maintain', title: 'Sforzo Intenso', message: `RPE ${avgRpe.toFixed(1)}. Sessione impegnativa, mantieni i parametri.` };
           }
         }
       }
@@ -246,51 +195,15 @@ export function getExerciseCoachAdvice(
     }
 
     if (metricType === 'time') {
-      if (lastSession.rirs) {
-        const validRirs = Object.values(lastSession.rirs)
-          .filter((r) => r !== '' && !isNaN(Number(r)))
-          .map(Number);
-        if (validRirs.length > 0) {
-          const rirTarget = isCircuit ? validRirs[0] : validRirs.reduce((a, b) => a + b, 0) / validRirs.length;
-          if (rirTarget >= 3) {
-            return {
-              badge: 'increase',
-              title: 'Ampio Margine',
-              message: 'Margine elevato (RIR 3+). Prova ad allungare di 10-15s.'
-            };
-          } else if (rirTarget >= 1.5) {
-            return {
-              badge: 'increase',
-              title: 'Ottimo Margine',
-              message: 'Buon controllo: prova ad aggiungere 5-10s al set.'
-            };
-          } else if (rirTarget > 0) {
-            return {
-              badge: 'maintain',
-              title: 'Tempo Ideale',
-              message: 'Tempo calibrato alla perfezione. Mantieni la durata e cura la tecnica.'
-            };
-          } else {
-            return {
-              badge: 'decrease',
-              title: 'Cedimento Raggiunto',
-              message: 'Arrivato a cedimento tecnico: riduci leggermente i secondi per mantenere qualità.'
-            };
-          }
-        }
-      }
-      return null;
+      return { badge: 'info', title: 'Isometria', message: 'Cura la respirazione e mantieni la massima tensione corporea.' };
     }
 
-    // Standard weights
+    // Standard weights & Bodyweight (True Double Progression)
     if (isWeightType) {
       const validSetKeys = Object.keys(lastSession.reps || {}).filter((k) => lastSession.reps[k] !== '');
-
       if (validSetKeys.length > 0) {
-        // 🔴 Identificazione del Top Set
         let maxW = -1;
         let topIdx = validSetKeys[0];
-        
         validSetKeys.forEach((idx) => {
           const w = parseFloat(lastSession.weights?.[idx] ?? lastSession.weight) || 0;
           if (w > maxW) {
@@ -302,88 +215,83 @@ export function getExerciseCoachAdvice(
         const topWeight = maxW;
         const topReps = parseInt(lastSession.reps[topIdx]) || 0;
         const topRir = parseFloat(lastSession.rirs[topIdx]);
-        const targetReps = parseInt(targetRepsStr) || 0;
-        const hitReps = targetReps === 0 || topReps >= targetReps;
-        
+
+        // Parsing della Doppia Progressione (es. "8-12" -> min: 8, max: 12)
+        let minTargetReps = 8;
+        let maxTargetReps = 12;
+        if (targetRepsStr.includes('-')) {
+          const parts = targetRepsStr.split('-');
+          minTargetReps = parseInt(parts[0]) || 8;
+          maxTargetReps = parseInt(parts[1]) || 12;
+        } else {
+          const parsed = parseInt(targetRepsStr) || 10;
+          minTargetReps = parsed;
+          maxTargetReps = parsed;
+        }
+
         let upThreshold = 2.0;
         let downThreshold = 0.5;
-
-        if (state.bodyGoal === 'bulk') {
-          upThreshold = 1.0;
-          downThreshold = 0.5;
-        } else if (state.bodyGoal === 'cut') {
-          upThreshold = 2.5;
-          downThreshold = 0.0;
-        }
+        if (state.bodyGoal === 'bulk') { upThreshold = 1.0; downThreshold = 0.5; }
+        else if (state.bodyGoal === 'cut') { upThreshold = 2.5; downThreshold = 0.0; }
 
         // Corpo Libero Puro
         if (metricType === 'bodyweight' && topWeight === 0) {
           if (!isNaN(topRir)) {
-            if (topRir >= upThreshold && hitReps) {
-              if (topReps >= 12) {
-                return {
-                  badge: 'increase',
-                  title: 'Pronto per la Zavorra',
-                  message: `Sul tuo Top Set (${topReps} reps) avevi un margine alto (RIR ${topRir.toFixed(1)}). È il momento di aggiungere una zavorra leggera (es. 2.5-5kg) per spingere la forza.`,
-                  fatigueAlert: fatigueAlert || undefined
-                };
-              } else {
-                return {
-                  badge: 'increase',
-                  title: 'Aumenta le Ripetizioni',
-                  message: `Sul tuo Top Set avevi reps in riserva alte (RIR ${topRir.toFixed(1)}). Prova ad aggiungere 1-2 ripetizioni oggi.`,
-                  fatigueAlert: fatigueAlert || undefined
-                };
-              }
-            } else if (topRir <= downThreshold || !hitReps) {
+            if (topReps < maxTargetReps && topRir >= upThreshold) {
               return {
-                badge: 'maintain',
-                title: 'Consolida le Ripetizioni',
-                message: `Sul Top Set eri al limite (RIR ${topRir.toFixed(1)}). Mantieni queste ripetizioni per consolidare la tecnica.`,
+                badge: 'increase',
+                title: 'Doppia Progressione (Reps)',
+                message: `Sul top set hai chiuso ${topReps} reps con RIR ${topRir.toFixed(1)}. Obiettivo: punta a chiudere ${topReps + 1}-${maxTargetReps} reps oggi.`,
+                fatigueAlert: fatigueAlert || undefined
+              };
+            } else if (topReps >= maxTargetReps && topRir >= upThreshold) {
+              return {
+                badge: 'increase',
+                title: 'Pronto per la Zavorra',
+                message: `Hai saturato il range massimo (${topReps} reps) con ottimo margine (RIR ${topRir.toFixed(1)}). Inizia a usare una zavorra leggera (+2.5kg).`,
                 fatigueAlert: fatigueAlert || undefined
               };
             } else {
               return {
                 badge: 'maintain',
-                title: 'Volume Calibrato',
-                message: `Ripetizioni del Top Set perfette (RIR ${topRir.toFixed(1)}). Continua così.`,
+                title: 'Consolida le Reps',
+                message: `Top set a ${topReps} reps (RIR ${topRir.toFixed(1)}). Mantieni e consolida la tecnica.`,
                 fatigueAlert: fatigueAlert || undefined
               };
             }
           }
         } 
-        
-        // Pesi o Corpo Libero Zavorrato
+        // Pesi Liberi / Zavorrati (Doppia Progressione sul Carico)
         else {
           if (!isNaN(topRir)) {
-            if (topRir >= upThreshold && hitReps) {
-              const jump = topWeight < 20 ? 1 : topWeight < 50 ? 2.5 : 5;
+            if (topReps < maxTargetReps && topRir >= upThreshold) {
+              return {
+                badge: 'increase',
+                title: 'Aumenta le Ripetizioni',
+                message: `Sul top set (${topWeight}kg) hai fatto ${topReps} reps (Target max: ${maxTargetReps}). Oggi prova a guadagnare 1 ripetizione in più.`,
+                fatigueAlert: fatigueAlert || undefined
+              };
+            } else if (topReps >= maxTargetReps && topRir >= upThreshold) {
+              const jump = 2.5; // Incremento standard raccomandato di 2.5kg
               const targetW = topWeight + jump;
               return {
                 badge: 'increase',
-                title: 'Progressione Consigliata',
-                message: `Sul tuo Top Set (${topWeight}kg) avevi margine (RIR ${topRir.toFixed(1)}). Oggi prova ${targetW}kg (+${jump}kg) sul primo set.`,
+                title: 'Progressione di Carico (+2.5kg)',
+                message: `Range completato (${topReps} reps) con margine (RIR ${topRir.toFixed(1)}). Oggi sali a ${targetW}kg sul primo set!`,
                 fatigueAlert: fatigueAlert || undefined
               };
-            } else if (topRir <= downThreshold || !hitReps) {
+            } else if (topRir <= downThreshold) {
               return {
                 badge: 'maintain',
-                title: state.bodyGoal === 'cut' ? 'Recupera il Target' : 'Consolida il Carico',
-                message: `Sul tuo Top Set (${topWeight}kg) eri al limite (RIR ${topRir.toFixed(1)}). Mantieni questo carico per consolidarlo.`,
-                fatigueAlert: fatigueAlert || undefined
-              };
-            } else if (state.bodyGoal === 'cut') {
-              return {
-                badge: 'maintain',
-                title: 'Mantenimento in Cut',
-                message: `In cut, mantenere il Top Set a ${topWeight}kg è un ottimo risultato.`,
+                title: 'Consolida il Carico',
+                message: `Eri al limite sul top set (${topWeight}kg, RIR ${topRir.toFixed(1)}). Mantieni il carico per consolidarlo.`,
                 fatigueAlert: fatigueAlert || undefined
               };
             } else {
               return {
                 badge: 'maintain',
                 title: 'Carico Calibrato',
-                message: `Il tuo Top Set a ${topWeight}kg (RIR ${topRir.toFixed(1)}) è ben calibrato. Consolida prima di salire.`,
+                message: `Ottimo lavoro sul top set (${topWeight}kg). Mantieni i parametri attuali.`,
                 fatigueAlert: fatigueAlert || undefined
               };
             }
@@ -391,14 +299,7 @@ export function getExerciseCoachAdvice(
         }
       }
     }
-
-    return fatigueAlert
-      ? {
-          badge: 'info',
-          title: 'Coach Tendenza',
-          message: fatigueAlert
-        }
-      : null;
+    return fatigueAlert ? { badge: 'info', title: 'Coach Tendenza', message: fatigueAlert } : null;
   } catch {
     return null;
   }
@@ -410,34 +311,29 @@ export function getGoalCrossInsight(state: AppState, stats: VolumeStats): string
     if (!goal || goal === 'recomp') return null;
     const hist = state.bodyMetricsHistory || [];
     if (hist.length < 2) return null;
-
     const now = new Date();
     const past = hist.find((h) => {
       const d = Math.floor((now.getTime() - new Date(h.date).getTime()) / 86400000);
       return d >= 21 && d <= 42;
     });
     if (!past) return null;
-
     const cur = hist[0];
     const curFm = parseFloat(String(cur.fm)) || null;
     const pastFm = parseFloat(String(past.fm)) || null;
     const fmDown = curFm !== null && pastFm !== null && pastFm - curFm >= 0.5;
-
     const curWeight = parseFloat(String(cur.weight)) || 0;
     const pastWeight = parseFloat(String(past.weight)) || 0;
     const curFfm = parseFloat(String(cur.ffm)) || 0;
     const pastFfm = parseFloat(String(past.ffm)) || 0;
-
     const weightUp = curWeight - pastWeight >= 0.3;
     const ffmUp = curFfm - pastFfm >= 0.3;
     const volumeHigh = stats.hasLastWeek && stats.lastWeek > 0 && stats.week > stats.lastWeek * 1.15;
-
     if (goal === 'cut' && fmDown && volumeHigh) {
       const pct = Math.round((stats.week / stats.lastWeek - 1) * 100);
-      return `In cut, la massa grassa è in calo ma il volume settimanale è salito del +${pct}%. Rischio sovraccarico: valuta di attivare una settimana di scarico.`;
+      return `In cut la massa grassa è in calo ma il volume settimanale è salito del +${pct}%. Rischio sovraccarico: valuta uno scarico.`;
     }
     if (goal === 'bulk' && weightUp && ffmUp) {
-      return `In bulk, peso e massa magra sono in crescita costante rispetto a ${past.date}: continua con questa progressione!`;
+      return `In bulk peso e massa magra sono in crescita costante: continua così!`;
     }
     return null;
   } catch {

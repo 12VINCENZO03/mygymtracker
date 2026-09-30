@@ -34,8 +34,24 @@ import { SyncModal } from './components/SyncModal';
 import { HistoryModal } from './components/HistoryModal';
 import { VideoModal } from './components/VideoModal';
 
+// 🔴 NUOVO: La Funzione Protettrice. Pulisce l'input da lettere, virgole e numeri negativi
+const sanitizeNumericInput = (val: string | number): string => {
+  if (val === undefined || val === null) return '';
+  
+  // 1. Sostituisce la virgola col punto e rimuove TUTTO ciò che non è numero o punto
+  let cleaned = String(val).replace(',', '.').replace(/[^0-9.]/g, '');
+  
+  // 2. Se è vuoto o c'è solo un punto, restituisce stringa vuota
+  if (cleaned === '' || cleaned === '.') return '';
+  
+  // 3. Converte in numero e impedisce che sia minore di zero
+  const parsed = parseFloat(cleaned);
+  return !isNaN(parsed) ? Math.max(0, parsed).toString() : '';
+};
+
 export default function App() {
   const [state, setState] = useState<AppState | null>(null);
+  const stateRef = useRef<AppState | null>(null); // 🔴 NUOVO: Riferimento silenzioso per la memoria
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
   const [videoModalUrl, setVideoModalUrl] = useState<string | null>(null);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
@@ -133,22 +149,14 @@ export default function App() {
     setState((prev) => {
       if (!prev) return null;
       const next = { ...prev, activeTab: tabId };
-      saveGymState(next);
       return next;
     });
   }, []);
 
-  // 🔴 FASE 2: Sanitizzazione Input Numerici (Pesi Negativi)
+  // FASE 2: Sanitizzazione Input Numerici (Peso Globale)
   const handleSaveWeight = useCallback((id: string, val: string | number) => {
-    const rawStr = String(val).replace(',', '.').trim();
-    let cleanVal = '';
-    if (rawStr !== '') {
-      const parsedVal = parseFloat(rawStr);
-      if (!isNaN(parsedVal)) {
-        cleanVal = Math.max(0, parsedVal).toString();
-      }
-    }
-
+    const cleanVal = sanitizeNumericInput(val); // 🔴 Usiamo lo scudo protettivo
+    
     setState((prev) => {
       if (!prev) return null;
       const next = {
@@ -157,22 +165,14 @@ export default function App() {
       };
       updateExerciseHistory(next, id);
       calculateVolumeAndLoad(next);
-      saveGymState(next);
       return next;
     });
   }, []);
 
-  // 🔴 NUOVO: Salvataggio peso per singola serie
+  // NUOVO: Salvataggio peso per singola serie e Fix Bug Trattino
   const handleSaveSetWeight = useCallback((setId: string, val: string | number) => {
-    const rawStr = String(val).replace(',', '.').trim();
-    let cleanVal = '';
-    if (rawStr !== '') {
-      const parsedVal = parseFloat(rawStr);
-      if (!isNaN(parsedVal)) {
-        cleanVal = Math.max(0, parsedVal).toString();
-      }
-    }
-
+    const cleanVal = sanitizeNumericInput(val); // 🔴 Usiamo lo scudo protettivo
+    
     setState((prev) => {
       if (!prev) return null;
       const next = {
@@ -180,10 +180,29 @@ export default function App() {
         setWeights: { ...prev.setWeights, [setId]: cleanVal }
       };
       
-      const exId = setId.split('-')[0];
+      // 🔴 BUG FIX TRATTINO: Troviamo l'ULTIMO trattino (es: "bench-press-0" -> "bench-press")
+      const lastDashIndex = setId.lastIndexOf('-');
+      const exId = lastDashIndex > 0 ? setId.substring(0, lastDashIndex) : setId;
+      
       updateExerciseHistory(next, exId);
       calculateVolumeAndLoad(next);
-      saveGymState(next);
+      return next;
+    });
+  }, []);
+
+  // 🔴 NUOVO: Salvataggio campi cardio avanzati (Velocità, Inclinazione, ecc.)
+  const handleSaveCustomField = useCallback((setId: string, fieldId: string, val: string) => {
+    setState((prev) => {
+      if (!prev) return null;
+      const allFields = prev.setCustomFields || {};
+      const currentFields = allFields[setId] || {};
+      const next = {
+        ...prev,
+        setCustomFields: {
+          ...allFields,
+          [setId]: { ...currentFields, [fieldId]: val }
+        }
+      };
       return next;
     });
   }, []);
@@ -203,20 +222,25 @@ export default function App() {
     };
   }, [state, handleSelectTab, handleSaveWeight]);
 
+  // 🔴 1. Mantiene stateRef sempre sincronizzato in modo silenzioso
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
+  // 🔴 2. Gestisce gli eventi di sistema una sola volta all'avvio
   useEffect(() => {
     const handleVis = () => {
       if (document.visibilityState === 'visible') {
-        const curTab = state?.activeTab;
-        const active = curTab && state?.activeWorkouts[curTab]?.active;
+        const curTab = stateRef.current?.activeTab;
+        const active = curTab && stateRef.current?.activeWorkouts[curTab]?.active;
         if (active && !wakeLockRef.current) requestWakeLock();
-      } else if (document.visibilityState === 'hidden' && state) {
-        saveGymState(state);
+      } else if (document.visibilityState === 'hidden' && stateRef.current) {
+        saveGymState(stateRef.current);
       }
     };
 
-    // NUOVO: Rete di sicurezza per iOS quando l'app viene "killata"
     const handlePageHide = () => {
-      if (state) saveGymState(state);
+      if (stateRef.current) saveGymState(stateRef.current);
     };
 
     document.addEventListener('visibilitychange', handleVis);
@@ -226,7 +250,7 @@ export default function App() {
       document.removeEventListener('visibilitychange', handleVis);
       window.removeEventListener('pagehide', handlePageHide);
     };
-  }, [state, requestWakeLock]);
+  }, [requestWakeLock]); // Rimosso 'state' dalle dipendenze!
 
   const activeTabId = state?.activeTab || 'home';
   const currentWorkout = state?.activeWorkouts[activeTabId];
@@ -409,14 +433,18 @@ export default function App() {
           if (ex.structureType === 'amrap') {
             roundsToCount = currState.amrapRounds[ex.id] || 0;
           }
-
           ex.exercises.forEach((sub) => {
             const amrapRepVal = currState.setReps[`${sub.id}-amrap`];
+            
             if (sub.metricType === 'weight' || !sub.metricType) {
               for (let i = 0; i < roundsToCount; i++) {
                 if (ex.structureType === 'amrap' || currState.checkedSets[`${sub.id}-${i}`]) {
                   const reps = Math.max(0, parseInt((ex.structureType === 'amrap' && amrapRepVal) ? amrapRepVal : (currState.setReps[`${sub.id}-${i}`] || sub.reps || '10')) || 0);
-                  const weight = Math.max(0, parseFloat(currState.weights[sub.id]) || 0);
+                  
+                  // 🔴 BUG FIX PRO: Legge il peso specifico della serie (setWeights) con fallback al peso globale
+                  const setId = `${sub.id}-${i}`;
+                  const weight = Math.max(0, parseFloat(currState.setWeights?.[setId] ?? currState.weights[sub.id]) || 0);
+                  
                   tabVol += reps * weight;
                 }
               }
@@ -424,7 +452,11 @@ export default function App() {
               for (let i = 0; i < roundsToCount; i++) {
                 if (ex.structureType === 'amrap' || currState.checkedSets[`${sub.id}-${i}`]) {
                   const reps = Math.max(0, parseInt((ex.structureType === 'amrap' && amrapRepVal) ? amrapRepVal : (currState.setReps[`${sub.id}-${i}`] || sub.reps || '10')) || 0);
-                  const extraWeight = Math.max(0, parseFloat(currState.weights[sub.id]) || 0);
+                  
+                  // 🔴 Pesi granulari anche per il corpo libero zavorrato nei circuiti
+                  const setId = `${sub.id}-${i}`;
+                  const extraWeight = Math.max(0, parseFloat(currState.setWeights?.[setId] ?? currState.weights[sub.id]) || 0);
+                  
                   const baseWeight = bw > 0 ? bw : 0;
                   tabVol += reps * (extraWeight + baseWeight);
                 }
@@ -499,9 +531,20 @@ export default function App() {
     const history = currState.weightHistory[targetId];
 
     if (history.length > 0 && history[0].date === sessionDate) {
-      history[0] = { ...history[0], weight: currentWeight, reps, rirs, rpes };
+      history[0] = { 
+        ...history[0], 
+        weight: currentWeight, 
+        // 🔴 BUG FIX MERGE: Uniamo i vecchi pesi della giornata con quelli appena digitati
+        weights: { ...history[0].weights, ...weights }, 
+        reps, 
+        rirs, 
+        rpes 
+      };
     } else {
-      history.unshift(newEntry);
+      // 🔴 BUG FIX: Aggiungiamo la nuova entry SOLO se c'è almeno una spunta (non inseriamo giornate vuote)
+      if (Object.keys(reps).length > 0) {
+        history.unshift(newEntry);
+      }
     }
 
     if (currState.deloadActive) {
@@ -621,30 +664,27 @@ export default function App() {
             roundsToCount = Math.ceil(((ex.emomTotalMin || 1) * 60) / (ex.emomIntervalSec || 60));
           }
           if (ex.structureType === 'amrap') {
-            roundsToCount = state.amrapRounds[ex.id] || 0;
+            roundsToCount = (state.amrapRounds[ex.id] || 0) + 1; // 🔴 Aggiunto +1
           }
 
           const completedRounds = [];
           for (let j = 0; j < (roundsToCount || 10); j++) {
-            const isDone =
-              ex.structureType === 'amrap' ||
-              state.checkedSets[`${ex.id}-round-${j}`] ||
-              ex.exercises.some((sub) => state.checkedSets[`${sub.id}-${j}`]);
+            // 🔴 RIMOSSA L'ECCEZIONE AMRAP. Si salva solo se hai messo davvero una spunta.
+            const isDone = ex.exercises.some((sub) => state.checkedSets[`${sub.id}-${j}`]) || state.checkedSets[`${ex.id}-round-${j}`];
             
             if (isDone) {
               hasCheckedSets = true;
               totalSets++;
               const roundExs = ex.exercises.map((sub) => {
                 const setId = `${sub.id}-${j}`;
-                const amrapRepVal = state.setReps[`${sub.id}-amrap`];
                 return {
                   name: sub.name,
                   metricType: sub.metricType,
                   targetReps: sub.reps || sub.workSec,
                   pause: sub.pause,
-                  reps: (ex.structureType === 'amrap' && amrapRepVal) ? amrapRepVal : (state.setReps[setId] || sub.reps),
-                  weight: state.weights[sub.id] || 0,
-                  duration: (ex.structureType === 'amrap' && amrapRepVal) ? amrapRepVal : (state.setReps[setId] || sub.workSec || 60),
+                  reps: state.setReps[setId] || sub.reps,
+                  weight: state.setWeights[setId] ?? state.weights[sub.id] ?? 0,
+                  duration: state.setReps[setId] || sub.workSec || 60,
                   rir: state.setRir[setId] !== undefined ? state.setRir[setId] : '',
                   isRest: sub.metricType === 'rest'
                 };
@@ -1069,14 +1109,24 @@ export default function App() {
   const handleImportBackup = () => {
     const code = prompt('Incolla il codice di backup (GYM2::... oppure JSON):');
     if (!code) return;
-    if (!confirm('ATTENZIONE: ripristinare il backup sovrascriverà i dati attuali. Continuare?')) {
-      return;
-    }
+
     try {
+      // 1. Analizza e ripara i dati (ma NON li salva ancora)
       const parsed = importBackupString(code);
+      
+      // 2. 🔴 Estrae le informazioni per il popup intelligente
+      const allenamenti = parsed.workoutSessionsHistory?.length || 0;
+      const dataBackup = parsed.lastBackupDate || 'sconosciuta';
+      
+      // 3. Mostra l'avviso di sicurezza all'utente
+      if (!confirm(`Stai per ripristinare un backup del ${dataBackup} contenente ${allenamenti} allenamenti.\n\nATTENZIONE: i dati attuali verranno sovrascritti in modo irreversibile. Procedo?`)) {
+        return; // L'utente ha annullato
+      }
+
+      // 4. Salva i dati
       setState(parsed);
       saveGymState(parsed);
-      showToast('Dati ripristinati con successo! 🎉');
+      showToast('Dati ripristinati con successo! 🚀');
       setIsSyncModalOpen(false);
     } catch {
       showToast('Codice di backup non valido o corrotto.', true);
@@ -1326,6 +1376,7 @@ export default function App() {
                     }
                     onSaveWeight={(val) => handleSaveWeight(ex.id, val)}
                     onSaveSetWeight={handleSaveSetWeight}
+                    onSaveCustomField={handleSaveCustomField} // 🔴 AGGIUNGI QUESTA RIGA QUI
                     onToggleSet={(sIdx, pauseSec, prefill) =>
                       handleToggleSet(ex.id, sIdx, pauseSec, prefill)
                     }

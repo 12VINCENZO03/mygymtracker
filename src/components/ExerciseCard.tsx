@@ -15,6 +15,7 @@ interface ExerciseCardProps {
   onMoveEx: (dir: number) => void;
   onSaveWeight: (val: string) => void;
   onSaveSetWeight: (setId: string, val: string) => void;
+  onSaveCustomField: (setId: string, fieldId: string, val: string) => void; // 🔴 AGGIUNTO
   onToggleSet: (setIndex: number, pauseSec: number, prefill: { reps: string; weight: string; rir?: string; rpe?: string }) => void;
   onLongPressSet: (setIndex: number, pauseSec: number, prefill: { reps: string; weight: string; rir?: string; rpe?: string }) => void;
   onOpenEffortModal: (setId: string, isRpe: boolean) => void;
@@ -36,6 +37,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
   onMoveEx,
   onSaveWeight,
   onSaveSetWeight,
+  onSaveCustomField, // 🔴 AGGIUNTO
   onToggleSet,
   onLongPressSet,
   onOpenEffortModal,
@@ -157,6 +159,50 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
             />
           </div>
         </div>
+
+        {/* 🔴 NUOVO: Selezionatore Macchina Cardio */}
+        {ex.metricType === 'cardio' && (
+          <div className="mt-3 bg-zinc-950 p-3 rounded-2xl border border-zinc-800/80 shadow-inner">
+            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-2">
+              Tipo di Macchina (Imposta parametri di default)
+            </label>
+            <select
+              value={ex.cardioMachine || ''}
+              onChange={(e) => {
+                const machine = e.target.value;
+                onUpdateEx('cardioMachine', machine);
+                // 🔴 PT LOGIC: Auto-compilazione campi in base alla macchina
+                let defaultFields: any[] = [];
+                if (machine === 'corsa') {
+                  defaultFields = [
+                    { id: 'inclinazione', label: 'Inclinazione', unit: '%' },
+                    { id: 'velocita', label: 'Velocità', unit: 'km/h' },
+                    { id: 'distanza', label: 'Distanza', unit: 'km' }
+                  ];
+                } else if (machine === 'vogatore') {
+                  defaultFields = [
+                    { id: 'distanza', label: 'Distanza', unit: 'm' },
+                    { id: 'passo', label: 'Passo', unit: '/500m' },
+                    { id: 'spm', label: 'Colpi', unit: 's/m' }
+                  ];
+                } else if (machine === 'bike') {
+                  defaultFields = [
+                    { id: 'resistenza', label: 'Resistenza', unit: 'lvl' },
+                    { id: 'rpm', label: 'Cadenza', unit: 'RPM' },
+                    { id: 'distanza', label: 'Distanza', unit: 'km' }
+                  ];
+                }
+                onUpdateEx('cardioFields', defaultFields);
+              }}
+              className="bg-zinc-900 text-emerald-400 text-xs font-bold p-2.5 rounded-xl outline-none border border-zinc-700/50 w-full"
+            >
+              <option value="">Seleziona macchina...</option>
+              <option value="corsa">Corsa / Tapis Roulant</option>
+              <option value="vogatore">Vogatore</option>
+              <option value="bike">Bike / Assault</option>
+            </select>
+          </div>
+        )}
       </div>
     );
   }
@@ -299,93 +345,103 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
           };
 
           return (
-            <div key={setIdx} className="flex items-center gap-2.5">
-              <span className="text-[10px] font-black text-zinc-500 w-12 uppercase tracking-wider bg-zinc-950/80 border border-zinc-800/80 px-2 py-3.5 rounded-2xl text-center shadow-sm">
-                S{setIdx + 1}
-              </span>
+            <div key={setIdx} className="flex flex-col gap-1.5">
+              {/* RIGA 1: Timer e RPE (Uguale a prima) */}
+              <div className="flex items-center gap-2.5">
+                <span className="text-[10px] font-black text-zinc-500 w-12 uppercase tracking-wider bg-zinc-950/80 border border-zinc-800/80 px-2 py-3.5 rounded-2xl text-center shadow-sm shrink-0">
+                  S{setIdx + 1}
+                </span>
 
-              {/* 🔴 NUOVO: Input Peso per singola serie */}
-              {ex.metricType !== 'cardio' && (
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  disabled={!isWorkoutActive}
-                  value={displayWeight}
-                  onChange={(e) => onSaveSetWeight(setId, e.target.value)}
-                  placeholder={ex.metricType === 'bodyweight' ? '+kg' : 'kg'}
-                  className="bg-zinc-950/80 text-white w-16 py-3.5 rounded-2xl border border-zinc-800/80 text-center font-bold text-sm shadow-inner outline-none focus:border-emerald-500/50 disabled:opacity-50 transition-colors"
-                />
-              )}
-              
-              {/* Action Button */}
-              {isTimeType ? (
+                {ex.metricType !== 'cardio' && (
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    disabled={!isWorkoutActive}
+                    value={displayWeight}
+                    onChange={(e) => onSaveSetWeight(setId, e.target.value)}
+                    placeholder={ex.metricType === 'bodyweight' ? '+kg' : 'kg'}
+                    className="bg-zinc-950/80 text-white w-16 py-3.5 rounded-2xl border border-zinc-800/80 text-center font-bold text-sm shadow-inner outline-none focus:border-emerald-500/50 disabled:opacity-50 transition-colors"
+                  />
+                )}
+
+                {isTimeType ? (
+                  <button
+                    type="button"
+                    disabled={!isWorkoutActive}
+                    onClick={() => {
+                      const dur = Math.max(0, parseInt(actualReps) || ex.workSec || 60);
+                      onRunInlineTimer(setId, dur, ex.pause || 0, prefillData);
+                    }}
+                    className={`w-28 py-3.5 rounded-2xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm active:scale-[0.98] ${
+                      isChecked
+                        ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-emerald-500/20'
+                        : isTimerRunning
+                        ? 'bg-emerald-600 text-zinc-950 border-emerald-400 animate-pulse'
+                        : 'bg-zinc-800/80 text-zinc-200 border-zinc-700/60 hover:bg-zinc-700'
+                    }`}
+                  >
+                    {isTimerRunning ? `${timerRemaining}s` : isChecked ? <i className="fa-solid fa-check text-lg" /> : `${actualReps}s`}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={!isWorkoutActive}
+                    onPointerDown={() => handlePointerDown(setIdx, prefillData)}
+                    onPointerUp={() => handlePointerUp(setIdx, ex.pause || 0, prefillData)}
+                    onPointerLeave={handlePointerCancel}
+                    className={`w-28 py-3.5 rounded-2xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
+                      isChecked
+                        ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-emerald-500/20'
+                        : 'bg-zinc-800/80 text-zinc-200 border-zinc-700/60 hover:bg-zinc-700'
+                    }`}
+                  >
+                    {isChecked ? (actualReps !== defaultTargetReps ? `${actualReps} reps` : <i className="fa-solid fa-check text-lg" />) : `${actualReps} reps`}
+                  </button>
+                )}
+
                 <button
                   type="button"
                   disabled={!isWorkoutActive}
-                  onClick={() => {
-                    const dur = Math.max(0, parseInt(actualReps) || ex.workSec || 60);
-                    onRunInlineTimer(setId, dur, ex.pause || 0, prefillData);
-                  }}
-                  className={`w-28 py-3.5 rounded-2xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm active:scale-[0.98] ${
-                    isChecked
-                      ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-emerald-500/20'
-                      : isTimerRunning
-                      ? 'bg-emerald-600 text-zinc-950 border-emerald-400 animate-pulse'
-                      : 'bg-zinc-800/80 text-zinc-200 border-zinc-700/60 hover:bg-zinc-700'
+                  onClick={() => onOpenEffortModal(setId, isCardio)}
+                  className={`border text-[10px] font-extrabold flex-1 py-3.5 rounded-2xl outline-none uppercase tracking-wider shadow-sm transition-all active:scale-[0.98] ${
+                    currentEffort !== undefined && currentEffort !== ''
+                      ? 'text-zinc-100 border-zinc-500 bg-zinc-700'
+                      : displayEffort !== undefined && displayEffort !== ''
+                      ? 'text-emerald-400 border-dashed border-emerald-700/60 bg-emerald-950/20'
+                      : 'text-zinc-400 border-zinc-700/60 bg-zinc-900/50 hover:bg-zinc-800/80'
                   }`}
                 >
-                  {isTimerRunning ? (
-                    `${timerRemaining}s`
-                  ) : isChecked ? (
-                    <i className="fa-solid fa-check text-lg" />
-                  ) : (
-                    `${actualReps}s`
-                  )}
+                  {displayEffort !== undefined && displayEffort !== ''
+                    ? displayEffort === '-1' ? 'CED' : `${isCardio ? 'RPE' : 'RIR'} ${displayEffort}`
+                    : isCardio ? 'RPE' : 'RIR'}
                 </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled={!isWorkoutActive}
-                  onPointerDown={() => handlePointerDown(setIdx, prefillData)}
-                  onPointerUp={() => handlePointerUp(setIdx, ex.pause || 0, prefillData)}
-                  onPointerLeave={handlePointerCancel}
-                  className={`w-28 py-3.5 rounded-2xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
-                    isChecked
-                      ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-emerald-500/20'
-                      : 'bg-zinc-800/80 text-zinc-200 border-zinc-700/60 hover:bg-zinc-700'
-                  }`}
-                >
-                  {isChecked ? (
-                    actualReps !== defaultTargetReps ? (
-                      `${actualReps} reps`
-                    ) : (
-                      <i className="fa-solid fa-check text-lg" />
-                    )
-                  ) : (
-                    `${actualReps} reps`
-                  )}
-                </button>
-              )}
+              </div>
 
-              {/* 🔴 BUG FIX: RIR / RPE selector dinamico */}
-              <button
-                type="button"
-                disabled={!isWorkoutActive}
-                onClick={() => onOpenEffortModal(setId, isCardio)}
-                className={`border text-[10px] font-extrabold flex-1 py-3.5 rounded-2xl outline-none uppercase tracking-wider shadow-sm transition-all active:scale-[0.98] ${
-                  currentEffort !== undefined && currentEffort !== ''
-                    ? 'text-zinc-100 border-zinc-500 bg-zinc-700'
-                    : displayEffort !== undefined && displayEffort !== ''
-                    ? 'text-emerald-400 border-dashed border-emerald-700/60 bg-emerald-950/20'
-                    : 'text-zinc-400 border-zinc-700/60 bg-zinc-900/50 hover:bg-zinc-800/80'
-                }`}
-              >
-                {displayEffort !== undefined && displayEffort !== ''
-                  ? displayEffort === '-1'
-                    ? 'CED'
-                    : `${isCardio ? 'RPE' : 'RIR'} ${displayEffort}`
-                  : isCardio ? 'RPE' : 'RIR'}
-              </button>
+              {/* 🔴 RIGA 2: I nuovi campi Cardio (Visibili solo se è cardio e ci sono campi) */}
+              {isCardio && ex.cardioFields && ex.cardioFields.length > 0 && (
+                <div className="flex gap-2 ml-[58px]"> {/* ml-[58px] allinea perfettamente saltando il bottone "S1" */}
+                  {ex.cardioFields.map(cf => {
+                    const val = state.setCustomFields?.[setId]?.[cf.id] || '';
+                    return (
+                      <div key={cf.id} className="flex-1 bg-zinc-950/60 border border-zinc-800/60 rounded-xl p-1.5 flex flex-col items-center shadow-inner focus-within:border-emerald-500/50 transition-colors">
+                        <span className="text-[8px] font-extrabold text-zinc-500 uppercase tracking-wider mb-0.5">{cf.label}</span>
+                        <div className="flex items-baseline gap-0.5 w-full px-1">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            disabled={!isWorkoutActive}
+                            value={val}
+                            onChange={(e) => onSaveCustomField(setId, cf.id, e.target.value)}
+                            placeholder="-"
+                            className="bg-transparent text-white font-bold text-xs w-full text-center outline-none"
+                          />
+                          <span className="text-[8px] text-zinc-500 font-medium">{cf.unit}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           );
         })}
