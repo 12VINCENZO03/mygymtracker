@@ -679,33 +679,49 @@ export default function App() {
     if (!state) return;
     initAudio();
     const setId = `${exId}-${setIndex}`;
-    const newState = { ...state };
-    const isChecked = Boolean(newState.checkedSets[setId]);
+    const isChecked = Boolean(state.checkedSets[setId]);
+
+    // Shallow copy sicura solo dei dizionari interessati (Immutabilità)
+    const nextCheckedSets = { ...state.checkedSets };
+    const nextSetReps = { ...state.setReps };
+    const nextSetWeights = { ...state.setWeights };
+    const nextSetRir = { ...state.setRir };
+    const nextSetRpe = { ...state.setRpe };
 
     if (isChecked) {
-      delete newState.checkedSets[setId];
+      delete nextCheckedSets[setId];
     } else {
-      newState.checkedSets[setId] = true;
-      // 🔴 Congeliamo i dati visivi pre-compilati nello stato effettivo
-      if (newState.setReps[setId] === undefined) newState.setReps[setId] = prefill.reps;
-      if (newState.setWeights[setId] === undefined) newState.setWeights[setId] = prefill.weight;
-      if (prefill.rir !== undefined && newState.setRir[setId] === undefined) newState.setRir[setId] = prefill.rir;
-      if (prefill.rpe !== undefined && newState.setRpe[setId] === undefined) newState.setRpe[setId] = prefill.rpe;
+      nextCheckedSets[setId] = true;
+      if (nextSetReps[setId] === undefined) nextSetReps[setId] = prefill.reps;
+      if (nextSetWeights[setId] === undefined) nextSetWeights[setId] = prefill.weight;
+      if (prefill.rir !== undefined && nextSetRir[setId] === undefined) nextSetRir[setId] = prefill.rir;
+      if (prefill.rpe !== undefined && nextSetRpe[setId] === undefined) nextSetRpe[setId] = prefill.rpe;
+    }
 
+    const nextState = {
+      ...state,
+      checkedSets: nextCheckedSets,
+      setReps: nextSetReps,
+      setWeights: nextSetWeights,
+      setRir: nextSetRir,
+      setRpe: nextSetRpe
+    };
+
+    // Gestione Side Effects
+    if (!isChecked) {
       let handledCircuitRest = false;
-
       if (isSub && circuitId) {
-        const currentTab = newState.plan.find((t) => t.id === newState.activeTab);
+        const currentTab = nextState.plan.find((t) => t.id === nextState.activeTab);
         const circuit = currentTab?.exercises.find((e) => e.id === circuitId);
-                 
+        
         if (circuit && circuit.type === 'superset' && circuit.structureType === 'classic') {
           const lastRealEx = [...circuit.exercises].reverse().find((e) => e.metricType !== 'rest');
-                     
+          
           if (lastRealEx && lastRealEx.id === exId) {
             handledCircuitRest = true;
-            const circuitPause = circuit.pause || 90;
+            const circuitPause = circuit.pause !== undefined ? circuit.pause : 90;
             playShortBeep();
-                         
+            
             if (circuitPause > 0) {
               startRestTimer(circuitPause, () => {
                 setState((prev) => {
@@ -736,8 +752,8 @@ export default function App() {
       }
     }
 
-    saveGymState(newState); // AGGIUNTO
-    setState(newState);
+    saveGymState(nextState);
+    setState(nextState);
   };
 
   const handleLongPressSet = (
@@ -750,32 +766,47 @@ export default function App() {
     if (!state) return;
     const setId = `${exId}-${setIndex}`;
     const currentVal = state.setReps[setId] ?? prefill.reps;
+    
     const input = prompt('Quante ripetizioni hai eseguito davvero?', currentVal);
-         
+    
     if (input !== null && input.trim() !== '') {
-      const parsed = Math.max(0, parseInt(input)); 
+      const parsed = Math.max(0, parseInt(input));
+      
       if (!isNaN(parsed)) {
-        const newState = { ...state };
-        newState.setReps[setId] = parsed.toString();
-        // 🔴 Congeliamo i pesi e gli sforzi pre-compilati insieme alle nuove reps
-        if (newState.setWeights[setId] === undefined) newState.setWeights[setId] = prefill.weight;
-        if (prefill.rir !== undefined && newState.setRir[setId] === undefined) newState.setRir[setId] = prefill.rir;
-        if (prefill.rpe !== undefined && newState.setRpe[setId] === undefined) newState.setRpe[setId] = prefill.rpe;
-        newState.checkedSets[setId] = true;
+        const nextCheckedSets = { ...state.checkedSets };
+        const nextSetReps = { ...state.setReps };
+        const nextSetWeights = { ...state.setWeights };
+        const nextSetRir = { ...state.setRir };
+        const nextSetRpe = { ...state.setRpe };
+
+        nextSetReps[setId] = parsed.toString();
+        nextCheckedSets[setId] = true;
+        
+        if (nextSetWeights[setId] === undefined) nextSetWeights[setId] = prefill.weight;
+        if (prefill.rir !== undefined && nextSetRir[setId] === undefined) nextSetRir[setId] = prefill.rir;
+        if (prefill.rpe !== undefined && nextSetRpe[setId] === undefined) nextSetRpe[setId] = prefill.rpe;
+
+        const nextState = {
+          ...state,
+          checkedSets: nextCheckedSets,
+          setReps: nextSetReps,
+          setWeights: nextSetWeights,
+          setRir: nextSetRir,
+          setRpe: nextSetRpe
+        };
 
         let handledCircuitRest = false;
-
         if (circuitId) {
-          const currentTab = newState.plan.find((t) => t.id === newState.activeTab);
+          const currentTab = nextState.plan.find((t) => t.id === nextState.activeTab);
           const circuit = currentTab?.exercises.find((e) => e.id === circuitId);
-                     
+          
           if (circuit && circuit.type === 'superset' && circuit.structureType === 'classic') {
             const lastRealEx = [...circuit.exercises].reverse().find((e) => e.metricType !== 'rest');
-                             
+            
             if (lastRealEx && lastRealEx.id === exId) {
               handledCircuitRest = true;
-              const circuitPause = circuit.pause || 90;
-                                 
+              const circuitPause = circuit.pause !== undefined ? circuit.pause : 90;
+              
               if (circuitPause > 0) {
                 startRestTimer(circuitPause, () => {
                   setState((prev) => {
@@ -802,8 +833,8 @@ export default function App() {
           });
         }
 
-        saveGymState(newState); // AGGIUNTO
-        setState(newState);
+        saveGymState(nextState);
+        setState(nextState);
       }
     }
   };
@@ -868,41 +899,43 @@ export default function App() {
       return;
     }
     initAudio();
+    const absoluteStartTime = Date.now();
     const totalRounds = Math.ceil((totalMin * 60) / intervalSec);
-    let currentRound = 0;
-    let roundEndTime = Date.now() + intervalSec * 1000;
+    let lastAnnouncedRound = 0; // Il round 0 è appena iniziato
+
     setActiveMasterTimer({
       circuitId,
       type: 'emom',
       remainingSec: intervalSec,
-      activeEmomRound: currentRound,
+      activeEmomRound: 0,
       totalRounds,
       intervalSec
     });
+
     masterTimerIntervalRef.current = safeSetInterval(() => {
-      const remaining = Math.ceil((roundEndTime - Date.now()) / 1000);
-      if (remaining <= 0) {
+      const elapsedSec = (Date.now() - absoluteStartTime) / 1000;
+      const currentRound = Math.floor(elapsedSec / intervalSec);
+
+      if (currentRound >= totalRounds) {
+        if (masterTimerIntervalRef.current) safeClearInterval(masterTimerIntervalRef.current);
+        masterTimerIntervalRef.current = null;
+        setActiveMasterTimer(null);
         playTrumpet();
-        currentRound++;
-        if (currentRound >= totalRounds) {
-          if (masterTimerIntervalRef.current) safeClearInterval(masterTimerIntervalRef.current);
-          masterTimerIntervalRef.current = null;
-          setActiveMasterTimer(null);
-          showToast('EMOM Completato con successo! 🎉');
-        } else {
-          roundEndTime = Date.now() + intervalSec * 1000;
-          setActiveMasterTimer({
-            circuitId,
-            type: 'emom',
-            remainingSec: intervalSec,
-            activeEmomRound: currentRound,
-            totalRounds,
-            intervalSec
-          });
-        }
-      } else {
-        setActiveMasterTimer((prev) => (prev ? { ...prev, remainingSec: remaining } : null));
+        showToast('EMOM Completato con successo! 🏆');
+        return;
       }
+
+      const remaining = Math.max(0, Math.ceil((currentRound + 1) * intervalSec - elapsedSec));
+
+      // Suona solo se c'è un cambio round E sono passati meno di 5 sec (evita spam arretrato da background iOS)
+      if (currentRound > lastAnnouncedRound) {
+        lastAnnouncedRound = currentRound;
+        if (elapsedSec - (currentRound * intervalSec) < 5) {
+          playTrumpet();
+        }
+      }
+
+      setActiveMasterTimer((prev) => (prev ? { ...prev, remainingSec: remaining, activeEmomRound: currentRound } : null));
     }, 250);
   };
 
@@ -914,21 +947,25 @@ export default function App() {
       return;
     }
     initAudio();
+    const absoluteStartTime = Date.now();
     const duration = totalMin * 60;
-    const endTime = Date.now() + duration * 1000;
+
     setActiveMasterTimer({
       circuitId,
       type: 'amrap',
       remainingSec: duration
     });
+
     masterTimerIntervalRef.current = safeSetInterval(() => {
-      const remaining = Math.ceil((endTime - Date.now()) / 1000);
+      const elapsedSec = (Date.now() - absoluteStartTime) / 1000;
+      const remaining = Math.max(0, Math.ceil(duration - elapsedSec));
+
       if (remaining <= 0) {
         if (masterTimerIntervalRef.current) safeClearInterval(masterTimerIntervalRef.current);
         masterTimerIntervalRef.current = null;
         setActiveMasterTimer(null);
         playTrumpet();
-        showToast('AMRAP Terminato!');
+        showToast('AMRAP Terminato! 🏆');
       } else {
         setActiveMasterTimer((prev) => (prev ? { ...prev, remainingSec: remaining } : null));
       }

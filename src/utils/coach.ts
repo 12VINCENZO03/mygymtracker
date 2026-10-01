@@ -85,61 +85,6 @@ export function calculateAllVolumeStatsV2(sessionsV2: WorkoutSessionV2[]): Volum
 
   return stats;
 }
-// -----------------------------------------------------------------
-
-export function calculateAllVolumeStats(volumeLog: Record<string, number>): VolumeStats {
-  const d = new Date();
-  const todayStr = getTodayStr();
-  const stats: VolumeStats = {
-    today: volumeLog[todayStr] || 0,
-    week: 0,
-    lastWeek: 0,
-    month: 0,
-    lastMonth: 0,
-    year: 0,
-    lastYear: 0,
-    hasLastWeek: false,
-    hasLastMonth: false,
-    hasLastYear: false
-  };
-  const currentWeekStart = new Date(d);
-  currentWeekStart.setDate(d.getDate() - d.getDay() + (d.getDay() === 0 ? -6 : 1));
-  currentWeekStart.setHours(0, 0, 0, 0);
-  const lastWeekStart = new Date(currentWeekStart);
-  lastWeekStart.setDate(lastWeekStart.getDate() - 7);
-  const lastWeekEnd = new Date(currentWeekStart);
-  lastWeekEnd.setDate(lastWeekEnd.getDate() - 1);
-  const currentMonth = d.getMonth();
-  const currentYear = d.getFullYear();
-  
-  // Correzione del bug del mese precedente (gestione corretta dei mesi da 31 giorni)
-  const lastMonthDate = new Date(d.getFullYear(), d.getMonth() - 1, 1);
-  const lastMonth = lastMonthDate.getMonth();
-  const lastMonthYear = lastMonthDate.getFullYear();
-  const lastYear = currentYear - 1;
-
-  for (const [dateStr, vol] of Object.entries(volumeLog)) {
-    if (!vol) continue;
-    const parts = dateStr.split('-');
-    const logDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-    if (logDate >= currentWeekStart) stats.week += vol;
-    if (logDate >= lastWeekStart && logDate <= lastWeekEnd) {
-      stats.lastWeek += vol;
-      stats.hasLastWeek = true;
-    }
-    if (logDate.getFullYear() === currentYear && logDate.getMonth() === currentMonth) stats.month += vol;
-    if (logDate.getFullYear() === lastMonthYear && logDate.getMonth() === lastMonth) {
-      stats.lastMonth += vol;
-      stats.hasLastMonth = true;
-    }
-    if (logDate.getFullYear() === currentYear) stats.year += vol;
-    if (logDate.getFullYear() === lastYear) {
-      stats.lastYear += vol;
-      stats.hasLastYear = true;
-    }
-  }
-  return stats;
-}
 
 export function computeCurrentStreak(workoutDates: string[]): number {
   // 1. Raccogliamo le date univoche

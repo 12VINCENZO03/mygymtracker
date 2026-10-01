@@ -133,17 +133,48 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
         {/* Structure Parameters */}
         <div className="flex flex-wrap gap-2 mb-5">
           {!isEmom && !isAmrap && (
-            <div className="flex items-center bg-zinc-950 border border-zinc-800/80 rounded-2xl p-2 flex-1 min-w-[90px] shadow-inner">
-              <span className="text-[9px] text-zinc-500 font-extrabold uppercase ml-2 w-8 tracking-wider">Giri</span>
-              <input
-                type="number"
-                min={1}
-                max={20}
-                value={circuit.rounds !== undefined ? circuit.rounds : 3}
-                onChange={(e) => onUpdateCircuit('rounds', parseInt(e.target.value) || 0)}
-                className="bg-transparent text-white font-bold w-full text-center outline-none text-sm"
-              />
-            </div>
+            <>
+              <div className="flex items-center bg-zinc-950 border border-zinc-800/80 rounded-2xl p-2 flex-1 min-w-[90px] shadow-inner">
+                <span className="text-[9px] text-zinc-500 font-extrabold uppercase ml-2 w-8 tracking-wider">Giri</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={circuit.rounds !== undefined ? circuit.rounds : 3}
+                  onChange={(e) => onUpdateCircuit('rounds', parseInt(e.target.value) || 0)}
+                  className="bg-transparent text-white font-bold w-full text-center outline-none text-sm"
+                />
+              </div>
+              <div className="flex items-center bg-zinc-950 border border-zinc-800/80 rounded-2xl p-2 flex-[2] min-w-[140px] shadow-inner">
+                <span className="text-[9px] text-zinc-500 font-extrabold uppercase ml-2 w-14 tracking-wider">Recupero</span>
+                <div className="flex items-center w-full gap-2 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (circuit.pause !== 0) {
+                        onUpdateCircuit('previousPause', circuit.pause !== undefined ? circuit.pause : 90);
+                        onUpdateCircuit('pause', 0);
+                      } else {
+                        onUpdateCircuit('pause', circuit.previousPause !== undefined ? circuit.previousPause : 90);
+                      }
+                    }}
+                    className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase transition-colors ${circuit.pause !== 0 ? 'bg-emerald-500 text-zinc-950' : 'bg-zinc-800 text-zinc-400'}`}
+                  >
+                    {circuit.pause !== 0 ? 'Sì' : 'No'}
+                  </button>
+                  {circuit.pause !== 0 && (
+                    <input
+                      type="number"
+                      step={5}
+                      min={0}
+                      value={circuit.pause !== undefined ? circuit.pause : 90}
+                      onChange={(e) => onUpdateCircuit('pause', Math.max(0, parseInt(e.target.value) || 0))}
+                      className="bg-transparent text-white font-bold w-12 text-center outline-none text-sm"
+                    />
+                  )}
+                </div>
+              </div>
+            </>
           )}
 
           {isEmom && (
@@ -383,6 +414,11 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
           <h3 className="text-lg font-black text-white leading-tight flex items-baseline gap-1.5">
             <span className="text-emerald-500 font-black opacity-90">{index}.</span>
             {circuit.name}
+            {!isEmom && !isAmrap && circuit.pause === 0 && (
+              <span className="ml-2 text-[9px] bg-rose-500/20 text-rose-400 border border-rose-500/30 px-1.5 py-0.5 rounded uppercase tracking-wider font-black translate-y-[-2px] shrink-0">
+                NO REC
+              </span>
+            )}
           </h3>
         </div>
       </div>

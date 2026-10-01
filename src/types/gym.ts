@@ -59,6 +59,7 @@ export interface SupersetExercise {
   name: string;
   rounds?: number;
   pause?: number;
+  previousPause?: number;
   emomTotalMin?: number;
   emomIntervalSec?: number;
   amrapTotalMin?: number;
