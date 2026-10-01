@@ -5,6 +5,29 @@ import { generateId } from './storage';
 import { runDataIntegrityCheck } from './audit';
 import { validateSetData } from './validation';
 
+export interface LegacyV1Session {
+    id?: string;
+    date: string;
+    time?: string;
+    duration?: string;
+    tabName?: string;
+    exercises: Array<{
+        type: 'single' | 'superset';
+        name: string;
+        metricType?: string;
+        sets: Array<{ index: number; weight?: string | number; reps?: string | number; duration?: string | number; rir?: string; rpe?: string }>;
+        structureType?: 'classic' | 'emom' | 'amrap';
+        rounds: Array<{
+            roundIndex: number;
+            exercises: Array<{ name: string; metricType?: string; reps?: string | number; weight?: string | number; duration?: string | number; rir?: string; rpe?: string }>;
+        }>;
+    }>;
+}
+
+export interface LegacyV1State extends Partial<AppState> {
+    workoutSessionsHistory?: LegacyV1Session[];
+}
+
 export interface MigrationResult {
     migratedDatabase: AppDatabaseV2;
     migratedState: AppState;
@@ -19,7 +42,7 @@ export interface MigrationResult {
  * 4. Aggancia gli ID permanenti ai Record Personali (PR).
  * 5. Esegue il controllo medico di integrità prima della validazione finale.
  */
-export function migrateV1ToV2(v1State: Partial<AppState>): AppDatabaseV2 {
+export function migrateV1ToV2(v1State: LegacyV1State): AppDatabaseV2 {
     const registry: Record<string, ExerciseDefV2> = { ...(v1State.registryV2 || {}) };
     const sessions: WorkoutSessionV2[] = [...(v1State.sessionsV2 || [])];
     const existingSessionIds = new Set(sessions.map(s => s.id));
@@ -63,9 +86,9 @@ export function migrateV1ToV2(v1State: Partial<AppState>): AppDatabaseV2 {
     }
 
     // 2. Convertiamo lo storico legacy se presente
-    const oldHistory = v1State.workoutSessionsHistory || [];
-    oldHistory.forEach(oldSession => {
-        if (existingSessionIds.has(oldSession.id)) {
+    const oldHistory: LegacyV1Session[] = v1State.workoutSessionsHistory || [];
+    oldHistory.forEach((oldSession: LegacyV1Session) => {
+        if (oldSession.id && existingSessionIds.has(oldSession.id)) {
             // Già migrata in precedenza, evita duplicazioni
             return;
         }
@@ -142,7 +165,7 @@ export function migrateV1ToV2(v1State: Partial<AppState>): AppDatabaseV2 {
                 newBlocks.push({
                     id: generateId(),
                     nameSnapshot: oldEx.name,
-                    structureType: oldEx.structureType,
+                    structureType: oldEx.structureType || 'classic',
                     rounds
                 });
             }

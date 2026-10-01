@@ -229,3 +229,20 @@ export function getOrRegisterExercise(
 
   return { updatedRegistry: updated, exerciseId: newId };
 }
+
+export function calculateTodayLoad(sessions: WorkoutSessionV2[], todayStr: string): number {
+  if (!sessions) return 0;
+  let load = 0;
+  sessions.filter(s => s.date === todayStr).forEach(session => {
+    session.blocks.forEach(block => {
+      if ('rounds' in block) {
+        block.rounds.forEach(r => r.exercises.forEach(sub => {
+          if (sub.type === 'time' || sub.type === 'cardio') sub.sets.forEach(set => load += (set.durationSec || 60) * (set.rpe || (10 - (set.rir || 2))));
+        }));
+      } else {
+        if (block.type === 'time' || block.type === 'cardio') block.sets.forEach(set => load += (set.durationSec || 60) * (set.rpe || (10 - (set.rir || 2))));
+      }
+    });
+  });
+  return Math.round(load);
+}

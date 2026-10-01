@@ -359,12 +359,13 @@ export async function saveGymState(state: AppState): Promise<void> {
   state.lastSavedAt = Date.now();
 
   try {
-    if (storageWorker) {
+    const worker = storageWorker;
+    if (worker) {
       await new Promise<void>((resolve, reject) => {
         const reqId = Date.now();
         const handler = (msgEv: MessageEvent) => {
           if (msgEv.data && msgEv.data.id === reqId) {
-            storageWorker.removeEventListener('message', handler);
+            worker.removeEventListener('message', handler);
             if (msgEv.data.success) {
               resolve();
             } else {
@@ -372,8 +373,8 @@ export async function saveGymState(state: AppState): Promise<void> {
             }
           }
         };
-        storageWorker.addEventListener('message', handler);
-        storageWorker.postMessage({ action: 'save', payload: state, id: reqId });
+        worker.addEventListener('message', handler);
+        worker.postMessage({ action: 'save', payload: state, id: reqId });
       });
     } else {
       // Fallback sincrono su IndexedDB
@@ -383,16 +384,6 @@ export async function saveGymState(state: AppState): Promise<void> {
         const sessions = state.sessionsV2 || [];
         const hotState = { ...state };
         delete (hotState as any).sessionsV2;
-        delete hotState.workoutSessionsHistory;
-        delete hotState.weightHistory;
-        delete hotState.volumeLog;
-        delete hotState.sessionLoadLog;
-        delete hotState.allWorkoutDates;
-        delete hotState.streakDates;
-        delete hotState.scheduleHistoryDates;
-        delete hotState.schedaCompletions;
-        delete hotState.lastSessionDate;
-        delete hotState.exerciseNameRegistry;
 
         tx.objectStore('store').put(hotState, 'state');
         tx.objectStore('sessions').put(sessions, 'history');

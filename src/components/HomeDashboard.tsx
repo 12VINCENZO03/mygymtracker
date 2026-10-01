@@ -1,7 +1,7 @@
 import React from 'react';
 import { AppState, WorkoutTab } from '../types/gym';
 import { calculateAllVolumeStatsV2, getGoalCrossInsight } from '../utils/coach';
-import { computeStreakFromSessions, getTabCompletionStats } from '../utils/domain';
+import { computeStreakFromSessions, getTabCompletionStats, calculateTodayLoad } from '../utils/domain';
 import { getTodayStr } from '../utils/storage';
 
 interface HomeDashboardProps {
@@ -16,8 +16,8 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   onAddFirstTab
 }) => {
   // 🔴 MOTORE V2: Statistiche incrollabili
-  const stats = calculateAllVolumeStatsV2(state.sessionsV2 || []);
-  const loadOggi = state.sessionLoadLog ? state.sessionLoadLog[getTodayStr()] || 0 : 0;
+  const stats = React.useMemo(() => calculateAllVolumeStatsV2(state.sessionsV2 || []), [state.sessionsV2]);
+  const loadOggi = React.useMemo(() => calculateTodayLoad(state.sessionsV2 || [], getTodayStr()), [state.sessionsV2]);
   const nonHomeTabs = state.plan.filter((t) => !t.isHome);
 
   if (nonHomeTabs.length === 0) {

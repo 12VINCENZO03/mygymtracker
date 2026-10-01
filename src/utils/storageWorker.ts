@@ -36,22 +36,8 @@ const workerCode = `
         // Estraiamo la lista delle sessioni V2 per salvarla nel cassetto isolato
         const sessions = fullState.sessionsV2 || [];
         
-        // Creiamo lo stato leggero "hotState" (escludendo le sessioni pesanti)
         const hotState = { ...fullState };
         delete hotState.sessionsV2;
-        
-        // Pulizia definitiva campi legacy
-        delete hotState.workoutSessionsHistory;
-        delete hotState.weightHistory;
-        delete hotState.volumeLog;
-        delete hotState.sessionLoadLog;
-        delete hotState.allWorkoutDates;
-        delete hotState.streakDates;
-        delete hotState.scheduleHistoryDates;
-        delete hotState.schedaCompletions;
-        delete hotState.lastSessionDate;
-        delete hotState.exerciseNameRegistry;
-
         tx.objectStore('store').put(hotState, 'state');
         tx.objectStore('sessions').put(sessions, 'history');
         

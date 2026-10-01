@@ -333,8 +333,6 @@ export default function App() {
   // 🔴 FASE 1: Garbage Collector (Dati Orfani)
   const cleanupOrphanDataForId = (nextState: AppState, targetId: string) => {
     delete nextState.weights[targetId];
-    if (nextState.weightHistory) delete nextState.weightHistory[targetId];
-    if (nextState.exerciseNameRegistry) delete nextState.exerciseNameRegistry[targetId];
 
     const cleanRecord = (record: Record<string, unknown>) => {
       Object.keys(record).forEach((key) => {
@@ -650,16 +648,6 @@ export default function App() {
         newState.setDurations = {};
         newState.setCustomFields = {};
 
-        if (newState.allWorkoutDates && !newState.allWorkoutDates.includes(todayDateStr)) {
-          newState.allWorkoutDates.push(todayDateStr);
-        }
-        if (newState.streakDates && newState.favoriteTabs[tabId] && !newState.streakDates.includes(todayDateStr)) {
-          newState.streakDates.push(todayDateStr);
-        }
-        if (newState.scheduleHistoryDates) newState.scheduleHistoryDates[tabId] = new Date().toISOString();
-        if (newState.schedaCompletions) newState.schedaCompletions[tabId] = (newState.schedaCompletions[tabId] || 0) + 1;
-
-        calculateVolumeAndLoad(newState);
         await saveGymState(newState);
         setState(newState);
         setSummaryData({ newSnapshot: v2Session, prevSnapshot });

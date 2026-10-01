@@ -199,7 +199,7 @@ export interface AppState {
   currentEffortSelection: { setId: string; targetId: string; isRpe: boolean } | null;
   lastBackupDate: string | null;
   
-  // 🔴 CANONICAL V2 ENGINE (L'UNICA CASA DEI DATI)
+  // 🔴 CANONICAL V2 ENGINE
   schemaVersion: number;
   revision: number;
   lastSavedAt?: number;
