@@ -19,10 +19,6 @@ export interface HistoricalPerformance {
 
 /**
  * Trova l'ultima prestazione registrata di un esercizio nello storico canonico V2.
- * Ordine di ricerca:
- * 1. Priorità assoluta ad exerciseId permanente
- * 2. Fallback sul nome normalizzato se l'ID non è ancora presente
- * Cerca partendo dalla sessione più recente (indice 0) e termina al primo riscontro -> O(1) in media.
  */
 export function getLastExercisePerformance(
   sessions: WorkoutSessionV2[] | undefined,
@@ -30,12 +26,12 @@ export function getLastExercisePerformance(
   exerciseName?: string
 ): HistoricalPerformance | null {
   if (!sessions || sessions.length === 0) return null;
+
   const targetName = exerciseName ? exerciseName.trim().toLowerCase() : '';
 
   for (const session of sessions) {
     for (const block of session.blocks) {
       if ('rounds' in block) {
-        // Blocco Circuito / Superset
         for (const round of block.rounds) {
           for (const sub of round.exercises) {
             const matchId = exerciseId && sub.exerciseId === exerciseId;
@@ -57,7 +53,6 @@ export function getLastExercisePerformance(
           }
         }
       } else {
-        // Esercizio Singolo
         const matchId = exerciseId && block.exerciseId === exerciseId;
         const matchName = targetName && block.nameSnapshot.trim().toLowerCase() === targetName;
         if (matchId || (!exerciseId && matchName)) {
@@ -77,7 +72,6 @@ export function getLastExercisePerformance(
       }
     }
   }
-
   return null;
 }
 
@@ -93,7 +87,6 @@ export function getHistoricalSetDataV2(
   const perf = getLastExercisePerformance(sessions, exerciseId, exerciseName);
   if (!perf || !perf.sets || perf.sets.length === 0) return null;
 
-  // Trova il set con index corrispondente
   const set = perf.sets.find((s) => s.index === setIndexOneBased) || perf.sets[setIndexOneBased - 1];
   if (!set) return null;
 
@@ -107,7 +100,6 @@ export function getHistoricalSetDataV2(
 
 /**
  * Restituisce l'insieme unico di tutte le date in cui è avvenuto almeno un allenamento.
- * O(N) una tantum, O(1) lookup.
  */
 export function getWorkoutDatesSet(sessions: WorkoutSessionV2[] | undefined): Set<string> {
   const set = new Set<string>();
@@ -127,7 +119,6 @@ export function computeStreakFromSessions(
 ): number {
   if (!sessions || sessions.length === 0) return 0;
 
-  // Filtriamo per schede preferite se specificato
   const filtered = favoriteTabIds && favoriteTabIds.length > 0
     ? sessions.filter(s => !s.planId || favoriteTabIds.includes(s.planId))
     : sessions;
@@ -137,14 +128,14 @@ export function computeStreakFromSessions(
   const dateSet = getWorkoutDatesSet(filtered);
   const now = new Date();
   const format = (d: Date) => d.toISOString().split('T')[0];
-
   const today = format(now);
+
   const yesterdayDate = new Date(now);
   yesterdayDate.setDate(now.getDate() - 1);
   const yesterday = format(yesterdayDate);
 
   let checkDate = new Date(now);
-  // Se oggi non c'è allenamento, controlliamo se c'era ieri per mantenere lo streak attivo
+
   if (!dateSet.has(today)) {
     if (!dateSet.has(yesterday)) {
       return 0;
@@ -162,7 +153,6 @@ export function computeStreakFromSessions(
       break;
     }
   }
-
   return streak;
 }
 
@@ -190,59 +180,38 @@ export function getTabCompletionStats(
       }
     }
   }
-
   return { count, lastCompletedAt, lastDateStr };
 }
 
-/**
- * Assicura che un esercizio esista nel registro permanente V2.
- * Se esiste già un esercizio con lo stesso nome, restituisce l'ID esistente (deduplicazione).
- * Altrimenti, registra una nuova voce con ID permanente generato.
- */
-export function getOrRegisterExercise(
-  registry: Record<string, ExerciseDefV2>,
-  name: string,
-  type: ExerciseTypeV2 = 'weight',
-  cardioMachine?: string
-): { updatedRegistry: Record<string, ExerciseDefV2>; exerciseId: string } {
-  const cleanName = name.trim();
-  const existingKey = Object.keys(registry).find(
-    (k) => registry[k].name.trim().toLowerCase() === cleanName.toLowerCase()
-  );
-
-  if (existingKey) {
-    return { updatedRegistry: registry, exerciseId: existingKey };
-  }
-
-  const newId = generateId();
-  const updated = {
-    ...registry,
-    [newId]: {
-      id: newId,
-      name: cleanName,
-      type,
-      cardioMachine,
-      createdAt: Date.now(),
-      updatedAt: Date.now()
-    }
-  };
-
-  return { updatedRegistry: updated, exerciseId: newId };
-}
-
+// 🔴 UX PRO: Calcolo derivato on-the-fly per il Carico Odierno della Dashboard
 export function calculateTodayLoad(sessions: WorkoutSessionV2[], todayStr: string): number {
   if (!sessions) return 0;
   let load = 0;
-  sessions.filter(s => s.date === todayStr).forEach(session => {
+  
+  const todaySessions = sessions.filter(s => s.date === todayStr);
+  todaySessions.forEach(session => {
     session.blocks.forEach(block => {
       if ('rounds' in block) {
         block.rounds.forEach(r => r.exercises.forEach(sub => {
-          if (sub.type === 'time' || sub.type === 'cardio') sub.sets.forEach(set => load += (set.durationSec || 60) * (set.rpe || (10 - (set.rir || 2))));
+          if (sub.type === 'time' || sub.type === 'cardio') {
+            sub.sets.forEach(set => {
+              const dur = set.durationSec || 60;
+              const effort = set.rpe || (10 - (set.rir || 2)); 
+              load += dur * effort;
+            });
+          }
         }));
       } else {
-        if (block.type === 'time' || block.type === 'cardio') block.sets.forEach(set => load += (set.durationSec || 60) * (set.rpe || (10 - (set.rir || 2))));
+        if (block.type === 'time' || block.type === 'cardio') {
+          block.sets.forEach(set => {
+            const dur = set.durationSec || 60;
+            const effort = set.rpe || (10 - (set.rir || 2)); 
+            load += dur * effort;
+          });
+        }
       }
     });
   });
+  
   return Math.round(load);
 }
