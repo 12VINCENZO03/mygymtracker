@@ -123,10 +123,18 @@ export default function App() {
   const requestWakeLock = useCallback(async () => {
     try {
       if ('wakeLock' in navigator) {
-        wakeLockRef.current = await navigator.wakeLock.request('screen');
+        if (wakeLockRef.current) return; // Se è già attivo, non fare nulla
+        
+        const lock = await navigator.wakeLock.request('screen');
+        wakeLockRef.current = lock;
+        
+        // BUG FIX iOS: Ascoltiamo quando Apple killa il blocco per poterlo riattivare
+        lock.addEventListener('release', () => {
+          wakeLockRef.current = null;
+        });
       }
-    } catch {
-      // ignore
+    } catch (e) {
+      console.warn('Wake Lock disattivato da iOS:', e);
     }
   }, []);
 
@@ -223,7 +231,7 @@ export default function App() {
     stateRef.current = state;
   }, [state]);
 
-  // 🔴 2. Gestisce gli eventi di sistema una sola volta all'avvio
+  // 2. Gestisce gli eventi di sistema e il riarmo del Wake Lock
   useEffect(() => {
     const handleVis = () => {
       if (document.visibilityState === 'visible') {
@@ -239,14 +247,24 @@ export default function App() {
       if (stateRef.current) saveGymState(stateRef.current);
     };
 
+    // Riarmo furtivo: qualsiasi tocco sullo schermo durante il workout riattiva il blocco se iOS lo ha fatto cadere
+    const handleTouch = () => {
+      const curTab = stateRef.current?.activeTab;
+      const active = curTab && stateRef.current?.activeWorkouts[curTab]?.active;
+      if (active && !wakeLockRef.current) requestWakeLock();
+    };
+
     document.addEventListener('visibilitychange', handleVis);
     window.addEventListener('pagehide', handlePageHide);
+    // passive: true ottimizza le performance di scorrimento dello schermo su iOS
+    document.addEventListener('touchstart', handleTouch, { passive: true });
 
     return () => {
       document.removeEventListener('visibilitychange', handleVis);
       window.removeEventListener('pagehide', handlePageHide);
+      document.removeEventListener('touchstart', handleTouch);
     };
-  }, [requestWakeLock]); // Rimosso 'state' dalle dipendenze!
+  }, [requestWakeLock]);
 
   const activeTabId = state?.activeTab || 'home';
   const currentWorkout = state?.activeWorkouts[activeTabId];
