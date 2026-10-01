@@ -19,28 +19,33 @@ export interface VolumeStats {
 export function calculateVolumeFromSessionV2(session: WorkoutSessionV2): number {
   let vol = 0;
   const bw = session.bodyWeightAtSession || 0; // Il peso di quel giorno esatto!
+  if (!session.blocks) return vol;
 
-  session.blocks.forEach(block => {
+  for (const block of session.blocks) {
     if ('rounds' in block) {
-      block.rounds.forEach(r => r.exercises.forEach(sub => {
-        sub.sets.forEach(set => {
-          const reps = set.reps || 0;
-          const w = set.weight || 0;
-          if (sub.type === 'weight' || !sub.type) vol += reps * w;
-          else if (sub.type === 'bodyweight') vol += reps * (w + bw);
-          else if (sub.type === 'time') vol += bw * ((set.durationSec || 60) / 10);
-        });
-      }));
+      for (const r of block.rounds) {
+        for (const sub of r.exercises) {
+          if (!sub.sets) continue;
+          for (const set of sub.sets) {
+            const reps = set.reps || 0;
+            const w = set.weight || 0;
+            if (sub.type === 'weight' || !sub.type) vol += reps * w;
+            else if (sub.type === 'bodyweight') vol += reps * (w + bw);
+            else if (sub.type === 'time') vol += bw * ((set.durationSec || 60) / 10);
+          }
+        }
+      }
     } else {
-      block.sets.forEach(set => {
+      if (!block.sets) continue;
+      for (const set of block.sets) {
         const reps = set.reps || 0;
         const w = set.weight || 0;
         if (block.type === 'weight' || !block.type) vol += reps * w;
         else if (block.type === 'bodyweight') vol += reps * (w + bw);
         else if (block.type === 'time') vol += bw * ((set.durationSec || 60) / 10);
-      });
+      }
     }
-  });
+  }
   return vol;
 }
 
@@ -51,6 +56,8 @@ export function calculateAllVolumeStatsV2(sessionsV2: WorkoutSessionV2[]): Volum
     today: 0, week: 0, lastWeek: 0, month: 0, lastMonth: 0, year: 0, lastYear: 0,
     hasLastWeek: false, hasLastMonth: false, hasLastYear: false
   };
+
+  if (!sessionsV2 || sessionsV2.length === 0) return stats;
 
   const currentWeekStart = new Date(d);
   currentWeekStart.setDate(d.getDate() - d.getDay() + (d.getDay() === 0 ? -6 : 1));
@@ -66,14 +73,14 @@ export function calculateAllVolumeStatsV2(sessionsV2: WorkoutSessionV2[]): Volum
   const lastMonthYear = lastMonthDate.getFullYear();
   const lastYear = currentYear - 1;
 
-  sessionsV2.forEach(session => {
+  for (const session of sessionsV2) {
     const vol = calculateVolumeFromSessionV2(session);
-    if (vol === 0) return;
+    if (vol === 0) continue;
 
     if (session.date === todayStr) stats.today += vol;
 
     const parts = session.date.split('-');
-    const logDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    const logDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
     
     if (logDate >= currentWeekStart) stats.week += vol;
     if (logDate >= lastWeekStart && logDate <= lastWeekEnd) { stats.lastWeek += vol; stats.hasLastWeek = true; }
@@ -81,7 +88,7 @@ export function calculateAllVolumeStatsV2(sessionsV2: WorkoutSessionV2[]): Volum
     if (logDate.getFullYear() === lastMonthYear && logDate.getMonth() === lastMonth) { stats.lastMonth += vol; stats.hasLastMonth = true; }
     if (logDate.getFullYear() === currentYear) stats.year += vol;
     if (logDate.getFullYear() === lastYear) { stats.lastYear += vol; stats.hasLastYear = true; }
-  });
+  }
 
   return stats;
 }

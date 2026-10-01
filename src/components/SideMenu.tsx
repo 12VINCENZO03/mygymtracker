@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AppState, BodyGoal } from '../types/gym';
-import { calculateAllVolumeStatsV2 } from '../utils/coach';
+import { calculateAllVolumeStatsV2, calculateVolumeFromSessionV2 } from '../utils/coach';
 import { getWorkoutDatesSet } from '../utils/domain';
 import { getTodayStr } from '../utils/storage';
 
@@ -282,6 +282,72 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                     <span className="text-xs font-black text-emerald-400">{bmi}</span>
                   </div>
 
+                  {/* GRAFICO TREND BIA - Stile Apple Health SVG Nativo */}
+                  {state.bodyMetricsHistory.length >= 2 && (
+                    <div className="bg-zinc-900 p-4 rounded-2xl border border-zinc-800 space-y-3 mt-3 mb-1">
+                      <div className="flex justify-between items-center text-[10px] font-extrabold uppercase tracking-wider text-zinc-400">
+                        <span className="flex items-center gap-1.5 text-emerald-400">
+                          <i className="fa-solid fa-chart-line" /> Trend Composizione Corporea
+                        </span>
+                        <span>{state.bodyMetricsHistory.length} Rilevazioni</span>
+                      </div>
+
+                      {/* SVG Nativo reattivo */}
+                      <div className="w-full h-36 relative">
+                        <svg className="w-full h-full overflow-visible" viewBox="0 0 300 120">
+                          {/* Linee guida di sfondo */}
+                          <line x1="0" y1="0" x2="300" y2="0" stroke="#27272a" strokeWidth="1" strokeDasharray="3" />
+                          <line x1="0" y1="60" x2="300" y2="60" stroke="#27272a" strokeWidth="1" strokeDasharray="3" />
+                          <line x1="0" y1="120" x2="300" y2="120" stroke="#27272a" strokeWidth="1" />
+
+                          {(() => {
+                            const sorted = [...state.bodyMetricsHistory].sort(
+                              (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+                            );
+                            const weights = sorted.map(h => parseFloat(String(h.weight)) || 0).filter(w => w > 0);
+                            const ffms = sorted.map(h => parseFloat(String(h.ffm)) || 0).filter(f => f > 0);
+                            
+                            if (weights.length < 2) return null;
+
+                            const minW = Math.min(...weights, ...(ffms.length > 0 ? ffms : weights)) - 3;
+                            const maxW = Math.max(...weights, ...(ffms.length > 0 ? ffms : weights)) + 3;
+                            const rangeW = maxW - minW || 1;
+
+                            const getPoints = (key: 'weight' | 'ffm') => 
+                              sorted.map((h, i) => {
+                                const val = parseFloat(String(h[key])) || 0;
+                                const x = (i / (sorted.length - 1)) * 280 + 10;
+                                const y = 110 - ((val - minW) / rangeW) * 100;
+                                return `${x},${y}`;
+                              }).join(' ');
+
+                            const weightPoints = getPoints('weight');
+                            const ffmPoints = getPoints('ffm');
+
+                            return (
+                              <>
+                                {/* Linea Peso Totale (Grigio/Blu neutro) */}
+                                <polyline fill="none" stroke="#71717a" strokeWidth="2.5" strokeLinecap="round" points={weightPoints} />
+                                {/* Linea Massa Magra FFM (Verde Apple) */}
+                                <polyline fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" points={ffmPoints} />
+                              </>
+                            );
+                          })()}
+                        </svg>
+                      </div>
+
+                      {/* Legenda minima */}
+                      <div className="flex justify-between items-center text-[10px] text-zinc-500 pt-1 border-t border-zinc-800/60 font-bold">
+                        <span className="flex items-center gap-1 text-emerald-400">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Massa Magra (FFM)
+                        </span>
+                        <span className="flex items-center gap-1 text-zinc-400">
+                          <span className="w-2 h-2 rounded-full bg-zinc-500 inline-block" /> Peso Totale
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Storico BIA accordion */}
                   <div className="mt-3 bg-zinc-950 rounded-xl border border-zinc-800 overflow-hidden">
                     <button
@@ -351,6 +417,114 @@ export const SideMenu: React.FC<SideMenuProps> = ({
 
             {progressOpen && (
               <div className="p-4 pt-0 space-y-4">
+                {/* Trend del Tonnellaggio - Stile Apple Fitness SVG Nativo */}
+                <div className="bg-zinc-950 p-3.5 rounded-2xl border border-zinc-800/60 space-y-2.5">
+                  <div className="flex justify-between items-center text-[10px] font-extrabold uppercase tracking-wider text-zinc-400">
+                    <span className="flex items-center gap-1.5 text-emerald-400">
+                      <i className="fa-solid fa-arrow-trend-up" /> Trend Tonnellaggio
+                    </span>
+                    <span className="text-zinc-500">Ultime {Math.min(10, state.sessionsV2?.length || 0)} sessioni</span>
+                  </div>
+
+                  {(() => {
+                    const rawSessions = state.sessionsV2 || [];
+                    // Prendi max 10 sessioni più recenti e invertile in ordine cronologico crescente
+                    const recentSessions = [...rawSessions.slice(0, 10)].reverse();
+                    
+                    if (recentSessions.length < 2) {
+                      return (
+                        <div className="text-zinc-500 text-center py-5 text-[11px] italic bg-zinc-900/40 rounded-xl border border-zinc-800/40">
+                          Esegui almeno 2 allenamenti per vedere il trend
+                        </div>
+                      );
+                    }
+
+                    const sessionData = recentSessions.map((s) => ({
+                      date: s.date,
+                      tonnage: Math.round(calculateVolumeFromSessionV2(s))
+                    }));
+
+                    const values = sessionData.map((d) => d.tonnage);
+                    const minVal = Math.max(0, Math.min(...values) * 0.9);
+                    const maxVal = Math.max(...values) * 1.1 || 1000;
+                    const rangeVal = maxVal - minVal || 1;
+
+                    const points = sessionData
+                      .map((d, i) => {
+                        const x = (i / (sessionData.length - 1)) * 260 + 20;
+                        const y = 90 - ((d.tonnage - minVal) / rangeVal) * 75;
+                        return `${x},${y}`;
+                      })
+                      .join(' ');
+
+                    const lastSession = sessionData[sessionData.length - 1];
+                    const firstSession = sessionData[0];
+                    const diff = lastSession.tonnage - firstSession.tonnage;
+
+                    return (
+                      <>
+                        <div className="w-full h-28 relative">
+                          <svg className="w-full h-full overflow-visible" viewBox="0 0 300 100">
+                            {/* Griglia di sfondo tratteggiata */}
+                            <line x1="10" y1="15" x2="290" y2="15" stroke="#27272a" strokeWidth="1" strokeDasharray="3" />
+                            <line x1="10" y1="52" x2="290" y2="52" stroke="#27272a" strokeWidth="1" strokeDasharray="3" />
+                            <line x1="10" y1="90" x2="290" y2="90" stroke="#27272a" strokeWidth="1" />
+
+                            {/* Linea del trend del tonnellaggio */}
+                            <polyline
+                              fill="none"
+                              stroke="#10b981"
+                              strokeWidth="2.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              points={points}
+                            />
+
+                            {/* Punti e label sui nodi */}
+                            {sessionData.map((d, i) => {
+                              const x = (i / (sessionData.length - 1)) * 260 + 20;
+                              const y = 90 - ((d.tonnage - minVal) / rangeVal) * 75;
+                              const isLast = i === sessionData.length - 1;
+                              const isFirst = i === 0;
+
+                              return (
+                                <g key={i}>
+                                  <circle
+                                    cx={x}
+                                    cy={y}
+                                    r={isLast ? 4 : 3}
+                                    fill={isLast ? '#34d399' : '#10b981'}
+                                  />
+                                  {(isLast || isFirst) && (
+                                    <text
+                                      x={x}
+                                      y={y - 8}
+                                      fill={isLast ? '#34d399' : '#a1a1aa'}
+                                      fontSize="9"
+                                      fontWeight="bold"
+                                      textAnchor={isFirst ? 'start' : 'end'}
+                                    >
+                                      {(d.tonnage / 1000).toFixed(1)}k
+                                    </text>
+                                  )}
+                                </g>
+                              );
+                            })}
+                          </svg>
+                        </div>
+
+                        <div className="flex justify-between items-center text-[10px] text-zinc-500 pt-1 border-t border-zinc-900 font-bold">
+                          <span>Inizio: {firstSession.date}</span>
+                          <span className={diff >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                            {diff >= 0 ? `+${(diff / 1000).toFixed(1)}k kg` : `${(diff / 1000).toFixed(1)}k kg`}
+                          </span>
+                          <span>Ultimo: {lastSession.date}</span>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+
                 {/* Volume Bar Comparison */}
                 <div className="flex items-end gap-3 h-24 border-b border-zinc-800/60 pb-2">
                   <div className="flex-1 flex flex-col items-center justify-end gap-1 h-full">
@@ -417,6 +591,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                     })}
                   </div>
                 </div>
+
 
                 <button
                   type="button"

@@ -186,6 +186,7 @@ export default function App() {
 
     setState((prev) => {
       if (!prev) return null;
+      if (prev.weights[id] === cleanVal) return prev;
       const next = { ...prev, weights: { ...prev.weights, [id]: cleanVal } };
       saveGymState(next); // AGGIUNTO
       return next;
@@ -197,6 +198,7 @@ export default function App() {
 
     setState((prev) => {
       if (!prev) return null;
+      if (prev.setWeights[setId] === cleanVal) return prev;
       const nextState = { ...prev, setWeights: { ...prev.setWeights, [setId]: cleanVal } };
       saveGymState(nextState); // AGGIUNTO
       return nextState;
@@ -681,21 +683,29 @@ export default function App() {
     const setId = `${exId}-${setIndex}`;
     const isChecked = Boolean(state.checkedSets[setId]);
 
-    // Shallow copy sicura solo dei dizionari interessati (Immutabilità)
+    // Shallow copy sicura solo dei dizionari interessati (Immutabilità granulare)
     const nextCheckedSets = { ...state.checkedSets };
-    const nextSetReps = { ...state.setReps };
-    const nextSetWeights = { ...state.setWeights };
-    const nextSetRir = { ...state.setRir };
-    const nextSetRpe = { ...state.setRpe };
+    let nextSetReps = state.setReps;
+    let nextSetWeights = state.setWeights;
+    let nextSetRir = state.setRir;
+    let nextSetRpe = state.setRpe;
 
     if (isChecked) {
       delete nextCheckedSets[setId];
     } else {
       nextCheckedSets[setId] = true;
-      if (nextSetReps[setId] === undefined) nextSetReps[setId] = prefill.reps;
-      if (nextSetWeights[setId] === undefined) nextSetWeights[setId] = prefill.weight;
-      if (prefill.rir !== undefined && nextSetRir[setId] === undefined) nextSetRir[setId] = prefill.rir;
-      if (prefill.rpe !== undefined && nextSetRpe[setId] === undefined) nextSetRpe[setId] = prefill.rpe;
+      if (nextSetReps[setId] === undefined) {
+        nextSetReps = { ...nextSetReps, [setId]: prefill.reps };
+      }
+      if (nextSetWeights[setId] === undefined) {
+        nextSetWeights = { ...nextSetWeights, [setId]: prefill.weight };
+      }
+      if (prefill.rir !== undefined && nextSetRir[setId] === undefined) {
+        nextSetRir = { ...nextSetRir, [setId]: prefill.rir };
+      }
+      if (prefill.rpe !== undefined && nextSetRpe[setId] === undefined) {
+        nextSetRpe = { ...nextSetRpe, [setId]: prefill.rpe };
+      }
     }
 
     const nextState = {

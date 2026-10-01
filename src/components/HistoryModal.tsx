@@ -17,18 +17,27 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Helper intelligente per ricalcolare il numero di serie al volo (Single Source of Truth)
-  const getTotalSets = (session: WorkoutSessionV2) => {
+  // Helper intelligente per ricalcolare il numero di serie al volo (Single Source of Truth ad alte prestazioni)
+  const getTotalSets = (session: WorkoutSessionV2): number => {
     let count = 0;
-    session.blocks.forEach(b => {
+    if (!session || !session.blocks) return count;
+    for (const b of session.blocks) {
       if ('rounds' in b) {
-        b.rounds.forEach(r => r.exercises.forEach(sub => count += sub.sets.length));
+        for (const r of b.rounds) {
+          for (const sub of r.exercises) {
+            if (sub.sets) count += sub.sets.length;
+          }
+        }
       } else {
-        count += b.sets.length;
+        if (b.sets) count += b.sets.length;
       }
-    });
+    }
     return count;
   };
+
+  const displayedHistory = React.useMemo(() => {
+    return (historyV2 || []).slice(0, visibleCount);
+  }, [historyV2, visibleCount]);
 
   return (
     <div className="fixed inset-0 bg-zinc-950 z-[100] flex flex-col animate-in fade-in">
@@ -70,7 +79,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
             </div>
           ) : (
             <>
-              {historyV2.slice(0, visibleCount).map((s) => (
+              {displayedHistory.map((s) => (
                 <div
                   key={s.id}
                   onClick={() => setSelectedSession(s)}
@@ -99,9 +108,9 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setVisibleCount((prev) => prev + 30)}
-                  className="w-full bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-300 text-xs font-bold py-3 rounded-xl transition"
+                  className="w-full bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-300 text-xs font-bold py-3.5 rounded-2xl transition active:scale-[0.99] shadow-sm"
                 >
-                  Carica altri ({historyV2.length - visibleCount} rimanenti)
+                  Carica altri ({Math.min(30, historyV2.length - visibleCount)} di {historyV2.length - visibleCount} rimanenti)
                 </button>
               )}
             </>

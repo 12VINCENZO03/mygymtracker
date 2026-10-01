@@ -15,9 +15,10 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   onSelectTab,
   onAddFirstTab
 }) => {
-  // 🔴 MOTORE V2: Statistiche incrollabili
-  const stats = React.useMemo(() => calculateAllVolumeStatsV2(state.sessionsV2 || []), [state.sessionsV2]);
-  const loadOggi = React.useMemo(() => calculateTodayLoad(state.sessionsV2 || [], getTodayStr()), [state.sessionsV2]);
+  // 🔴 MOTORE V2: Statistiche incrollabili con memoizzazione avanzata
+  const todayStr = React.useMemo(() => getTodayStr(), []);
+  const stats = React.useMemo(() => calculateAllVolumeStatsV2(state.sessionsV2 || []), [state.sessionsV2, todayStr]);
+  const loadOggi = React.useMemo(() => calculateTodayLoad(state.sessionsV2 || [], todayStr), [state.sessionsV2, todayStr]);
   const nonHomeTabs = state.plan.filter((t) => !t.isHome);
 
   if (nonHomeTabs.length === 0) {
