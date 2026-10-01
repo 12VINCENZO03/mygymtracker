@@ -139,8 +139,8 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                 type="number"
                 min={1}
                 max={20}
-                value={circuit.rounds || 3}
-                onChange={(e) => onUpdateCircuit('rounds', Math.max(1, parseInt(e.target.value) || 1))}
+                value={circuit.rounds !== undefined ? circuit.rounds : 3}
+                onChange={(e) => onUpdateCircuit('rounds', parseInt(e.target.value) || 0)}
                 className="bg-transparent text-white font-bold w-full text-center outline-none text-sm"
               />
             </div>
@@ -640,7 +640,7 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
       </div>
 
       {/* Classic Circuit Round Rest Buttons */}
-      {!isEmom && !isAmrap && circuit.pause !== 0 && (
+      {!isEmom && !isAmrap && (circuit.pause || 0) > 0 && (
         <div className="mt-5 pt-4 border-t border-zinc-800/60 flex flex-wrap gap-2 pl-2">
           {Array.from({ length: totalRounds }).map((_, rIdx) => {
             const roundKey = `${circuit.id}-round-${rIdx}`;

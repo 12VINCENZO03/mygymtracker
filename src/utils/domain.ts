@@ -191,7 +191,7 @@ export function calculateTodayLoad(sessions: WorkoutSessionV2[], todayStr: strin
     session.blocks.forEach(block => {
       const processSets = (sets: WorkoutSetV2[]) => {
         sets.forEach(set => {
-          const duration = set.durationSec || (set.reps ? set.reps * 3 : 60); 
+          const duration = set.durationSec || (set.reps ? Number(set.reps) * 3 : 60);
           const effort = set.rpe !== undefined ? set.rpe : (set.rir !== undefined ? (10 - set.rir) : 8);
           load += (duration / 60) * effort;
         });
