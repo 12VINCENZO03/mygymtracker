@@ -177,6 +177,8 @@ export interface AppState {
   plan: WorkoutTab[];
   activeTab: string;
   isEditMode: boolean;
+  
+  // STATO TEMPORANEO DELLA UI (Si svuota a fine allenamento)
   weights: Record<string, string>;
   setWeights: Record<string, string>;
   checkedSets: Record<string, boolean>;
@@ -185,9 +187,10 @@ export interface AppState {
   setDurations: Record<string, string>;
   setRpe: Record<string, string>;
   setCustomFields: Record<string, Record<string, string>>;
+  currentEffortSelection: { setId: string; targetId: string; isRpe: boolean } | null;
+  
+  // DATI DI DOMINIO
   prs: PRRecord[];
-  openHistories?: Record<string, boolean>;
-  openPRHistories?: Record<string, boolean>;
   activeWorkouts: Record<string, ActiveWorkoutState>;
   bodyMetrics: BodyMetrics;
   bodyMetricsHistory: BodyMetricHistoryEntry[];
@@ -196,10 +199,9 @@ export interface AppState {
   bodyGoal: BodyGoal;
   deloadActive: boolean;
   deloadDates: string[];
-  currentEffortSelection: { setId: string; targetId: string; isRpe: boolean } | null;
   lastBackupDate: string | null;
   
-  // 🔴 CANONICAL V2 ENGINE
+  // 🔴 CANONICAL V2 ENGINE (L'UNICA VERA CASA DEI DATI STORICI E REGISTRO)
   schemaVersion: number;
   revision: number;
   lastSavedAt?: number;

@@ -213,8 +213,6 @@ export default function App() {
         }
       };
 
-      updateExerciseHistory(nextState, exId);
-      calculateVolumeAndLoad(nextState);
       return nextState;
     });
   }, []);
@@ -387,10 +385,6 @@ export default function App() {
       setActiveMasterTimer(null);
     }
   };
-
-  // 🔴 CANONICAL V2: Volume, Carico e Storico Esercizio sono derived data calcolati da sessionsV2
-  const calculateVolumeAndLoad = (_currState?: AppState) => {};
-  const updateExerciseHistory = (_currState?: AppState, _targetId?: string) => {};
 
   const handleStartWorkout = async (tabId: string) => {
     if (!state) return;
@@ -687,7 +681,6 @@ export default function App() {
           }
         }
       });
-      calculateVolumeAndLoad(newState);
       setState(newState);
       showToast('Sessione riavviata.');
     }
@@ -761,8 +754,6 @@ export default function App() {
       }
     }
 
-    updateExerciseHistory(newState, exId);
-    calculateVolumeAndLoad(newState);
     setState(newState);
   };
 
@@ -828,8 +819,6 @@ export default function App() {
           });
         }
 
-        updateExerciseHistory(newState, exId);
-        calculateVolumeAndLoad(newState);
         setState(newState);
       }
     }
@@ -1359,12 +1348,10 @@ export default function App() {
                       setState((prev) => {
                         if (!prev) return null;
                         const cur = prev.amrapRounds[ex.id] || 0;
-                        const next = {
+                        return {
                           ...prev,
                           amrapRounds: { ...prev.amrapRounds, [ex.id]: cur + 1 }
                         };
-                        calculateVolumeAndLoad(next);
-                        return next;
                       });
                     }}
                     onStartRoundRest={(sec, roundIdx) => {

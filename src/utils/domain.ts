@@ -183,7 +183,7 @@ export function getTabCompletionStats(
   return { count, lastCompletedAt, lastDateStr };
 }
 
-// 🔴 UX PRO: Calcolo derivato on-the-fly per il Carico Odierno della Dashboard
+// 🔴 UX PRO: Calcolo derivato on-the-fly per la Dashboard
 export function calculateTodayLoad(sessions: WorkoutSessionV2[], todayStr: string): number {
   if (!sessions) return 0;
   let load = 0;
