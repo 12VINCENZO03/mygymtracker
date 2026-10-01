@@ -289,7 +289,7 @@ export default function App() {
       restTimerCallbackRef.current = onFinished || null;
       const endTime = Date.now() + dur * 1000;
       restTimerIntervalRef.current = safeSetInterval(() => {
-        const remaining = Math.ceil((endTime - Date.now()) / 1000);
+        const remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
         if (remaining <= 0) {
           if (restTimerIntervalRef.current) safeClearInterval(restTimerIntervalRef.current);
           restTimerIntervalRef.current = null;
@@ -862,7 +862,7 @@ export default function App() {
     setActiveInlineTimers((prev) => ({ ...prev, [setId]: durationSec }));
     const endTime = Date.now() + durationSec * 1000;
     inlineTimerIntervalsRef.current[setId] = safeSetInterval(() => {
-      const remaining = Math.ceil((endTime - Date.now()) / 1000);
+      const remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
       if (remaining <= 0) {
         safeClearInterval(inlineTimerIntervalsRef.current[setId]);
         delete inlineTimerIntervalsRef.current[setId];
@@ -874,14 +874,26 @@ export default function App() {
         playTrumpet();
         setState((prev) => {
           if (!prev) return null;
-          const nextState = { ...prev };
-          nextState.checkedSets[setId] = true;
+          const nextCheckedSets = { ...prev.checkedSets, [setId]: true };
+          const nextSetReps = { ...prev.setReps };
+          const nextSetWeights = { ...prev.setWeights };
+          const nextSetRir = { ...prev.setRir };
+          const nextSetRpe = { ...prev.setRpe };
           // 🔴 Congeliamo i dati al termine del timer
-          if (nextState.setReps[setId] === undefined) nextState.setReps[setId] = String(durationSec);
-          if (nextState.setWeights[setId] === undefined) nextState.setWeights[setId] = prefill.weight;
-          if (prefill.rir !== undefined && nextState.setRir[setId] === undefined) nextState.setRir[setId] = prefill.rir;
-          if (prefill.rpe !== undefined && nextState.setRpe[setId] === undefined) nextState.setRpe[setId] = prefill.rpe;
-          saveGymState(nextState); // AGGIUNTO
+          if (nextSetReps[setId] === undefined) nextSetReps[setId] = String(durationSec);
+          if (nextSetWeights[setId] === undefined) nextSetWeights[setId] = prefill.weight;
+          if (prefill.rir !== undefined && nextSetRir[setId] === undefined) nextSetRir[setId] = prefill.rir;
+          if (prefill.rpe !== undefined && nextSetRpe[setId] === undefined) nextSetRpe[setId] = prefill.rpe;
+
+          const nextState = {
+            ...prev,
+            checkedSets: nextCheckedSets,
+            setReps: nextSetReps,
+            setWeights: nextSetWeights,
+            setRir: nextSetRir,
+            setRpe: nextSetRpe
+          };
+          saveGymState(nextState); // Persistenza immediata
           return nextState;
         });
         if (pauseSec > 0) startRestTimer(pauseSec);
@@ -896,9 +908,11 @@ export default function App() {
       if (masterTimerIntervalRef.current) safeClearInterval(masterTimerIntervalRef.current);
       masterTimerIntervalRef.current = null;
       setActiveMasterTimer(null);
+      if (state) saveGymState(state);
       return;
     }
     initAudio();
+    if (state) saveGymState(state);
     const absoluteStartTime = Date.now();
     const totalRounds = Math.ceil((totalMin * 60) / intervalSec);
     let lastAnnouncedRound = 0; // Il round 0 è appena iniziato
@@ -944,9 +958,11 @@ export default function App() {
       if (masterTimerIntervalRef.current) safeClearInterval(masterTimerIntervalRef.current);
       masterTimerIntervalRef.current = null;
       setActiveMasterTimer(null);
+      if (state) saveGymState(state);
       return;
     }
     initAudio();
+    if (state) saveGymState(state);
     const absoluteStartTime = Date.now();
     const duration = totalMin * 60;
 
@@ -1100,17 +1116,32 @@ export default function App() {
         }}
         onDeleteTab={(id) => {
           if (state.plan.length <= 2) {
-            showToast('Impossibile eliminare l&apos;unica scheda.');
+            showToast("Impossibile eliminare l'unica scheda.");
             return;
           }
           if (confirm('Eliminare questa scheda e tutti i suoi esercizi?')) {
             setState((prev) => {
               if (!prev) return null;
-              return {
-                ...prev,
-                plan: prev.plan.filter((t) => t.id !== id),
-                activeTab: 'home'
-              };
+              const next = { ...prev };
+              
+              // Pulizia chirurgica dei dati orfani di tutti gli esercizi della scheda eliminata
+              const targetTab = next.plan.find(t => t.id === id);
+              if (targetTab) {
+                targetTab.exercises.forEach(ex => {
+                  if (ex.type === 'single') {
+                    cleanupOrphanDataForId(next, ex.id);
+                  } else if (ex.type === 'superset') {
+                    cleanupCircuitOrphanData(next, ex);
+                  }
+                });
+              }
+              
+              delete next.activeWorkouts[id];
+              next.plan = next.plan.filter((t) => t.id !== id);
+              next.activeTab = 'home';
+              
+              saveGymState(next);
+              return next;
             });
           }
         }}
@@ -1370,10 +1401,12 @@ export default function App() {
                       setState((prev) => {
                         if (!prev) return null;
                         const cur = prev.amrapRounds[ex.id] || 0;
-                        return {
+                        const next = {
                           ...prev,
                           amrapRounds: { ...prev.amrapRounds, [ex.id]: cur + 1 }
                         };
+                        saveGymState(next);
+                        return next;
                       });
                     }}
                     onStartRoundRest={(sec, roundIdx) => {

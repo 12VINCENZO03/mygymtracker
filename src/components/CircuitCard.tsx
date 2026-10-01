@@ -338,6 +338,15 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                     className="bg-zinc-900 text-white text-xs font-bold p-2.5 rounded-2xl border border-zinc-700/50 text-center shadow-inner outline-none focus:border-emerald-500 transition-colors"
                   />
                 </div>
+                {(sub.metricType as string) !== 'rest' && (
+                  <input
+                    type="text"
+                    value={sub.link || ''}
+                    onChange={(e) => onUpdateSubEx(sub.id, 'link', e.target.value)}
+                    placeholder="Link video esecuzione (YouTube / Google Drive)"
+                    className="w-full bg-zinc-900 text-zinc-400 text-xs font-medium p-3 rounded-2xl border border-zinc-700/50 outline-none shadow-inner focus:border-emerald-500 transition-colors"
+                  />
+                )}
               </div>
             );
           })}
@@ -428,7 +437,7 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
         <div className="bg-zinc-950 p-4 rounded-3xl border border-zinc-800/80 mb-5 flex items-center justify-between shadow-inner ml-2">
           <div>
             <div className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Timer AMRAP</div>
-            <div className="text-2xl font-black text-amber-400 font-mono tracking-tight mt-0.5">
+            <div className="text-3xl font-black text-amber-400 font-mono tracking-wider tabular-nums mt-0.5 drop-shadow-[0_0_12px_rgba(251,191,36,0.25)]">
               {isMasterTimerRunning ? formatTime(masterTimerRemainingSec) : `${circuit.amrapTotalMin || 10}:00`}
             </div>
           </div>
@@ -448,10 +457,16 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
             <button
               type="button"
               disabled={!isWorkoutActive}
-              onClick={onAddAmrapRound}
-              className="bg-zinc-800 hover:bg-zinc-700 text-emerald-400 px-4 py-3 rounded-2xl font-black text-xs border border-zinc-700 active:scale-95 transition-all shadow-sm"
+              onClick={() => {
+                if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+                  try { navigator.vibrate(40); } catch { /* ignore */ }
+                }
+                onAddAmrapRound();
+              }}
+              className="bg-zinc-800 hover:bg-zinc-700 active:bg-emerald-500 active:text-zinc-950 text-emerald-400 px-4 py-3 rounded-2xl font-black text-xs border border-zinc-700 active:scale-90 transition-all duration-150 shadow-sm flex items-center gap-1.5"
             >
-              +1 Giro ({amrapRoundsCount})
+              <i className="fa-solid fa-plus text-[10px]" />
+              1 Giro ({amrapRoundsCount})
             </button>
           </div>
         </div>
@@ -612,16 +627,16 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                   let emomClass = '';
                   if (isEmom) {
                     if (activeEmomRound === -1 || rIdx > activeEmomRound) {
-                      emomClass = 'emom-locked';
+                      emomClass = 'emom-locked opacity-40 grayscale';
                     } else if (rIdx === activeEmomRound) {
-                      emomClass = 'emom-active';
+                      emomClass = 'emom-active ring-2 ring-emerald-400 ring-offset-2 ring-offset-zinc-950 rounded-2xl p-1 bg-emerald-950/30 transition-all duration-300 shadow-[0_0_15px_rgba(16,185,129,0.35)]';
                     } else {
-                      emomClass = 'opacity-60';
+                      emomClass = 'opacity-60 transition-opacity duration-300';
                     }
                   }
 
                   return (
-                    <div key={rIdx} className={`flex items-center gap-2.5 ${emomClass}`}>
+                    <div key={rIdx} className={`flex items-center gap-2.5 transition-all duration-300 ${emomClass}`}>
                       <span className="text-[10px] font-black text-zinc-500 w-12 uppercase bg-zinc-950/80 border border-zinc-800/80 px-2 py-3.5 rounded-2xl text-center shadow-sm">
                         G{rIdx + 1}
                       </span>
