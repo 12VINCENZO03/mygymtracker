@@ -45,16 +45,24 @@ export function unlockAudio() {
 
   // Trucco 2: Play e Pause istantaneo degli HTMLAudioElement
   if (timerSound) {
+    timerSound.muted = true;
     timerSound.play().then(() => {
       timerSound!.pause();
       timerSound!.currentTime = 0;
-    }).catch(() => {});
+      timerSound!.muted = false;
+    }).catch(() => {
+      timerSound!.muted = false;
+    });
   }
   if (beepSound) {
+    beepSound.muted = true;
     beepSound.play().then(() => {
       beepSound!.pause();
       beepSound!.currentTime = 0;
-    }).catch(() => {});
+      beepSound!.muted = false;
+    }).catch(() => {
+      beepSound!.muted = false;
+    });
   }
 
   isUnlocked = true;

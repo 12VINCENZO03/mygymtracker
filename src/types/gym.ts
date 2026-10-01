@@ -109,65 +109,6 @@ export interface PRRecord {
   history: Array<{ date: string; weight: string }>;
 }
 
-export interface SessionSetSnapshot {
-  index: number;
-  reps?: string;
-  weight?: string | number;
-  duration?: string | number;
-  rir?: string;
-  rpe?: string;
-}
-
-export interface SessionExerciseSnapshot {
-  type: 'single';
-  name: string;
-  metricType: MetricType;
-  targetSets?: number;
-  targetReps?: string | number;
-  pause?: number;
-  sets: SessionSetSnapshot[];
-}
-
-export interface SessionSubSnapshot {
-  name: string;
-  metricType: MetricType;
-  targetReps?: string | number;
-  pause?: number;
-  reps?: string;
-  weight?: string | number;
-  duration?: string | number;
-  rir?: string;
-  rpe?: string;
-  isRest?: boolean;
-}
-
-export interface SessionRoundSnapshot {
-  roundIndex: number;
-  exercises: SessionSubSnapshot[];
-}
-
-export interface SessionCircuitSnapshot {
-  type: 'superset';
-  name: string;
-  structureType: CircuitStructure;
-  targetRounds?: number;
-  emomTotalMin?: number;
-  emomIntervalSec?: number;
-  amrapTotalMin?: number;
-  rounds: SessionRoundSnapshot[];
-}
-
-export interface WorkoutSessionSnapshot {
-  id: string;
-  date: string;
-  time: string;
-  tabName: string;
-  tabSubtitle?: string;
-  duration: string;
-  totalSets: number;
-  exercises: (SessionExerciseSnapshot | SessionCircuitSnapshot)[];
-}
-
 export interface ActiveWorkoutState {
   active: boolean;
   startTime: number | null;

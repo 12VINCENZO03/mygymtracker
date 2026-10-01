@@ -313,13 +313,18 @@ export async function createSafetyBackup(state: AppState, reason: string): Promi
 export async function saveGymState(state: AppState): Promise<void> {
   if (typeof window === 'undefined') return;
   setPersistenceStatus('SAVING');
-  state.revision = (state.revision || 0) + 1;
-  state.lastSavedAt = Date.now();
 
-  // 1. IL PARACADUTE SINCRONO (Mai rimuoverlo)
+  // Creiamo una copia della radice e aggiorniamo i metadati senza mutare l'oggetto React
+  const stateToSave = {
+    ...state,
+    revision: (state.revision || 0) + 1,
+    lastSavedAt: Date.now()
+  };
+
+  // 1. IL PARACADUTE SINCRONO
   try {
-    const hotState = { ...state };
-    delete (hotState as any).sessionsV2; // Escludiamo lo storico pesante dal limite di 5MB
+    const hotState = { ...stateToSave };
+    delete (hotState as any).sessionsV2; // Escludiamo lo storico pesante
     localStorage.setItem('mygym_state', JSON.stringify(hotState));
   } catch (e) {
     console.warn('Impossibile salvare su localStorage', e);
@@ -339,14 +344,14 @@ export async function saveGymState(state: AppState): Promise<void> {
           }
         };
         worker.addEventListener('message', handler);
-        worker.postMessage({ action: 'save', payload: state, id: reqId });
+        worker.postMessage({ action: 'save', payload: stateToSave, id: reqId });
       });
     } else {
       const db = await initDB();
       await new Promise<void>((resolve, reject) => {
         const tx = db.transaction(['store', 'sessions'], 'readwrite');
-        const sessions = state.sessionsV2 || [];
-        const hotState = { ...state };
+        const sessions = stateToSave.sessionsV2 || [];
+        const hotState = { ...stateToSave };
         delete (hotState as any).sessionsV2;
         tx.objectStore('store').put(hotState, 'state');
         tx.objectStore('sessions').put(sessions, 'history');
@@ -356,7 +361,7 @@ export async function saveGymState(state: AppState): Promise<void> {
     }
     setPersistenceStatus('SAVED');
     if (tabChannel) {
-      tabChannel.postMessage({ type: 'STATE_SAVED', revision: state.revision, timestamp: Date.now() });
+      tabChannel.postMessage({ type: 'STATE_SAVED', revision: stateToSave.revision, timestamp: stateToSave.lastSavedAt });
     }
   } catch (err) {
     setPersistenceStatus('ERROR');

@@ -44,44 +44,20 @@ function generateWav(filename, duration, sampleGenerator) {
   fs.writeFileSync(filename, buffer);
 }
 
-// 1. Whistle Generator
-function whistleSample(t) {
-  // Blasts:
-  // Blast 1: 0.05 to 0.45
-  // Blast 2: 0.60 to 1.00
-  // Blast 3: 1.15 to 2.45
-  let blastEnv = 0;
-  const inRange = (t, start, end) => t >= start && t <= end;
-  
-  const envelope = (t, start, end) => {
-    const dur = end - start;
-    const progress = (t - start) / dur;
-    const attack = Math.min(1, (t - start) / 0.03); // 30ms attack
-    const decay = Math.min(1, (end - t) / 0.05); // 50ms release
-    return attack * decay;
+// 1. Bell Generator (crisp dual chime)
+function bellSample(t) {
+  const playTone = (time, freq) => {
+    if (t < time) return 0;
+    const localT = t - time;
+    if (localT > 2.0) return 0;
+    const env = Math.exp(-localT * 3.5);
+    const tone = Math.sin(2 * Math.PI * freq * localT);
+    const harmonic = 0.15 * Math.sin(2 * Math.PI * (freq * 2) * localT);
+    return (tone + harmonic) * env;
   };
-
-  if (inRange(t, 0.05, 0.45)) {
-    blastEnv = envelope(t, 0.05, 0.45);
-  } else if (inRange(t, 0.60, 1.00)) {
-    blastEnv = envelope(t, 0.60, 1.00);
-  } else if (inRange(t, 1.15, 2.45)) {
-    blastEnv = envelope(t, 1.15, 2.45);
-  } else {
-    return 0;
-  }
-
-  // Dual tone typical of referee whistles + pea modulation
-  const flutter = 1 + 0.15 * Math.sin(2 * Math.PI * 33 * t);
-  const freq1 = 2820 * flutter;
-  const freq2 = 3180 * flutter;
-  const tone1 = Math.sin(2 * Math.PI * freq1 * t);
-  const tone2 = Math.sin(2 * Math.PI * freq2 * t);
-  const harmonic = 0.2 * Math.sin(2 * Math.PI * (freq1 * 2) * t);
-  const noise = (Math.random() * 2 - 1) * 0.12;
-
-  const raw = (tone1 * 0.45 + tone2 * 0.45 + harmonic + noise) * blastEnv;
-  return raw * 0.85;
+  const tone1 = playTone(0.0, 880.0);
+  const tone2 = playTone(0.3, 1108.73);
+  return (tone1 + tone2) * 0.7;
 }
 
 // 2. Beep Generator (crisp chime)
@@ -95,11 +71,11 @@ function beepSample(t) {
 }
 
 // Generate WAVs
-generateWav('/tmp/whistle.wav', 2.6, whistleSample);
+generateWav('/tmp/bell.wav', 2.5, bellSample);
 generateWav('/tmp/beep.wav', 0.2, beepSample);
 
 // Convert to MP3
-execSync('ffmpeg -y -i /tmp/whistle.wav -codec:a libmp3lame -qscale:a 2 public/timer-end.mp3');
+execSync('ffmpeg -y -i /tmp/bell.wav -codec:a libmp3lame -qscale:a 2 public/timer-end.mp3');
 execSync('ffmpeg -y -i /tmp/beep.wav -codec:a libmp3lame -qscale:a 2 public/beep.mp3');
 
 console.log('Audio files created in public/');

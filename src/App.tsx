@@ -431,7 +431,6 @@ export default function App() {
     try {
       const currentTab = state.plan.find((t) => t.id === tabId);
       if (!currentTab) return;
-
       skipRestTimer();
       releaseWakeLock();
 
@@ -446,19 +445,19 @@ export default function App() {
       let totalSets = 0;
       const v2Blocks: BlockSnapshotV2[] = [];
 
-      const newState = { ...state };
-      newState.activeWorkouts[tabId] = { active: false, startTime: null };
-
-      if (!newState.registryV2) newState.registryV2 = {};
-      if (!newState.sessionsV2) newState.sessionsV2 = [];
+      // CLONE PROFONDO DI DIZIONARI E ARRAY
+      const nextActiveWorkouts = { ...state.activeWorkouts, [tabId]: { active: false, startTime: null } };
+      const nextRegistry = { ...(state.registryV2 || {}) };
+      const nextSessionsV2 = [...(state.sessionsV2 || [])];
+      const nextPrs = [...(state.prs || [])];
 
       const getOrRegisterEx = (name: string, type: any): string => {
-        let regId = Object.keys(newState.registryV2!).find(
-          (k) => newState.registryV2![k].name.trim().toLowerCase() === name.trim().toLowerCase()
+        let regId = Object.keys(nextRegistry).find(
+          (k) => nextRegistry[k].name.trim().toLowerCase() === name.trim().toLowerCase()
         );
         if (!regId) {
           regId = generateId();
-          newState.registryV2![regId] = { id: regId, name: name.trim(), type: type || 'weight' };
+          nextRegistry[regId] = { id: regId, name: name.trim(), type: type || 'weight' };
         }
         return regId;
       };
@@ -476,7 +475,6 @@ export default function App() {
               const rawDuration = state.setDurations[setId] || state.setReps[setId] || ex.workSec || 60;
               const rawRir = state.setRir[setId];
               const rawRpe = state.setRpe[setId];
-
               const validData = validateSetData(
                 parseInt(String(rawReps)) || undefined,
                 parseFloat(String(rawWeight)) || undefined,
@@ -484,13 +482,12 @@ export default function App() {
                 rawRir === '-1' || rawRir === 'CED' ? undefined : parseFloat(String(rawRir)),
                 parseFloat(String(rawRpe)) || undefined
               );
-
               completedSets.push({
                 id: generateId(),
                 index: i + 1,
                 ...validData,
                 isCed: rawRir === '-1' || rawRir === 'CED',
-                customFields: newState.setCustomFields?.[`${ex.name}-${i + 1}`] || newState.setCustomFields?.[setId] || undefined
+                customFields: state.setCustomFields?.[`${ex.name}-${i + 1}`] || state.setCustomFields?.[setId] || undefined
               });
             }
           }
@@ -511,7 +508,6 @@ export default function App() {
           if (ex.structureType === 'amrap') {
             roundsToCount = (state.amrapRounds[ex.id] || 0) + 1;
           }
-
           const completedRounds: CircuitRoundV2[] = [];
           for (let j = 0; j < (roundsToCount || 10); j++) {
             const isDone = ex.exercises.some((sub) => state.checkedSets[`${sub.id}-${j}`]) || state.checkedSets[`${ex.id}-round-${j}`];
@@ -526,7 +522,6 @@ export default function App() {
                 const rawDuration = state.setDurations[setId] || state.setReps[setId] || sub.workSec || 60;
                 const rawRir = state.setRir[setId];
                 const rawRpe = state.setRpe[setId];
-
                 const validData = validateSetData(
                   parseInt(String(rawReps)) || undefined,
                   parseFloat(String(rawWeight)) || undefined,
@@ -534,7 +529,6 @@ export default function App() {
                   rawRir === '-1' || rawRir === 'CED' ? undefined : parseFloat(String(rawRir)),
                   parseFloat(String(rawRpe)) || undefined
                 );
-
                 return {
                   exerciseId: regId,
                   nameSnapshot: sub.name,
@@ -544,7 +538,7 @@ export default function App() {
                     index: 1,
                     ...validData,
                     isCed: rawRir === '-1' || rawRir === 'CED',
-                    customFields: newState.setCustomFields?.[`${sub.name}-${j + 1}`] || newState.setCustomFields?.[setId] || undefined
+                    customFields: state.setCustomFields?.[`${sub.name}-${j + 1}`] || state.setCustomFields?.[setId] || undefined
                   }]
                 };
               });
@@ -563,11 +557,10 @@ export default function App() {
       });
 
       if (hasCheckedSets) {
-        const prevSnapshot = newState.sessionsV2.find(
+        const prevSnapshot = state.sessionsV2?.find(
           (s) => s.tabNameSnapshot === currentTab.name
         ) || null;
-
-        const bwAtSession = parseFloat(String(newState.bodyMetrics?.weight)) || 0;
+        const bwAtSession = parseFloat(String(state.bodyMetrics?.weight)) || 0;
         const sessionId = generateId();
 
         const v2Session: WorkoutSessionV2 = {
@@ -584,87 +577,115 @@ export default function App() {
           blocks: v2Blocks
         };
 
-        // 🔴 MOTORE V2: Aggiornamento Record Personali (PR) tramite ID Permanente
+        // GESTIONE IMMUTABILE DEI PR
         v2Blocks.forEach((block) => {
           if (!('rounds' in block) && (block.type === 'weight' || !block.type)) {
             const maxW = Math.max(...block.sets.map((s) => s.weight || 0));
             if (maxW > 0) {
               const permId = block.exerciseId;
-              const existingPr = newState.prs.find((p) =>
+              const existingPrIndex = nextPrs.findIndex((p) =>
                 (permId && p.exerciseId === permId) ||
                 (!p.exerciseId && p.name.trim().toLowerCase() === block.nameSnapshot.trim().toLowerCase())
               );
 
-              if (!existingPr) {
-                newState.prs.push({
+              if (existingPrIndex === -1) {
+                nextPrs.push({
                   id: generateId(),
                   exerciseId: permId,
                   name: block.nameSnapshot,
                   weight: String(maxW),
                   history: [{ date: todayDateStr, weight: String(maxW) }]
                 });
-              } else if (maxW > (parseFloat(existingPr.weight) || 0)) {
-                existingPr.weight = String(maxW);
-                existingPr.exerciseId = permId || existingPr.exerciseId;
-                existingPr.name = block.nameSnapshot;
-                existingPr.history.unshift({ date: todayDateStr, weight: String(maxW) });
+              } else {
+                const exPr = nextPrs[existingPrIndex];
+                if (maxW > (parseFloat(exPr.weight) || 0)) {
+                  nextPrs[existingPrIndex] = {
+                    ...exPr,
+                    weight: String(maxW),
+                    exerciseId: permId || exPr.exerciseId,
+                    name: block.nameSnapshot,
+                    history: [{ date: todayDateStr, weight: String(maxW) }, ...exPr.history]
+                  };
+                }
               }
             }
           }
         });
 
-        // Salvataggio della sessione canonica V2
-        newState.sessionsV2.unshift(v2Session);
+        nextSessionsV2.unshift(v2Session);
 
-        // 🔴 PULIZIA INTERFACCIA: Svuotiamo le spunte per preparare il prossimo allenamento!
-        newState.checkedSets = {};
-        newState.setReps = {};
-        newState.setWeights = {};
-        newState.setRir = {};
-        newState.setRpe = {};
-        newState.setDurations = {};
-        newState.setCustomFields = {};
+        // Assemblaggio finale
+        const newState: AppState = {
+          ...state,
+          activeWorkouts: nextActiveWorkouts,
+          registryV2: nextRegistry,
+          sessionsV2: nextSessionsV2,
+          prs: nextPrs,
+          checkedSets: {},
+          setReps: {},
+          setWeights: {},
+          setRir: {},
+          setRpe: {},
+          setDurations: {},
+          setCustomFields: {}
+        };
 
         await saveGymState(newState);
         setState(newState);
         setSummaryData({ newSnapshot: v2Session, prevSnapshot });
       } else {
+        const newState = { ...state, activeWorkouts: nextActiveWorkouts };
         await saveGymState(newState);
         setState(newState);
         showToast('Allenamento terminato (nessuna serie registrata).');
       }
     } finally {
-      setIsSaving(false); // 🔴 Rilasciamo il blocco solo a fine operazione
+      setIsSaving(false);
     }
   };
 
   const handleResetSession = (tabId: string) => {
     if (!state) return;
     if (confirm('Vuoi davvero azzerare la sessione odierna in questa scheda?')) {
-      const newState = { ...state };
-      const tab = newState.plan.find((t) => t.id === tabId);
+      const nextCheckedSets = { ...state.checkedSets };
+      const nextSetReps = { ...state.setReps };
+      const nextSetRir = { ...state.setRir };
+      const nextSetRpe = { ...state.setRpe };
+      const nextAmrapRounds = { ...state.amrapRounds };
+
+      const tab = state.plan.find((t) => t.id === tabId);
       tab?.exercises.forEach((ex) => {
         if (ex.type === 'single') {
           for (let i = 0; i < ex.sets; i++) {
-            delete newState.checkedSets[`${ex.id}-${i}`];
-            delete newState.setReps[`${ex.id}-${i}`];
-            delete newState.setRir[`${ex.id}-${i}`];
-            delete newState.setRpe[`${ex.id}-${i}`];
+            delete nextCheckedSets[`${ex.id}-${i}`];
+            delete nextSetReps[`${ex.id}-${i}`];
+            delete nextSetRir[`${ex.id}-${i}`];
+            delete nextSetRpe[`${ex.id}-${i}`];
           }
         } else if (ex.type === 'superset') {
-          delete newState.amrapRounds[ex.id];
+          delete nextAmrapRounds[ex.id];
           for (let j = 0; j < 50; j++) {
-            delete newState.checkedSets[`${ex.id}-round-${j}`];
+            delete nextCheckedSets[`${ex.id}-round-${j}`];
             ex.exercises.forEach((sub) => {
-              delete newState.checkedSets[`${sub.id}-${j}`];
-              delete newState.setReps[`${sub.id}-${j}`];
-              delete newState.setRir[`${sub.id}-${j}`];
-              delete newState.setRpe[`${sub.id}-${j}`];
+              delete nextCheckedSets[`${sub.id}-${j}`];
+              delete nextSetReps[`${sub.id}-${j}`];
+              delete nextSetRir[`${sub.id}-${j}`];
+              delete nextSetRpe[`${sub.id}-${j}`];
             });
           }
         }
       });
-      saveGymState(newState); // AGGIUNTO
+
+      const newState = {
+        ...state,
+        checkedSets: nextCheckedSets,
+        setReps: nextSetReps,
+        setRir: nextSetRir,
+        setRpe: nextSetRpe,
+        amrapRounds: nextAmrapRounds
+      };
+      
+      saveGymState(newState);
       setState(newState);
       showToast('Sessione riavviata.');
     }
@@ -1132,17 +1153,27 @@ export default function App() {
           if (confirm('Eliminare questa scheda e tutti i suoi esercizi?')) {
             setState((prev) => {
               if (!prev) return null;
-              const next = { ...prev };
               
-              // Pulizia chirurgica dei dati orfani di tutti gli esercizi della scheda eliminata
+              // Isoliamo e cloniamo tutti i dizionari prima di passarli al Garbage Collector
+              const next = { 
+                ...prev,
+                weights: { ...prev.weights },
+                checkedSets: { ...prev.checkedSets },
+                setWeights: { ...prev.setWeights },
+                setReps: { ...prev.setReps },
+                setRir: { ...prev.setRir },
+                setDurations: { ...prev.setDurations },
+                setRpe: { ...prev.setRpe },
+                setCustomFields: { ...prev.setCustomFields },
+                amrapRounds: { ...prev.amrapRounds },
+                activeWorkouts: { ...prev.activeWorkouts }
+              };
+              
               const targetTab = next.plan.find(t => t.id === id);
               if (targetTab) {
                 targetTab.exercises.forEach(ex => {
-                  if (ex.type === 'single') {
-                    cleanupOrphanDataForId(next, ex.id);
-                  } else if (ex.type === 'superset') {
-                    cleanupCircuitOrphanData(next, ex);
-                  }
+                  if (ex.type === 'single') cleanupOrphanDataForId(next, ex.id);
+                  else if (ex.type === 'superset') cleanupCircuitOrphanData(next, ex);
                 });
               }
               
