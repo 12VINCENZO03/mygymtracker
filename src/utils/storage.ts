@@ -310,54 +310,22 @@ export async function createSafetyBackup(state: AppState, reason: string): Promi
 /**
  * Carica l'intero stato canonico V2 combinando lo stato leggero con lo storico immutabile.
  */
-export async function loadGymState(): Promise<AppState> {
-  let loadedData: Partial<AppState> | null = null;
-  try {
-    const db = await initDB();
-    loadedData = await new Promise((resolve, reject) => {
-      const tx = db.transaction(['store', 'sessions'], 'readonly');
-      
-      let stateData: any = null;
-      let sessionsData: any = null;
-
-      const reqState = tx.objectStore('store').get('state');
-      reqState.onsuccess = () => stateData = reqState.result;
-
-      const reqSessions = tx.objectStore('sessions').get('history');
-      reqSessions.onsuccess = () => sessionsData = reqSessions.result;
-
-      tx.oncomplete = () => {
-        if (stateData) {
-          // Assembliamo lo stato canonico V2
-          stateData.sessionsV2 = Array.isArray(sessionsData) ? sessionsData : [];
-          resolve(stateData);
-        } else {
-          resolve(null);
-        }
-      };
-      tx.onerror = (e) => reject((e.target as IDBRequest).error);
-    });
-  } catch (err) {
-    console.warn('Lettura DB fallita o primo avvio', err);
-  }
-
-  if (!loadedData) {
-    return JSON.parse(JSON.stringify(initialDefaultState));
-  }
-
-  return normalizeState(loadedData);
-}
-
-/**
- * Salva lo stato in modo atomico, incrementando la revisione e notificando gli altri tab.
- */
 export async function saveGymState(state: AppState): Promise<void> {
   if (typeof window === 'undefined') return;
-
   setPersistenceStatus('SAVING');
   state.revision = (state.revision || 0) + 1;
   state.lastSavedAt = Date.now();
 
+  // 1. IL PARACADUTE SINCRONO (Mai rimuoverlo)
+  try {
+    const hotState = { ...state };
+    delete (hotState as any).sessionsV2; // Escludiamo lo storico pesante dal limite di 5MB
+    localStorage.setItem('mygym_state', JSON.stringify(hotState));
+  } catch (e) {
+    console.warn('Impossibile salvare su localStorage', e);
+  }
+
+  // 2. SALVATAGGIO ASINCRONO SU INDEXEDDB (via Worker o diretto)
   try {
     const worker = storageWorker;
     if (worker) {
@@ -366,45 +334,83 @@ export async function saveGymState(state: AppState): Promise<void> {
         const handler = (msgEv: MessageEvent) => {
           if (msgEv.data && msgEv.data.id === reqId) {
             worker.removeEventListener('message', handler);
-            if (msgEv.data.success) {
-              resolve();
-            } else {
-              reject(new Error(msgEv.data.error || 'Errore nel worker di salvataggio'));
-            }
+            if (msgEv.data.success) resolve();
+            else reject(new Error(msgEv.data.error || 'Errore worker'));
           }
         };
         worker.addEventListener('message', handler);
         worker.postMessage({ action: 'save', payload: state, id: reqId });
       });
     } else {
-      // Fallback sincrono su IndexedDB
       const db = await initDB();
       await new Promise<void>((resolve, reject) => {
         const tx = db.transaction(['store', 'sessions'], 'readwrite');
         const sessions = state.sessionsV2 || [];
         const hotState = { ...state };
         delete (hotState as any).sessionsV2;
-
         tx.objectStore('store').put(hotState, 'state');
         tx.objectStore('sessions').put(sessions, 'history');
         tx.oncomplete = () => resolve();
         tx.onerror = (e) => reject((e.target as IDBRequest).error);
       });
     }
-
     setPersistenceStatus('SAVED');
     if (tabChannel) {
-      tabChannel.postMessage({
-        type: 'STATE_SAVED',
-        revision: state.revision,
-        timestamp: Date.now()
-      });
+      tabChannel.postMessage({ type: 'STATE_SAVED', revision: state.revision, timestamp: Date.now() });
     }
   } catch (err) {
     setPersistenceStatus('ERROR');
     console.error('Salvataggio su IndexedDB fallito:', err);
     throw err;
   }
+}
+
+export async function loadGymState(): Promise<AppState> {
+  let loadedData: Partial<AppState> | null = null;
+  
+  // 1. LETTURA SINCRONA DA LOCALSTORAGE (Dati caldi di emergenza)
+  try {
+    const local = localStorage.getItem('mygym_state');
+    if (local) loadedData = JSON.parse(local);
+  } catch (e) {
+    console.warn('Errore lettura localStorage', e);
+  }
+
+  // 2. LETTURA DA INDEXEDDB
+  try {
+    const db = await initDB();
+    const idbData = await new Promise<any>((resolve, reject) => {
+      const tx = db.transaction(['store', 'sessions'], 'readonly');
+      let stateData: any = null;
+      let sessionsData: any = null;
+      const reqState = tx.objectStore('store').get('state');
+      reqState.onsuccess = () => stateData = reqState.result;
+      const reqSessions = tx.objectStore('sessions').get('history');
+      reqSessions.onsuccess = () => sessionsData = reqSessions.result;
+      tx.oncomplete = () => {
+        if (stateData) {
+          stateData.sessionsV2 = Array.isArray(sessionsData) ? sessionsData : [];
+          resolve(stateData);
+        } else {
+          resolve(null);
+        }
+      };
+      tx.onerror = (e) => reject((e.target as IDBRequest).error);
+    });
+    
+    if (idbData) {
+      if (!loadedData || (idbData.revision || 0) >= (loadedData.revision || 0)) {
+         loadedData = idbData;
+      } else {
+         loadedData.sessionsV2 = idbData.sessionsV2 || []; // Preserviamo sempre lo storico V2 da DB
+      }
+    }
+  } catch (err) {
+    console.warn('Lettura DB fallita', err);
+  }
+
+  if (!loadedData) return JSON.parse(JSON.stringify(initialDefaultState));
+  return normalizeState(loadedData);
 }
 
 /**

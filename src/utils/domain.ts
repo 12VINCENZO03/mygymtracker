@@ -183,35 +183,25 @@ export function getTabCompletionStats(
   return { count, lastCompletedAt, lastDateStr };
 }
 
-// 🔴 UX PRO: Calcolo derivato on-the-fly per la Dashboard
 export function calculateTodayLoad(sessions: WorkoutSessionV2[], todayStr: string): number {
-  if (!sessions) return 0;
   let load = 0;
-  
+  if (!sessions) return load;
   const todaySessions = sessions.filter(s => s.date === todayStr);
   todaySessions.forEach(session => {
     session.blocks.forEach(block => {
+      const processSets = (sets: WorkoutSetV2[]) => {
+        sets.forEach(set => {
+          const duration = set.durationSec || (set.reps ? set.reps * 3 : 60); 
+          const effort = set.rpe !== undefined ? set.rpe : (set.rir !== undefined ? (10 - set.rir) : 8);
+          load += (duration / 60) * effort;
+        });
+      };
       if ('rounds' in block) {
-        block.rounds.forEach(r => r.exercises.forEach(sub => {
-          if (sub.type === 'time' || sub.type === 'cardio') {
-            sub.sets.forEach(set => {
-              const dur = set.durationSec || 60;
-              const effort = set.rpe || (10 - (set.rir || 2)); 
-              load += dur * effort;
-            });
-          }
-        }));
+        block.rounds.forEach(r => r.exercises.forEach(sub => processSets(sub.sets)));
       } else {
-        if (block.type === 'time' || block.type === 'cardio') {
-          block.sets.forEach(set => {
-            const dur = set.durationSec || 60;
-            const effort = set.rpe || (10 - (set.rir || 2)); 
-            load += dur * effort;
-          });
-        }
+        processSets(block.sets);
       }
     });
   });
-  
   return Math.round(load);
 }

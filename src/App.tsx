@@ -186,14 +186,9 @@ export default function App() {
 
     setState((prev) => {
       if (!prev) return null;
-      // 🔴 FASE I: Immutabilità garantita tramite copia profonda pulita
-      return {
-        ...prev,
-        weights: {
-          ...prev.weights,
-          [id]: cleanVal
-        }
-      };
+      const next = { ...prev, weights: { ...prev.weights, [id]: cleanVal } };
+      saveGymState(next); // AGGIUNTO
+      return next;
     });
   }, []);
 
@@ -202,17 +197,8 @@ export default function App() {
 
     setState((prev) => {
       if (!prev) return null;
-      const lastDashIndex = setId.lastIndexOf('-');
-      const exId = lastDashIndex > 0 ? setId.substring(0, lastDashIndex) : setId;
-
-      const nextState = {
-        ...prev,
-        setWeights: {
-          ...prev.setWeights,
-          [setId]: cleanVal
-        }
-      };
-
+      const nextState = { ...prev, setWeights: { ...prev.setWeights, [setId]: cleanVal } };
+      saveGymState(nextState); // AGGIUNTO
       return nextState;
     });
   }, []);
@@ -223,13 +209,8 @@ export default function App() {
       if (!prev) return null;
       const allFields = prev.setCustomFields || {};
       const currentFields = allFields[setId] || {};
-      const next = {
-        ...prev,
-        setCustomFields: {
-          ...allFields,
-          [setId]: { ...currentFields, [fieldId]: val }
-        }
-      };
+      const next = { ...prev, setCustomFields: { ...allFields, [setId]: { ...currentFields, [fieldId]: val } } };
+      saveGymState(next); // AGGIUNTO
       return next;
     });
   }, []);
@@ -681,6 +662,7 @@ export default function App() {
           }
         }
       });
+      saveGymState(newState); // AGGIUNTO
       setState(newState);
       showToast('Sessione riavviata.');
     }
@@ -754,6 +736,7 @@ export default function App() {
       }
     }
 
+    saveGymState(newState); // AGGIUNTO
     setState(newState);
   };
 
@@ -819,6 +802,7 @@ export default function App() {
           });
         }
 
+        saveGymState(newState); // AGGIUNTO
         setState(newState);
       }
     }
@@ -866,6 +850,7 @@ export default function App() {
           if (nextState.setWeights[setId] === undefined) nextState.setWeights[setId] = prefill.weight;
           if (prefill.rir !== undefined && nextState.setRir[setId] === undefined) nextState.setRir[setId] = prefill.rir;
           if (prefill.rpe !== undefined && nextState.setRpe[setId] === undefined) nextState.setRpe[setId] = prefill.rpe;
+          saveGymState(nextState); // AGGIUNTO
           return nextState;
         });
         if (pauseSec > 0) startRestTimer(pauseSec);
