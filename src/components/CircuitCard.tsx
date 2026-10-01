@@ -153,8 +153,8 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                 <input
                   type="number"
                   min={1}
-                  value={circuit.emomTotalMin || 10}
-                  onChange={(e) => onUpdateCircuit('emomTotalMin', Math.max(1, parseInt(e.target.value) || 1))}
+                  value={circuit.emomTotalMin !== undefined ? circuit.emomTotalMin : 10}
+                  onChange={(e) => onUpdateCircuit('emomTotalMin', parseInt(e.target.value, 10) || 0)}
                   className="bg-transparent text-white font-bold w-full text-center outline-none text-sm"
                 />
               </div>
@@ -163,8 +163,8 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                 <input
                   type="number"
                   min={5}
-                  value={circuit.emomIntervalSec || 60}
-                  onChange={(e) => onUpdateCircuit('emomIntervalSec', Math.max(5, parseInt(e.target.value) || 60))}
+                  value={circuit.emomIntervalSec !== undefined ? circuit.emomIntervalSec : 60}
+                  onChange={(e) => onUpdateCircuit('emomIntervalSec', parseInt(e.target.value, 10) || 0)}
                   className="bg-transparent text-white font-bold w-full text-center outline-none text-sm"
                 />
               </div>
@@ -177,8 +177,8 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
               <input
                 type="number"
                 min={1}
-                value={circuit.amrapTotalMin || 10}
-                onChange={(e) => onUpdateCircuit('amrapTotalMin', Math.max(1, parseInt(e.target.value) || 1))}
+                value={circuit.amrapTotalMin !== undefined ? circuit.amrapTotalMin : 10}
+                onChange={(e) => onUpdateCircuit('amrapTotalMin', parseInt(e.target.value, 10) || 0)}
                 className="bg-transparent text-white font-bold w-full text-center outline-none text-sm"
               />
             </div>
@@ -640,7 +640,7 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
       </div>
 
       {/* Classic Circuit Round Rest Buttons */}
-      {!isEmom && !isAmrap && (
+      {!isEmom && !isAmrap && circuit.pause !== 0 && (
         <div className="mt-5 pt-4 border-t border-zinc-800/60 flex flex-wrap gap-2 pl-2">
           {Array.from({ length: totalRounds }).map((_, rIdx) => {
             const roundKey = `${circuit.id}-round-${rIdx}`;
