@@ -149,101 +149,128 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
 
             {/* Motore V2: Rendering dinamico dei Blocchi Immutabili Corazzato */}
             {Array.isArray(selectedSession.blocks) && selectedSession.blocks.map((block, bIdx) => {
-              // AGGIUNTO: type check stringente
+              // Controllo difensivo stringente
               if (!block || typeof block !== 'object') return null;
 
               if (!('rounds' in block)) {
                 // Rendering Esercizio Singolo
                 const ex = block as ExerciseSnapshotV2;
+                const exName = typeof ex.nameSnapshot === 'object' ? 'Esercizio' : String(ex.nameSnapshot || 'Esercizio');
                 return (
                   <div key={bIdx} className="bg-zinc-900/50 border border-zinc-800/80 rounded-2xl p-4">
-                    <h5 className="text-sm font-extrabold text-emerald-400 mb-2">{ex.nameSnapshot || 'Esercizio'}</h5>
+                    <h5 className="text-sm font-extrabold text-emerald-400 mb-2">{exName}</h5>
                     <div className="bg-zinc-950 rounded-xl border border-zinc-800/70 divide-y divide-zinc-800/70">
-                      {Array.isArray(ex.sets) && ex.sets.map((set, sIdx) => (
-                        <div key={sIdx} className="p-3 flex justify-between items-center text-xs">
-                          <span className="font-bold text-zinc-500">Serie {set.index || sIdx + 1}</span>
-                          <div className="flex items-center gap-2">
-                            {set.reps !== undefined && (
-                              <span className="text-white font-semibold">
-                                {set.reps} <span className="text-zinc-500 text-[10px]">reps</span>
-                              </span>
-                            )}
-                            {set.durationSec !== undefined && (
-                              <span className="text-white font-semibold">
-                                {set.durationSec} <span className="text-zinc-500 text-[10px]">sec</span>
-                              </span>
-                            )}
-                            {set.weight !== undefined && (
-                              <>
-                                <span className="text-zinc-700">|</span>
+                      {Array.isArray(ex.sets) && ex.sets.map((set, sIdx) => {
+                        if (!set || typeof set !== 'object') return null;
+                        const idxLabel = typeof set.index === 'object' ? sIdx + 1 : (set.index ?? sIdx + 1);
+                        const repsVal = typeof set.reps === 'object' ? (set.reps as any)?.value : set.reps;
+                        const durVal = typeof set.durationSec === 'object' ? (set.durationSec as any)?.value : set.durationSec;
+                        const weightVal = typeof set.weight === 'object' ? (set.weight as any)?.value : set.weight;
+                        const rirVal = typeof set.rir === 'object' ? (set.rir as any)?.value : set.rir;
+                        const rpeVal = typeof set.rpe === 'object' ? (set.rpe as any)?.value : set.rpe;
+
+                        return (
+                          <div key={sIdx} className="p-3 flex justify-between items-center text-xs">
+                            <span className="font-bold text-zinc-500">Serie {String(idxLabel)}</span>
+                            <div className="flex items-center gap-2">
+                              {repsVal !== undefined && repsVal !== null && repsVal !== '' && (
                                 <span className="text-white font-semibold">
-                                  {set.weight} <span className="text-zinc-500 text-[10px]">kg</span>
+                                  {String(repsVal)} <span className="text-zinc-500 text-[10px]">reps</span>
                                 </span>
-                              </>
-                            )}
-                            {set.isCed ? (
-                              <span className="bg-rose-900/80 text-rose-300 px-2 py-0.5 rounded text-[10px] font-bold">CED</span>
-                            ) : set.rir !== undefined ? (
-                              <span className="bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded text-[10px] font-bold">
-                                RIR {set.rir}
-                              </span>
-                            ) : null}
-                            {set.rpe !== undefined && (
-                              <span className="bg-emerald-900/60 text-emerald-300 px-2 py-0.5 rounded text-[10px] font-bold">
-                                RPE {set.rpe}
-                              </span>
-                            )}
+                              )}
+                              {durVal !== undefined && durVal !== null && durVal !== '' && (
+                                <span className="text-white font-semibold">
+                                  {String(durVal)} <span className="text-zinc-500 text-[10px]">sec</span>
+                                </span>
+                              )}
+                              {weightVal !== undefined && weightVal !== null && weightVal !== '' && (
+                                <>
+                                  <span className="text-zinc-700">|</span>
+                                  <span className="text-white font-semibold">
+                                    {String(weightVal)} <span className="text-zinc-500 text-[10px]">kg</span>
+                                  </span>
+                                </>
+                              )}
+                              {set.isCed ? (
+                                <span className="bg-rose-900/80 text-rose-300 px-2 py-0.5 rounded text-[10px] font-bold">CED</span>
+                              ) : rirVal !== undefined && rirVal !== null && rirVal !== '' ? (
+                                <span className="bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded text-[10px] font-bold">
+                                  RIR {String(rirVal)}
+                                </span>
+                              ) : null}
+                              {rpeVal !== undefined && rpeVal !== null && rpeVal !== '' && (
+                                <span className="bg-emerald-900/60 text-emerald-300 px-2 py-0.5 rounded text-[10px] font-bold">
+                                  RPE {String(rpeVal)}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 );
               } else {
                 // Rendering Circuito
                 const circ = block as CircuitSnapshotV2;
+                const circName = typeof circ.nameSnapshot === 'object' ? 'Circuito' : String(circ.nameSnapshot || 'Circuito');
+                const circStructure = typeof circ.structureType === 'object' ? 'classic' : String(circ.structureType || 'classic');
                 return (
                   <div key={bIdx} className="bg-zinc-900/50 border border-zinc-800/80 rounded-2xl p-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <h5 className="text-sm font-extrabold text-emerald-400">{circ.nameSnapshot || 'Circuito'}</h5>
+                      <h5 className="text-sm font-extrabold text-emerald-400">{circName}</h5>
                       <span className="text-[10px] uppercase font-bold bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded">
-                        {circ.structureType || 'classic'}
+                        {circStructure}
                       </span>
                     </div>
                     <div className="space-y-2">
-                      {Array.isArray(circ.rounds) && circ.rounds.map((round, rIdx) => (
-                        <div key={round.roundIndex || rIdx} className="bg-zinc-950 rounded-xl border border-zinc-800 overflow-hidden">
-                          <div className="bg-zinc-900/80 px-3 py-1.5 text-xs font-bold text-zinc-400 border-b border-zinc-800">
-                            Giro {round.roundIndex || rIdx + 1}
+                      {Array.isArray(circ.rounds) && circ.rounds.map((round, rIdx) => {
+                        if (!round || typeof round !== 'object') return null;
+                        const roundIdxLabel = typeof round.roundIndex === 'object' ? rIdx + 1 : (round.roundIndex ?? rIdx + 1);
+
+                        return (
+                          <div key={roundIdxLabel || rIdx} className="bg-zinc-950 rounded-xl border border-zinc-800 overflow-hidden">
+                            <div className="bg-zinc-900/80 px-3 py-1.5 text-xs font-bold text-zinc-400 border-b border-zinc-800">
+                              Giro {String(roundIdxLabel)}
+                            </div>
+                            <div className="divide-y divide-zinc-800">
+                              {Array.isArray(round.exercises) && round.exercises.map((sub, subIdx) => {
+                                if (!sub || typeof sub !== 'object') return null;
+                                const subName = typeof sub.nameSnapshot === 'object' ? 'Esercizio' : String(sub.nameSnapshot || 'Esercizio');
+                                const firstSet = Array.isArray(sub.sets) && sub.sets[0] && typeof sub.sets[0] === 'object' ? sub.sets[0] : null;
+                                const repsVal = firstSet ? (typeof firstSet.reps === 'object' ? (firstSet.reps as any)?.value : firstSet.reps) : undefined;
+                                const weightVal = firstSet ? (typeof firstSet.weight === 'object' ? (firstSet.weight as any)?.value : firstSet.weight) : undefined;
+                                const rirVal = firstSet ? (typeof firstSet.rir === 'object' ? (firstSet.rir as any)?.value : firstSet.rir) : undefined;
+
+                                return (
+                                  <div key={subIdx} className="p-3 flex justify-between items-center text-xs">
+                                    <span className="text-zinc-200 font-semibold truncate max-w-[150px]">{subName}</span>
+                                    <div className="flex items-center gap-2">
+                                      {repsVal !== undefined && repsVal !== null && repsVal !== '' && (
+                                        <span className="text-white">
+                                          {String(repsVal)} <span className="text-zinc-500 text-[10px]">reps</span>
+                                        </span>
+                                      )}
+                                      {weightVal !== undefined && weightVal !== null && weightVal !== '' && (
+                                        <span className="text-white">
+                                          {String(weightVal)} <span className="text-zinc-500 text-[10px]">kg</span>
+                                        </span>
+                                      )}
+                                      {firstSet?.isCed ? (
+                                        <span className="bg-rose-900/80 text-rose-300 px-1.5 py-0.5 rounded text-[10px]">CED</span>
+                                      ) : rirVal !== undefined && rirVal !== null && rirVal !== '' ? (
+                                        <span className="bg-zinc-800 text-zinc-300 px-1.5 py-0.5 rounded text-[10px]">
+                                          RIR {String(rirVal)}
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
-                          <div className="divide-y divide-zinc-800">
-                            {Array.isArray(round.exercises) && round.exercises.map((sub, subIdx) => (
-                              <div key={subIdx} className="p-3 flex justify-between items-center text-xs">
-                                <span className="text-zinc-200 font-semibold truncate max-w-[150px]">{sub.nameSnapshot || 'Esercizio'}</span>
-                                <div className="flex items-center gap-2">
-                                  {Array.isArray(sub.sets) && sub.sets[0]?.reps !== undefined && (
-                                    <span className="text-white">
-                                      {sub.sets[0].reps} <span className="text-zinc-500 text-[10px]">reps</span>
-                                    </span>
-                                  )}
-                                  {Array.isArray(sub.sets) && sub.sets[0]?.weight !== undefined && (
-                                    <span className="text-white">
-                                      {sub.sets[0].weight} <span className="text-zinc-500 text-[10px]">kg</span>
-                                    </span>
-                                  )}
-                                  {Array.isArray(sub.sets) && sub.sets[0]?.isCed ? (
-                                    <span className="bg-rose-900/80 text-rose-300 px-1.5 py-0.5 rounded text-[10px]">CED</span>
-                                  ) : Array.isArray(sub.sets) && sub.sets[0]?.rir !== undefined ? (
-                                    <span className="bg-zinc-800 text-zinc-300 px-1.5 py-0.5 rounded text-[10px]">
-                                      RIR {sub.sets[0].rir}
-                                    </span>
-                                  ) : null}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 );

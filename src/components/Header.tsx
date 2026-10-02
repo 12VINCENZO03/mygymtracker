@@ -76,7 +76,7 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Tabs navigation */}
-      <div ref={scrollContainerRef} className="flex overflow-x-auto hide-scrollbar px-3 pb-1 gap-1.5 border-t border-zinc-800/30">
+      <div ref={scrollContainerRef} className="flex overflow-x-auto hide-scrollbar px-4 py-2 gap-2">
         {tabs.map((tab, idx) => {
           const isActive = tab.id === activeTabId;
           const isFav = Boolean(favoriteTabs[tab.id]);
@@ -91,10 +91,10 @@ export const Header: React.FC<HeaderProps> = ({
                 id={`tab-btn-${tab.id}`}
                 type="button"
                 onClick={() => onSelectTab(tab.id)}
-                className={`px-4 py-3 whitespace-nowrap text-xs font-bold transition border-b-2 flex items-center gap-2 outline-none shrink-0 ${
+                className={`px-4 py-2.5 whitespace-nowrap text-xs font-bold transition-all rounded-full flex items-center gap-2 outline-none shrink-0 ${
                   isActive
-                    ? 'border-emerald-500 text-emerald-400 bg-emerald-500/5'
-                    : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                    ? 'bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/30 shadow-sm'
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50'
                 }`}
               >
                 <span>🏠</span> Home
@@ -107,8 +107,8 @@ export const Header: React.FC<HeaderProps> = ({
               <div
                 key={tab.id}
                 id={`tab-btn-${tab.id}`}
-                className={`px-2 py-1.5 border-b-2 flex items-center gap-1.5 shrink-0 relative bg-zinc-900/60 rounded-t-xl border border-b-0 border-zinc-800/80 ${
-                  isActive ? 'border-emerald-500/60 bg-emerald-950/20' : ''
+                className={`px-2 py-1.5 flex items-center gap-1.5 shrink-0 relative rounded-2xl transition-all ${
+                  isActive ? 'bg-emerald-950/30 ring-1 ring-emerald-500/40 shadow-sm' : 'bg-zinc-900/60 ring-1 ring-zinc-800/80'
                 }`}
               >
                 <div className="flex items-center gap-0.5 bg-emerald-500 text-zinc-950 rounded-md overflow-hidden text-[9px] font-black mr-1">
@@ -153,10 +153,10 @@ export const Header: React.FC<HeaderProps> = ({
               id={`tab-btn-${tab.id}`}
               type="button"
               onClick={() => onSelectTab(tab.id)}
-              className={`px-4 py-3 whitespace-nowrap text-xs font-bold transition border-b-2 flex items-center gap-1.5 outline-none shrink-0 ${
+              className={`px-4 py-2.5 whitespace-nowrap text-xs font-bold transition-all rounded-full flex items-center gap-1.5 outline-none shrink-0 ${
                 isActive
-                  ? 'border-emerald-500 text-emerald-400 bg-emerald-500/5'
-                  : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                  ? 'bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/30 shadow-sm'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50'
               }`}
             >
               {isFav && <i className="fa-solid fa-star text-[10px] text-amber-400 mr-0.5" />}
@@ -169,7 +169,7 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             type="button"
             onClick={onAddTab}
-            className="px-4 py-2.5 text-emerald-400 font-extrabold text-xs whitespace-nowrap border-b-2 border-transparent shrink-0 outline-none flex items-center gap-1.5 hover:text-emerald-300"
+            className="px-4 py-2.5 text-emerald-400 font-extrabold text-xs whitespace-nowrap rounded-full shrink-0 outline-none flex items-center gap-1.5 hover:bg-emerald-500/10 transition-colors"
           >
             <i className="fa-solid fa-plus" /> Nuova Scheda
           </button>
