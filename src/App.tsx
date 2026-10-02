@@ -189,40 +189,56 @@ export default function App() {
     });
   }, []);
 
-  const handleSaveWeight = useCallback((id: string, val: string | number) => {
+  const handleSaveWeight = useCallback(async (id: string, val: string | number) => {
     const cleanVal = sanitizeNumericInput(val);
+    let nextToSave: AppState | null = null;
 
     setState((prev) => {
       if (!prev) return null;
       if (prev.weights[id] === cleanVal) return prev;
       const next = { ...prev, weights: { ...prev.weights, [id]: cleanVal } };
-      saveGymState(next); // AGGIUNTO
+      nextToSave = next;
       return next;
     });
+
+    if (nextToSave) {
+      await saveGymState(nextToSave);
+    }
   }, []);
 
-  const handleSaveSetWeight = useCallback((setId: string, val: string | number) => {
+  const handleSaveSetWeight = useCallback(async (setId: string, val: string | number) => {
     const cleanVal = sanitizeNumericInput(val);
+    let nextToSave: AppState | null = null;
 
     setState((prev) => {
       if (!prev) return null;
       if (prev.setWeights[setId] === cleanVal) return prev;
       const nextState = { ...prev, setWeights: { ...prev.setWeights, [setId]: cleanVal } };
-      saveGymState(nextState); // AGGIUNTO
+      nextToSave = nextState;
       return nextState;
     });
+
+    if (nextToSave) {
+      await saveGymState(nextToSave);
+    }
   }, []);
 
   // 🔴 NUOVO: Salvataggio campi cardio avanzati (Velocità, Inclinazione, ecc.)
-  const handleSaveCustomField = useCallback((setId: string, fieldId: string, val: string) => {
+  const handleSaveCustomField = useCallback(async (setId: string, fieldId: string, val: string) => {
+    let nextToSave: AppState | null = null;
+
     setState((prev) => {
       if (!prev) return null;
       const allFields = prev.setCustomFields || {};
       const currentFields = allFields[setId] || {};
       const next = { ...prev, setCustomFields: { ...allFields, [setId]: { ...currentFields, [fieldId]: val } } };
-      saveGymState(next); // AGGIUNTO
+      nextToSave = next;
       return next;
     });
+
+    if (nextToSave) {
+      await saveGymState(nextToSave);
+    }
   }, []);
 
 
@@ -438,6 +454,7 @@ export default function App() {
     newState.activeWorkouts[tabId] = { active: true, startTime: Date.now() };
     await requestWakeLock();
     setState(newState);
+    await saveGymState(newState);
     showToast('Allenamento iniziato! 🔥');
   };
 
@@ -662,7 +679,7 @@ export default function App() {
     }
   };
 
-  const handleResetSession = (tabId: string) => {
+  const handleResetSession = async (tabId: string) => {
     if (!state) return;
     if (confirm('Vuoi davvero azzerare la sessione odierna in questa scheda?')) {
       const nextCheckedSets = { ...state.checkedSets };
@@ -703,13 +720,13 @@ export default function App() {
         amrapRounds: nextAmrapRounds
       };
       
-      saveGymState(newState);
       setState(newState);
+      await saveGymState(newState);
       showToast('Sessione riavviata.');
     }
   };
 
-  const handleToggleSet = (
+  const handleToggleSet = async (
     exId: string,
     setIndex: number,
     pauseSec: number,
@@ -772,14 +789,20 @@ export default function App() {
             playShortBeep();
             
             if (circuitPause > 0) {
-              startRestTimer(circuitPause, () => {
+              startRestTimer(circuitPause, async () => {
+                let nextToSave: AppState | null = null;
                 setState((prev) => {
                   if (!prev) return null;
-                  return {
+                  const next = {
                     ...prev,
                     checkedSets: { ...prev.checkedSets, [`${circuitId}-round-${setIndex}`]: true }
                   };
+                  nextToSave = next;
+                  return next;
                 });
+                if (nextToSave) {
+                  await saveGymState(nextToSave);
+                }
                 const circuitEl = document.getElementById(`circuit-${circuitId}`);
                 circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
               });
@@ -801,11 +824,11 @@ export default function App() {
       }
     }
 
-    saveGymState(nextState);
-    setState(nextState);
+    setState(nextState); // Immediato / ottimistico per massima fluidità
+    await saveGymState(nextState); // Persistenza sicura su IndexedDB
   };
 
-  const handleLongPressSet = (
+  const handleLongPressSet = async (
     exId: string,
     setIndex: number,
     pauseSec: number,
@@ -857,14 +880,20 @@ export default function App() {
               const circuitPause = circuit.pause !== undefined ? circuit.pause : 90;
               
               if (circuitPause > 0) {
-                startRestTimer(circuitPause, () => {
+                startRestTimer(circuitPause, async () => {
+                  let nextToSave: AppState | null = null;
                   setState((prev) => {
                     if (!prev) return null;
-                    return {
+                    const next = {
                       ...prev,
                       checkedSets: { ...prev.checkedSets, [`${circuitId}-round-${setIndex}`]: true }
                     };
+                    nextToSave = next;
+                    return next;
                   });
+                  if (nextToSave) {
+                    await saveGymState(nextToSave);
+                  }
                   const circuitEl = document.getElementById(`circuit-${circuitId}`);
                   circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 });
@@ -882,8 +911,8 @@ export default function App() {
           });
         }
 
-        saveGymState(nextState);
-        setState(nextState);
+        setState(nextState); // Immediato / ottimistico
+        await saveGymState(nextState); // Persistenza sicura su IndexedDB
       }
     }
   };
@@ -921,6 +950,7 @@ export default function App() {
           return next;
         });
         playTrumpet();
+        let nextToSave: AppState | null = null;
         setState((prev) => {
           if (!prev) return null;
           const nextCheckedSets = { ...prev.checkedSets, [setId]: true };
@@ -942,9 +972,12 @@ export default function App() {
             setRir: nextSetRir,
             setRpe: nextSetRpe
           };
-          saveGymState(nextState); // Persistenza immediata
+          nextToSave = nextState;
           return nextState;
         });
+        if (nextToSave) {
+          saveGymState(nextToSave).catch(console.warn);
+        }
         if (pauseSec > 0) startRestTimer(pauseSec);
       } else {
         setActiveInlineTimers((prev) => ({ ...prev, [setId]: remaining }));
@@ -952,16 +985,16 @@ export default function App() {
     }, 250);
   };
 
-  const handleStartEmom = (circuitId: string, totalMin: number, intervalSec: number) => {
+  const handleStartEmom = async (circuitId: string, totalMin: number, intervalSec: number) => {
     if (activeMasterTimer && activeMasterTimer.circuitId === circuitId) {
       if (masterTimerIntervalRef.current) safeClearInterval(masterTimerIntervalRef.current);
       masterTimerIntervalRef.current = null;
       setActiveMasterTimer(null);
-      if (state) saveGymState(state);
+      if (state) await saveGymState(state);
       return;
     }
     initAudio();
-    if (state) saveGymState(state);
+    if (state) await saveGymState(state);
     const absoluteStartTime = Date.now();
     const totalRounds = Math.ceil((totalMin * 60) / intervalSec);
     let lastAnnouncedRound = 0; // Il round 0 è appena iniziato
@@ -1002,16 +1035,16 @@ export default function App() {
     }, 250);
   };
 
-  const handleStartAmrap = (circuitId: string, totalMin: number) => {
+  const handleStartAmrap = async (circuitId: string, totalMin: number) => {
     if (activeMasterTimer && activeMasterTimer.circuitId === circuitId) {
       if (masterTimerIntervalRef.current) safeClearInterval(masterTimerIntervalRef.current);
       masterTimerIntervalRef.current = null;
       setActiveMasterTimer(null);
-      if (state) saveGymState(state);
+      if (state) await saveGymState(state);
       return;
     }
     initAudio();
-    if (state) saveGymState(state);
+    if (state) await saveGymState(state);
     const absoluteStartTime = Date.now();
     const duration = totalMin * 60;
 
@@ -1163,12 +1196,13 @@ export default function App() {
             return { ...prev, plan: newPlan };
           });
         }}
-        onDeleteTab={(id) => {
+        onDeleteTab={async (id) => {
           if (state.plan.length <= 2) {
             showToast("Impossibile eliminare l'unica scheda.");
             return;
           }
           if (confirm('Eliminare questa scheda e tutti i suoi esercizi?')) {
+            let nextToSave: AppState | null = null;
             setState((prev) => {
               if (!prev) return null;
               
@@ -1198,10 +1232,12 @@ export default function App() {
               delete next.activeWorkouts[id];
               next.plan = next.plan.filter((t) => t.id !== id);
               next.activeTab = 'home';
-              
-              saveGymState(next);
+              nextToSave = next;
               return next;
             });
+            if (nextToSave) {
+              await saveGymState(nextToSave);
+            }
           }
         }}
         onRenameTab={(id, name) => {
@@ -1449,6 +1485,11 @@ export default function App() {
                     isWorkoutActive={isWorkoutActive}
                     isEditMode={state.isEditMode}
                     state={state}
+                    activeInlineTimerSec={activeInlineTimers}
+                    onRunInlineTimer={(setId, dur, pauseSec, prefill) => 
+                      handleRunInlineTimer(setId, dur, pauseSec, prefill)
+                    }
+                    onSaveCustomField={handleSaveCustomField}
                     isMasterTimerRunning={activeMasterTimer?.circuitId === ex.id}
                     masterTimerRemainingSec={activeMasterTimer?.remainingSec || 0}
                     activeEmomRound={activeMasterTimer?.activeEmomRound ?? -1}
@@ -1456,7 +1497,8 @@ export default function App() {
                     onOpenEffortModal={(setId, isRpe) => setEffortTarget({ setId, isRpe })}
                     onStartAmrapTimer={(min) => handleStartAmrap(ex.id, min)}
                     onStartEmomTimer={(min, sec) => handleStartEmom(ex.id, min, sec)}
-                    onAddAmrapRound={() => {
+                    onAddAmrapRound={async () => {
+                      let nextToSave: AppState | null = null;
                       setState((prev) => {
                         if (!prev) return null;
                         const cur = prev.amrapRounds[ex.id] || 0;
@@ -1464,28 +1506,43 @@ export default function App() {
                           ...prev,
                           amrapRounds: { ...prev.amrapRounds, [ex.id]: cur + 1 }
                         };
-                        saveGymState(next);
+                        nextToSave = next;
                         return next;
                       });
+                      if (nextToSave) {
+                        await saveGymState(nextToSave);
+                      }
                     }}
-                    onStartRoundRest={(sec, roundIdx) => {
+                    onStartRoundRest={async (sec, roundIdx) => {
                       const roundKey = `${ex.id}-round-${roundIdx}`;
                       if (state.checkedSets[roundKey]) {
+                        let nextToSave: AppState | null = null;
                         setState((prev) => {
                           if (!prev) return null;
                           const nextSets = { ...prev.checkedSets };
                           delete nextSets[roundKey];
-                          return { ...prev, checkedSets: nextSets };
+                          const next = { ...prev, checkedSets: nextSets };
+                          nextToSave = next;
+                          return next;
                         });
+                        if (nextToSave) {
+                          await saveGymState(nextToSave);
+                        }
                       } else {
-                        startRestTimer(sec, () => {
+                        startRestTimer(sec, async () => {
+                          let nextToSave: AppState | null = null;
                           setState((prev) => {
                             if (!prev) return null;
-                            return {
+                            const next = {
                               ...prev,
                               checkedSets: { ...prev.checkedSets, [roundKey]: true }
                             };
+                            nextToSave = next;
+                            return next;
                           });
+                          if (nextToSave) {
+                            await saveGymState(nextToSave);
+                          }
                           const circuitEl = document.getElementById(`circuit-${ex.id}`);
                           circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                         });
@@ -1840,18 +1897,24 @@ export default function App() {
         isOpen={Boolean(effortTarget)}
         isRpe={Boolean(effortTarget?.isRpe)}
         currentValue={effortTarget ? (effortTarget.isRpe ? state.setRpe[effortTarget.setId] || '' : state.setRir[effortTarget.setId] || '') : ''}
-        onSelect={(val) => {
+        onSelect={async (val) => {
           if (!effortTarget) return;
           const { setId, isRpe } = effortTarget;
+          let nextToSave: AppState | null = null;
           setState((prev) => {
             if (!prev) return null;
-            return {
+            const next = {
               ...prev,
               setRir: !isRpe ? { ...prev.setRir, [setId]: val } : prev.setRir,
               setRpe: isRpe ? { ...prev.setRpe, [setId]: val } : prev.setRpe
             };
+            nextToSave = next;
+            return next;
           });
           setEffortTarget(null);
+          if (nextToSave) {
+            await saveGymState(nextToSave);
+          }
         }}
         onClose={() => setEffortTarget(null)}
       />

@@ -48,9 +48,8 @@ export const RestTimerBubble: React.FC<RestTimerBubbleProps> = ({
       onClick={onSkip}
       role="button"
       tabIndex={0}
-      title="Tocca per saltare il recupero"
-      // Posizione in basso al centro con Glassmorphism
-      className={`fixed bottom-24 left-1/2 -translate-x-1/2 w-24 h-24 rounded-full z-[150] flex flex-col items-center justify-center cursor-pointer transition-all duration-300 bg-zinc-900/80 backdrop-blur-md shadow-2xl ${
+      // Posizione in alto al centro (sotto l'header) con Glassmorphism
+      className={`fixed top-20 left-1/2 transform -translate-x-1/2 z-50 w-24 h-24 rounded-full flex flex-col items-center justify-center cursor-pointer transition-all duration-300 bg-zinc-900/80 backdrop-blur-md shadow-2xl ${
         isFinishing 
           ? 'ring-4 ring-emerald-400 animate-pulse scale-110' // 🔴 FLASH VISIVO (Si ingrandisce e lampeggia)
           : 'ring-1 ring-zinc-800 hover:scale-105 active:scale-95'

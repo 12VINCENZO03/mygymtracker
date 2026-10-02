@@ -389,7 +389,11 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                         : 'bg-zinc-800/80 text-zinc-200 border-zinc-700/60 hover:bg-zinc-700'
                     }`}
                   >
-                    {isChecked ? (actualReps !== defaultTargetReps ? `${actualReps} reps` : <i className="fa-solid fa-check text-lg" />) : `${actualReps} reps`}
+                    {isCardio ? (
+                      isChecked ? <i className="fa-solid fa-flag-checkered text-lg" /> : 'Fatto'
+                    ) : (
+                      isChecked ? (actualReps !== defaultTargetReps ? `${actualReps} reps` : <i className="fa-solid fa-check text-lg" />) : `${actualReps} reps`
+                    )}
                   </button>
                 )}
 
@@ -426,7 +430,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                             disabled={!isWorkoutActive}
                             value={val}
                             onChange={(e) => onSaveCustomField(setId, cf.id, e.target.value)}
-                            placeholder="-"
+                            placeholder={hist?.customFields?.[cf.id] ? String(hist.customFields[cf.id]) : "-"}
                             className="bg-transparent text-white font-bold text-xs w-full text-center outline-none"
                           />
                           <span className="text-[8px] text-zinc-500 font-medium">{cf.unit}</span>

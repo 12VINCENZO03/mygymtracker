@@ -21,6 +21,7 @@ interface CircuitCardProps {
   onDeleteSubEx: (subId: string) => void;
   onMoveSubEx: (subId: string, dir: number) => void;
   onSaveWeight: (subId: string, val: string) => void;
+  onSaveCustomField?: (setId: string, fieldId: string, val: string) => void;
   onToggleSubSet: (subId: string, roundIndex: number, pauseSec: number, prefill: { reps: string; weight: string; rir?: string; rpe?: string }) => void;
   onLongPressSubSet: (subId: string, roundIndex: number, pauseSec: number, prefill: { reps: string; weight: string; rir?: string; rpe?: string }) => void;
   onOpenEffortModal: (setId: string, isRpe: boolean) => void;
@@ -29,6 +30,8 @@ interface CircuitCardProps {
   onStartAmrapTimer: (totalMin: number) => void;
   onStartEmomTimer: (totalMin: number, intervalSec: number) => void;
   onStartRoundRest: (seconds: number, roundIndex: number) => void;
+  onRunInlineTimer: (setId: string, durationSec: number, pauseSec: number, prefill: { weight: string; rir?: string; rpe?: string }) => void;
+  activeInlineTimerSec: Record<string, number>;
   isMasterTimerRunning: boolean;
   masterTimerRemainingSec: number;
   activeEmomRound: number;
@@ -51,6 +54,7 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
   onDeleteSubEx,
   onMoveSubEx,
   onSaveWeight,
+  onSaveCustomField,
   onToggleSubSet,
   onLongPressSubSet,
   onOpenEffortModal,
@@ -59,6 +63,8 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
   onStartAmrapTimer,
   onStartEmomTimer,
   onStartRoundRest,
+  onRunInlineTimer,
+  activeInlineTimerSec,
   isMasterTimerRunning,
   masterTimerRemainingSec,
   activeEmomRound
@@ -315,20 +321,27 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                     <option value="weight">Pesi</option>
                     <option value="bodyweight">C. Libero</option>
                     <option value="time">A Tempo</option>
+                    <option value="cardio">Cardio</option>
                   </select>
-                  <input
-                    type="text"
-                    value={sub.metricType === 'time' ? (sub.workSec || 30) : (sub.reps || '10')}
-                    onChange={(e) =>
-                      onUpdateSubEx(
-                        sub.id,
-                        sub.metricType === 'time' ? 'workSec' : 'reps',
-                        e.target.value
-                      )
-                    }
-                    placeholder="Reps / Sec"
-                    className="bg-zinc-900 text-white text-xs font-bold p-2.5 rounded-2xl border border-zinc-700/50 text-center shadow-inner outline-none focus:border-emerald-500 transition-colors"
-                  />
+                  {sub.metricType === 'cardio' ? (
+                    <div className="bg-zinc-900 text-zinc-500 text-[10px] font-bold p-2.5 rounded-2xl border border-zinc-800 text-center flex items-center justify-center">
+                      Cardio
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      value={sub.metricType === 'time' ? (sub.workSec || 30) : (sub.reps || '10')}
+                      onChange={(e) =>
+                        onUpdateSubEx(
+                          sub.id,
+                          sub.metricType === 'time' ? 'workSec' : 'reps',
+                          e.target.value
+                        )
+                      }
+                      placeholder={sub.metricType === 'time' ? 'Sec' : 'Reps'}
+                      className="bg-zinc-900 text-white text-xs font-bold p-2.5 rounded-2xl border border-zinc-700/50 text-center shadow-inner outline-none focus:border-emerald-500 transition-colors"
+                    />
+                  )}
                   <input
                     type="number"
                     min={0}
@@ -338,6 +351,50 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                     className="bg-zinc-900 text-white text-xs font-bold p-2.5 rounded-2xl border border-zinc-700/50 text-center shadow-inner outline-none focus:border-emerald-500 transition-colors"
                   />
                 </div>
+
+                {/* 🔴 Selezionatore Macchina Cardio per Sub-Esercizio */}
+                {sub.metricType === 'cardio' && (
+                  <div className="bg-zinc-900/60 p-3 rounded-2xl border border-zinc-800/80 shadow-inner">
+                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1.5">
+                      Tipo di Macchina (Parametri di default)
+                    </label>
+                    <select
+                      value={sub.cardioMachine || ''}
+                      onChange={(e) => {
+                        const machine = e.target.value;
+                        onUpdateSubEx(sub.id, 'cardioMachine', machine);
+                        let defaultFields: any[] = [];
+                        if (machine === 'corsa') {
+                          defaultFields = [
+                            { id: 'inclinazione', label: 'Inclinazione', unit: '%' },
+                            { id: 'velocita', label: 'Velocità', unit: 'km/h' },
+                            { id: 'distanza', label: 'Distanza', unit: 'km' }
+                          ];
+                        } else if (machine === 'vogatore') {
+                          defaultFields = [
+                            { id: 'distanza', label: 'Distanza', unit: 'm' },
+                            { id: 'passo', label: 'Passo', unit: '/500m' },
+                            { id: 'spm', label: 'Colpi', unit: 's/m' }
+                          ];
+                        } else if (machine === 'bike') {
+                          defaultFields = [
+                            { id: 'resistenza', label: 'Resistenza', unit: 'lvl' },
+                            { id: 'rpm', label: 'Cadenza', unit: 'RPM' },
+                            { id: 'distanza', label: 'Distanza', unit: 'km' }
+                          ];
+                        }
+                        onUpdateSubEx(sub.id, 'cardioFields', defaultFields);
+                      }}
+                      className="bg-zinc-950 text-emerald-400 text-xs font-bold p-2.5 rounded-xl outline-none border border-zinc-700/50 w-full"
+                    >
+                      <option value="">Seleziona macchina...</option>
+                      <option value="corsa">Corsa / Tapis Roulant</option>
+                      <option value="vogatore">Vogatore</option>
+                      <option value="bike">Bike / Assault</option>
+                    </select>
+                  </div>
+                )}
+
                 {(sub.metricType as string) !== 'rest' && (
                   <input
                     type="text"

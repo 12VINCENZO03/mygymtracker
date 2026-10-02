@@ -1,6 +1,5 @@
-// src/utils/domain.ts
 import { WorkoutSessionV2, WorkoutSetV2, ExerciseDefV2, ExerciseTypeV2 } from '../types/v2';
-import { generateId } from './storage';
+import { generateId, getTodayStr } from './storage';
 
 /**
  * Risultato della ricerca dell'ultima prestazione di un esercizio nello storico immutabile V2.
@@ -83,7 +82,7 @@ export function getHistoricalSetDataV2(
   setIndexOneBased: number,
   exerciseId?: string,
   exerciseName?: string
-): { reps?: number | string; weight?: number | string; rir?: number | string; rpe?: number | string } | null {
+): { reps?: number | string; weight?: number | string; rir?: number | string; rpe?: number | string; customFields?: Record<string, string | number> } | null {
   const perf = getLastExercisePerformance(sessions, exerciseId, exerciseName);
   if (!perf || !perf.sets || perf.sets.length === 0) return null;
 
@@ -94,7 +93,8 @@ export function getHistoricalSetDataV2(
     reps: set.reps,
     weight: set.weight,
     rir: set.isCed ? 'CED' : set.rir !== undefined ? set.rir : undefined,
-    rpe: set.rpe
+    rpe: set.rpe,
+    customFields: set.customFields
   };
 }
 
@@ -102,57 +102,70 @@ export function getHistoricalSetDataV2(
  * Restituisce l'insieme unico di tutte le date in cui è avvenuto almeno un allenamento.
  */
 export function getWorkoutDatesSet(sessions: WorkoutSessionV2[] | undefined): Set<string> {
-  const set = new Set<string>();
-  if (!sessions) return set;
-  for (const s of sessions) {
-    if (s.date) set.add(s.date);
-  }
-  return set;
+  if (!sessions) return new Set();
+  return new Set(sessions.map((s) => s.date).filter(Boolean));
 }
 
 /**
- * Calcola lo streak attuale (giorni consecutivi) direttamente dalle sessioni V2.
+ * Calcola lo streak attuale (giorni/sessioni consecutive) direttamente dalle sessioni V2,
+ * rispettando i riposi fisiologici (fino a 48-72h tra allenamenti).
  */
 export function computeStreakFromSessions(
-  sessions: WorkoutSessionV2[] | undefined,
+  sessionsV2: WorkoutSessionV2[] | undefined,
   favoriteTabIds?: string[]
 ): number {
-  if (!sessions || sessions.length === 0) return 0;
+  if (!sessionsV2 || sessionsV2.length === 0) return 0;
 
   const filtered = favoriteTabIds && favoriteTabIds.length > 0
-    ? sessions.filter(s => !s.planId || favoriteTabIds.includes(s.planId))
-    : sessions;
+    ? sessionsV2.filter(s => !s.planId || favoriteTabIds.includes(s.planId))
+    : sessionsV2;
 
   if (filtered.length === 0) return 0;
 
-  const dateSet = getWorkoutDatesSet(filtered);
-  const now = new Date();
-  const format = (d: Date) => d.toISOString().split('T')[0];
-  const today = format(now);
+  // Ordina in modo decrescente (la più recente in cima)
+  const uniqueDates = Array.from(getWorkoutDatesSet(filtered)).sort((a, b) => b.localeCompare(a));
+  if (uniqueDates.length === 0) return 0;
 
-  const yesterdayDate = new Date(now);
-  yesterdayDate.setDate(now.getDate() - 1);
-  const yesterday = format(yesterdayDate);
+  // Usa l'import diretto getTodayStr per l'orario locale reale
+  const todayStr = getTodayStr();
+  
+  // Helper per il calcolo sicuro dei giorni di distanza in locale, senza fusi orari sballati
+  const parseDate = (dStr: string) => {
+    const parts = dStr.split('-');
+    return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+  };
 
-  let checkDate = new Date(now);
+  const msPerDay = 1000 * 60 * 60 * 24;
+  const lastWorkoutDate = parseDate(uniqueDates[0]);
+  const todayDate = parseDate(todayStr);
+  
+  // Quanti giorni interi sono passati dall'ultimo allenamento?
+  const daysSinceLast = Math.floor((todayDate.getTime() - lastWorkoutDate.getTime()) / msPerDay);
 
-  if (!dateSet.has(today)) {
-    if (!dateSet.has(yesterday)) {
-      return 0;
-    }
-    checkDate = yesterdayDate;
+  // FINESTRA DI TOLLERANZA PT: Se l'ultimo allenamento risale a PIÙ di 3 giorni fa (> 72h), la streak è persa.
+  if (daysSinceLast > 3) {
+    return 0;
   }
 
-  let streak = 0;
-  while (true) {
-    const ds = format(checkDate);
-    if (dateSet.has(ds)) {
+  // Se siamo qui, il primo workout è valido. Inizia il conteggio a 1.
+  let streak = 1;
+
+  for (let i = 0; i < uniqueDates.length - 1; i++) {
+    const cur = parseDate(uniqueDates[i]);
+    const prev = parseDate(uniqueDates[i + 1]);
+    
+    // Distanza in giorni tra un allenamento e quello precedente
+    const gap = Math.floor((cur.getTime() - prev.getTime()) / msPerDay);
+
+    // Se l'intervallo è tra 1 e 3 giorni (recupero fisiologico valido), la streak aumenta
+    if (gap >= 1 && gap <= 3) {
       streak++;
-      checkDate.setDate(checkDate.getDate() - 1);
     } else {
+      // Buco superiore ai 3 giorni, la serie si è interrotta nel passato.
       break;
     }
   }
+
   return streak;
 }
 

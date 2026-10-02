@@ -354,7 +354,19 @@ export async function saveGymState(state: AppState): Promise<void> {
         const hotState = { ...stateToSave };
         delete (hotState as any).sessionsV2;
         tx.objectStore('store').put(hotState, 'state');
-        tx.objectStore('sessions').put(sessions, 'history');
+        
+        const sessionStore = tx.objectStore('sessions');
+        // Rimuoviamo l'eventuale chiave monolitica legacy 'history'
+        try { sessionStore.delete('history'); } catch (err) {}
+        
+        // Salvataggio atomico record per record
+        for (let i = 0; i < sessions.length; i++) {
+          const s = sessions[i];
+          if (s && s.id) {
+            sessionStore.put(s, s.id);
+          }
+        }
+        
         tx.oncomplete = () => resolve();
         tx.onerror = (e) => reject((e.target as IDBRequest).error);
       });
@@ -387,14 +399,39 @@ export async function loadGymState(): Promise<AppState> {
     const idbData = await new Promise<any>((resolve, reject) => {
       const tx = db.transaction(['store', 'sessions'], 'readonly');
       let stateData: any = null;
-      let sessionsData: any = null;
+      let sessionsData: WorkoutSessionV2[] = [];
       const reqState = tx.objectStore('store').get('state');
       reqState.onsuccess = () => stateData = reqState.result;
-      const reqSessions = tx.objectStore('sessions').get('history');
-      reqSessions.onsuccess = () => sessionsData = reqSessions.result;
+      
+      const sessionStore = tx.objectStore('sessions');
+      const reqSessions = sessionStore.getAll();
+      reqSessions.onsuccess = () => {
+        const res = reqSessions.result;
+        if (Array.isArray(res)) {
+          const flattened: WorkoutSessionV2[] = [];
+          for (const item of res) {
+            if (Array.isArray(item)) {
+              // Retrocompatibilità con vecchio array monolitico precedentemente memorizzato sotto 'history'
+              flattened.push(...item);
+            } else if (item && typeof item === 'object' && item.id) {
+              flattened.push(item);
+            }
+          }
+          // Ordinamento decrescente (la più recente in cima)
+          flattened.sort((a, b) => {
+            const timeA = a.completedAt || a.startedAt || new Date(a.date).getTime() || 0;
+            const timeB = b.completedAt || b.startedAt || new Date(b.date).getTime() || 0;
+            return timeB - timeA;
+          });
+          sessionsData = flattened;
+        } else {
+          sessionsData = [];
+        }
+      };
+      
       tx.oncomplete = () => {
         if (stateData) {
-          stateData.sessionsV2 = Array.isArray(sessionsData) ? sessionsData : [];
+          stateData.sessionsV2 = sessionsData;
           resolve(stateData);
         } else {
           resolve(null);
