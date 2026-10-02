@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { WorkoutTab } from '../types/gym';
 
 interface HeaderProps {
@@ -30,6 +30,17 @@ export const Header: React.FC<HeaderProps> = ({
   onRenameTab,
   onAddTab
 }) => {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      const activeEl = scrollContainerRef.current.querySelector('[data-active="true"]');
+      if (activeEl) {
+        activeEl.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      }
+    }
+  }, [activeTabId]);
+
   return (
     <header className="header-safe-top bg-zinc-950/80 backdrop-blur-xl sticky top-0 z-40 border-b border-zinc-800/50">
       <div className="px-4 sm:px-6 py-3.5 flex justify-between items-center relative z-10">
@@ -57,7 +68,7 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Tabs navigation */}
-      <div className="flex overflow-x-auto hide-scrollbar px-3 pb-1 gap-1.5 border-t border-zinc-800/30">
+      <div ref={scrollContainerRef} className="flex overflow-x-auto hide-scrollbar px-3 pb-1 gap-1.5 border-t border-zinc-800/30">
         {tabs.map((tab, idx) => {
           const isActive = tab.id === activeTabId;
           const isFav = Boolean(favoriteTabs[tab.id]);
@@ -70,6 +81,7 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 key={tab.id}
                 type="button"
+                data-active={isActive}
                 onClick={() => onSelectTab(tab.id)}
                 className={`px-4 py-3 whitespace-nowrap text-xs font-bold transition border-b-2 flex items-center gap-2 outline-none shrink-0 ${
                   isActive
@@ -86,6 +98,7 @@ export const Header: React.FC<HeaderProps> = ({
             return (
               <div
                 key={tab.id}
+                data-active={isActive}
                 className={`px-2 py-1.5 border-b-2 flex items-center gap-1.5 shrink-0 relative bg-zinc-900/60 rounded-t-xl border border-b-0 border-zinc-800/80 ${
                   isActive ? 'border-emerald-500/60 bg-emerald-950/20' : ''
                 }`}
@@ -132,6 +145,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               key={tab.id}
               type="button"
+              data-active={isActive}
               onClick={() => onSelectTab(tab.id)}
               className={`px-4 py-3 whitespace-nowrap text-xs font-bold transition border-b-2 flex items-center gap-1.5 outline-none shrink-0 ${
                 isActive
