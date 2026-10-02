@@ -148,45 +148,59 @@ export function extractExerciseHistoryFromSessions(
   }>();
 
   for (const session of sessions) {
-    if (!session.date) continue;
+    if (!session || !session.date) continue;
+    if (!session.blocks || !Array.isArray(session.blocks)) continue;
+
     for (const block of session.blocks) {
+      if (!block || typeof block !== 'object') continue;
+
       if ('rounds' in block) {
+        if (!Array.isArray(block.rounds)) continue;
         for (const round of block.rounds) {
+          if (!round || !Array.isArray(round.exercises)) continue;
           for (const sub of round.exercises) {
+            if (!sub) continue;
             const matchId = exerciseId && sub.exerciseId === exerciseId;
-            const matchName = targetName && sub.nameSnapshot.trim().toLowerCase() === targetName;
+            const matchName = targetName && String(sub.nameSnapshot || '').trim().toLowerCase() === targetName;
             if (matchId || (!exerciseId && matchName)) {
               if (!dateMap.has(session.date)) {
                 dateMap.set(session.date, { date: session.date, sets: [] });
               }
               const entry = dateMap.get(session.date)!;
-              sub.sets.forEach((s) => {
-                entry.sets.push({
-                  weight: s.weight !== undefined ? s.weight : 0,
-                  reps: s.reps !== undefined ? s.reps : '',
-                  rir: s.isCed ? 'CED' : s.rir !== undefined ? String(s.rir) : undefined,
-                  rpe: s.rpe !== undefined ? String(s.rpe) : undefined
+              if (Array.isArray(sub.sets)) {
+                sub.sets.forEach((s) => {
+                  if (!s) return;
+                  entry.sets.push({
+                    weight: s.weight !== undefined ? s.weight : 0,
+                    reps: s.reps !== undefined ? s.reps : '',
+                    rir: s.isCed ? 'CED' : s.rir !== undefined ? String(s.rir) : undefined,
+                    rpe: s.rpe !== undefined ? String(s.rpe) : undefined
+                  });
                 });
-              });
+              }
             }
           }
         }
       } else {
-        const matchId = exerciseId && block.exerciseId === exerciseId;
-        const matchName = targetName && block.nameSnapshot.trim().toLowerCase() === targetName;
+        const exBlock = block as any;
+        const matchId = exerciseId && exBlock.exerciseId === exerciseId;
+        const matchName = targetName && String(exBlock.nameSnapshot || '').trim().toLowerCase() === targetName;
         if (matchId || (!exerciseId && matchName)) {
           if (!dateMap.has(session.date)) {
             dateMap.set(session.date, { date: session.date, sets: [] });
           }
           const entry = dateMap.get(session.date)!;
-          block.sets.forEach((s) => {
-            entry.sets.push({
-              weight: s.weight !== undefined ? s.weight : 0,
-              reps: s.reps !== undefined ? s.reps : '',
-              rir: s.isCed ? 'CED' : s.rir !== undefined ? String(s.rir) : undefined,
-              rpe: s.rpe !== undefined ? String(s.rpe) : undefined
+          if (Array.isArray(exBlock.sets)) {
+            exBlock.sets.forEach((s: any) => {
+              if (!s) return;
+              entry.sets.push({
+                weight: s.weight !== undefined ? s.weight : 0,
+                reps: s.reps !== undefined ? s.reps : '',
+                rir: s.isCed ? 'CED' : s.rir !== undefined ? String(s.rir) : undefined,
+                rpe: s.rpe !== undefined ? String(s.rpe) : undefined
+              });
             });
-          });
+          }
         }
       }
     }

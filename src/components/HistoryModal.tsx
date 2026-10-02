@@ -67,7 +67,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
           )}
           <h2 className="text-white font-extrabold text-base flex items-center gap-2">
             <i className="fa-solid fa-clock-rotate-left text-emerald-500" />
-            {selectedSession ? (selectedSession.tabNameSnapshot || 'Dettaglio') : 'Cronologia Allenamenti'}
+            {selectedSession ? String(selectedSession.tabNameSnapshot || 'Dettaglio') : 'Cronologia Allenamenti'}
           </h2>
         </div>
         <button
@@ -93,7 +93,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
             <>
               {displayedHistory.map((s) => (
                 <div
-                  key={s.id || Math.random().toString()}
+                  key={String(s.id || Math.random())}
                   onClick={() => setSelectedSession(s)}
                   role="button"
                   tabIndex={0}
@@ -101,14 +101,14 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                 >
                   <div className="truncate pr-3">
                     <h4 className="text-white font-extrabold text-sm truncate max-w-[220px]">
-                      {s.tabNameSnapshot || (s as any).tabName || 'Allenamento'}
+                      {String(s.tabNameSnapshot || (s as any).tabName || 'Allenamento')}
                     </h4>
                     <div className="text-xs text-zinc-500 mt-1 flex items-center gap-3">
                       <span>
-                        <i className="fa-regular fa-calendar mr-1 opacity-70" /> {s.date || '-'}
+                        <i className="fa-regular fa-calendar mr-1 opacity-70" /> {String(s.date || '-')}
                       </span>
                       <span>
-                        <i className="fa-regular fa-clock mr-1 opacity-70" /> {s.durationStr || '00:00'}
+                        <i className="fa-regular fa-clock mr-1 opacity-70" /> {String(s.durationStr || '00:00')}
                       </span>
                       <span>
                         <i className="fa-solid fa-layer-group mr-1 opacity-70" /> {getTotalSets(s)} serie
@@ -135,7 +135,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
             <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl flex justify-around">
               <div className="text-center">
                 <div className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Durata</div>
-                <div className="text-base font-extrabold text-white mt-0.5">{selectedSession.durationStr || '-'}</div>
+                <div className="text-base font-extrabold text-white mt-0.5">{String(selectedSession.durationStr || '-')}</div>
               </div>
               <div className="text-center">
                 <div className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Serie Totali</div>
@@ -143,7 +143,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
               </div>
               <div className="text-center">
                 <div className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Data</div>
-                <div className="text-base font-extrabold text-emerald-400 mt-0.5">{selectedSession.date || '-'}</div>
+                <div className="text-base font-extrabold text-emerald-400 mt-0.5">{String(selectedSession.date || '-')}</div>
               </div>
             </div>
 
