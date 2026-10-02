@@ -99,7 +99,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
         <div className="header-safe-top p-5 flex justify-between items-center shrink-0 bg-zinc-950/90 backdrop-blur-md z-10 border-b border-zinc-800/40">
           <h2 className="text-white font-extrabold text-base tracking-tight flex items-center gap-2">
             <i className="fa-solid fa-dumbbell text-emerald-500" />
-            MyGym Menu
+            MyGym <span className="bg-emerald-500 text-zinc-950 px-2 py-0.5 rounded-md text-[10px] ml-1">v2.1</span>
           </h2>
           <button
             type="button"

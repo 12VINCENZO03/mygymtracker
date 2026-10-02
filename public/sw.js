@@ -1,5 +1,5 @@
 // public/sw.js
-const CACHE_NAME = 'mygym-cache-v5';
+const CACHE_NAME = 'mygym-cache-v6';
 const ASSETS = [
   '/',
   '/index.html',

@@ -6,8 +6,7 @@
     color: #fafafa;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     -webkit-tap-highlight-color: transparent;
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
+    /* RIMOSSI I PADDING SAFE-AREA GLOBALI */
   }
 }
 

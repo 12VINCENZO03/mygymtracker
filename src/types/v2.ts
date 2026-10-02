@@ -1,8 +1,27 @@
 // src/types/v2.ts
 
 export type ExerciseTypeV2 = 'weight' | 'bodyweight' | 'time' | 'cardio' | 'rest';
-
 export type PersistenceStatus = 'CLEAN' | 'DIRTY' | 'SAVING' | 'SAVED' | 'ERROR';
+
+// --- NUOVE TASSONOMIE COACH 2.0 ---
+export type MovementPattern = 
+  | 'horizontal_push' | 'horizontal_pull' 
+  | 'vertical_push' | 'vertical_pull' 
+  | 'squat' | 'hinge' | 'lunge'
+  | 'isolation_biceps' | 'isolation_triceps' 
+  | 'isolation_shoulders' | 'isolation_core' 
+  | 'isolation_calves' | 'isolation_legs'
+  | 'cardio' | 'other';
+
+export type EquipmentType = 
+  | 'barbell' | 'dumbbell' | 'machine' | 'cable' 
+  | 'bodyweight' | 'smith_machine' | 'kettlebell' | 'other';
+
+export type ProgressionModel = 
+  | 'double_progression' // Standard: satura il range di reps, poi alza il peso
+  | 'fixed_volume'       // Mantiene il carico, cerca di aumentare le serie/reps totali
+  | 'time_under_tension' // Progressione sui secondi di isometria/esecuzione
+  | 'distance_speed';    // Per il cardio
 
 // 1. IL REGISTRO PERMANENTE (Identità univoca, mai duplicata)
 export interface ExerciseDefV2 {
@@ -10,6 +29,14 @@ export interface ExerciseDefV2 {
     name: string; // MUTABILE (l'etichetta corrente, rinominabile senza spezzare la storia)
     type: ExerciseTypeV2;
     cardioMachine?: string; // es. 'treadmill', 'rower', 'bike'
+    
+    // --- NUOVI CAMPI COACH 2.0 (Opzionali per retrocompatibilità) ---
+    movementPattern?: MovementPattern;
+    equipment?: EquipmentType;
+    progressionModel?: ProgressionModel;
+    progressionIncrement?: number; // es. 2.5 (Bilanciere), 1.25 (Manubrio), 1 (Cavo)
+    incrementUnit?: string; // 'kg', 'lbs', 'sec'
+
     createdAt?: number;
     updatedAt?: number;
 }

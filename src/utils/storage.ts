@@ -8,18 +8,48 @@ import { runDataIntegrityCheck } from './audit';
 
 export const TIME_VOLUME_DIVISOR = 10;
 
-// Registro iniziale degli esercizi predefiniti con ID permanenti
+// Registro iniziale degli esercizi predefiniti con ID permanenti e metadati per il Coach 2.0
 export const initialRegistry: Record<string, ExerciseDefV2> = {
-  'ex_bench_press': { id: 'ex_bench_press', name: 'Panca Piana Bilanciere', type: 'weight' },
-  'ex_incline_db': { id: 'ex_incline_db', name: 'Spinte Manubri Panca Inclinata', type: 'weight' },
-  'ex_lat_raises': { id: 'ex_lat_raises', name: 'Alzate Laterali Cavi', type: 'weight' },
-  'ex_triceps_push': { id: 'ex_triceps_push', name: 'Pushdown Corda', type: 'weight' },
-  'ex_lat_machine': { id: 'ex_lat_machine', name: 'Lat Machine Presa Neutra', type: 'weight' },
-  'ex_cable_row': { id: 'ex_cable_row', name: 'Pulley Basso', type: 'weight' },
-  'ex_biceps_curl': { id: 'ex_biceps_curl', name: 'Curl con Manubri', type: 'weight' },
-  'ex_squat': { id: 'ex_squat', name: 'Squat con Bilanciere', type: 'weight' },
-  'ex_leg_press': { id: 'ex_leg_press', name: 'Leg Press 45°', type: 'weight' },
-  'ex_plank': { id: 'ex_plank', name: 'Plank Addominali', type: 'time' }
+  'ex_bench_press': { 
+    id: 'ex_bench_press', name: 'Panca Piana Bilanciere', type: 'weight',
+    movementPattern: 'horizontal_push', equipment: 'barbell', progressionModel: 'double_progression', progressionIncrement: 2.5, incrementUnit: 'kg'
+  },
+  'ex_incline_db': { 
+    id: 'ex_incline_db', name: 'Spinte Manubri Panca Inclinata', type: 'weight',
+    movementPattern: 'horizontal_push', equipment: 'dumbbell', progressionModel: 'double_progression', progressionIncrement: 2.0, incrementUnit: 'kg'
+  },
+  'ex_lat_raises': { 
+    id: 'ex_lat_raises', name: 'Alzate Laterali Cavi', type: 'weight',
+    movementPattern: 'isolation_shoulders', equipment: 'cable', progressionModel: 'double_progression', progressionIncrement: 1.25, incrementUnit: 'kg'
+  },
+  'ex_triceps_push': { 
+    id: 'ex_triceps_push', name: 'Pushdown Corda', type: 'weight',
+    movementPattern: 'isolation_triceps', equipment: 'cable', progressionModel: 'double_progression', progressionIncrement: 1.25, incrementUnit: 'kg'
+  },
+  'ex_lat_machine': { 
+    id: 'ex_lat_machine', name: 'Lat Machine Presa Neutra', type: 'weight',
+    movementPattern: 'vertical_pull', equipment: 'cable', progressionModel: 'double_progression', progressionIncrement: 2.5, incrementUnit: 'kg'
+  },
+  'ex_cable_row': { 
+    id: 'ex_cable_row', name: 'Pulley Basso', type: 'weight',
+    movementPattern: 'horizontal_pull', equipment: 'cable', progressionModel: 'double_progression', progressionIncrement: 2.5, incrementUnit: 'kg'
+  },
+  'ex_biceps_curl': { 
+    id: 'ex_biceps_curl', name: 'Curl con Manubri', type: 'weight',
+    movementPattern: 'isolation_biceps', equipment: 'dumbbell', progressionModel: 'double_progression', progressionIncrement: 2.0, incrementUnit: 'kg'
+  },
+  'ex_squat': { 
+    id: 'ex_squat', name: 'Squat con Bilanciere', type: 'weight',
+    movementPattern: 'squat', equipment: 'barbell', progressionModel: 'double_progression', progressionIncrement: 2.5, incrementUnit: 'kg'
+  },
+  'ex_leg_press': { 
+    id: 'ex_leg_press', name: 'Leg Press 45°', type: 'weight',
+    movementPattern: 'squat', equipment: 'machine', progressionModel: 'double_progression', progressionIncrement: 5.0, incrementUnit: 'kg'
+  },
+  'ex_plank': { 
+    id: 'ex_plank', name: 'Plank Addominali', type: 'time',
+    movementPattern: 'isolation_core', equipment: 'bodyweight', progressionModel: 'time_under_tension', progressionIncrement: 10, incrementUnit: 'sec'
+  }
 };
 
 export const defaultWorkoutPlan: WorkoutTab[] = [

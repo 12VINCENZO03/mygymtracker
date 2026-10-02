@@ -51,7 +51,7 @@ export const Header: React.FC<HeaderProps> = ({
   }, [activeTabId, tabs.length]);
 
   return (
-    <header className="header-safe-top bg-zinc-950/80 backdrop-blur-xl sticky top-0 z-40 border-b border-zinc-800/50">
+    <header className="header-safe-top shrink-0 bg-zinc-950/80 backdrop-blur-xl z-40 border-b border-zinc-800/50">
       <div className="px-4 sm:px-6 py-3.5 flex justify-between items-center relative z-10">
         <div className="flex items-center gap-2">
           <h1 className="text-lg sm:text-xl font-black tracking-tight text-emerald-400 flex items-center gap-1.5">
