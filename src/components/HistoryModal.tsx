@@ -21,9 +21,10 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
   const getTotalSets = (session: WorkoutSessionV2): number => {
     let count = 0;
     if (!session || !Array.isArray(session.blocks)) return count;
-
     for (const b of session.blocks) {
-      if (!b) continue;
+      // AGGIUNTO: Controllo typeof per evitare TypeError fatali su primitive
+      if (!b || typeof b !== 'object') continue;
+      
       if ('rounds' in b && Array.isArray((b as CircuitSnapshotV2).rounds)) {
         for (const r of (b as CircuitSnapshotV2).rounds) {
           if (!r || !Array.isArray(r.exercises)) continue;
@@ -148,7 +149,8 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
 
             {/* Motore V2: Rendering dinamico dei Blocchi Immutabili Corazzato */}
             {Array.isArray(selectedSession.blocks) && selectedSession.blocks.map((block, bIdx) => {
-              if (!block) return null;
+              // AGGIUNTO: type check stringente
+              if (!block || typeof block !== 'object') return null;
 
               if (!('rounds' in block)) {
                 // Rendering Esercizio Singolo

@@ -15,34 +15,37 @@ export interface VolumeStats {
   hasLastYear: boolean;
 }
 
-// --- 🔴 MOTORE V2: Calcolo del volume storicizzato perfetto (FASE F) ---
 export function calculateVolumeFromSessionV2(session: WorkoutSessionV2): number {
   let vol = 0;
   const bw = session.bodyWeightAtSession || 0; // Il peso di quel giorno esatto!
-  if (!session.blocks) return vol;
-
+  
+  if (!session || !session.blocks || !Array.isArray(session.blocks)) return vol;
+  
   for (const block of session.blocks) {
-    if ('rounds' in block) {
-      for (const r of block.rounds) {
+    // AGGIUNTO: type check difensivo
+    if (!block || typeof block !== 'object') continue;
+    
+    if ('rounds' in block && Array.isArray((block as any).rounds)) {
+      for (const r of (block as any).rounds) {
+        if (!r || !Array.isArray(r.exercises)) continue;
         for (const sub of r.exercises) {
-          if (!sub.sets) continue;
+          if (!sub || !Array.isArray(sub.sets)) continue;
           for (const set of sub.sets) {
             const reps = set.reps || 0;
             const w = set.weight || 0;
             if (sub.type === 'weight' || !sub.type) vol += reps * w;
             else if (sub.type === 'bodyweight') vol += reps * w; // Conta solo la zavorra esterna!
-            // Il type 'time' e 'cardio' non devono aggiungere "finti kg" al tonnellaggio totale.
           }
         }
       }
     } else {
-      if (!block.sets) continue;
-      for (const set of block.sets) {
+      const exBlock = block as any;
+      if (!Array.isArray(exBlock.sets)) continue;
+      for (const set of exBlock.sets) {
         const reps = set.reps || 0;
         const w = set.weight || 0;
-        if (block.type === 'weight' || !block.type) vol += reps * w;
-        else if (block.type === 'bodyweight') vol += reps * w; // Conta solo la zavorra esterna!
-        // Il type 'time' e 'cardio' non devono aggiungere "finti kg" al tonnellaggio totale.
+        if (exBlock.type === 'weight' || !exBlock.type) vol += reps * w;
+        else if (exBlock.type === 'bodyweight') vol += reps * w; // Conta solo la zavorra esterna!
       }
     }
   }
