@@ -101,6 +101,7 @@ export default function App() {
     intervalSec?: number;
     activeEmomRound?: number;
     totalRounds?: number;
+    pacingSec?: number;
   } | null>(null);
   const masterTimerIntervalRef = useRef<number | null>(null);
 
@@ -786,6 +787,9 @@ export default function App() {
           if (lastRealEx && lastRealEx.id === exId) {
             handledCircuitRest = true;
             const circuitPause = circuit.pause !== undefined ? circuit.pause : 90;
+            if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+              try { navigator.vibrate(20); } catch { /* ignore */ }
+            }
             playShortBeep();
             
             if (circuitPause > 0) {
@@ -812,6 +816,9 @@ export default function App() {
       }
 
       if (!handledCircuitRest) {
+        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+          try { navigator.vibrate(20); } catch { /* ignore */ }
+        }
         playShortBeep();
         if (pauseSec > 0) {
           startRestTimer(pauseSec, () => {
@@ -866,6 +873,11 @@ export default function App() {
           setRir: nextSetRir,
           setRpe: nextSetRpe
         };
+
+        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+          try { navigator.vibrate(20); } catch { /* ignore */ }
+        }
+        playShortBeep();
 
         let handledCircuitRest = false;
         if (circuitId) {
@@ -1035,7 +1047,7 @@ export default function App() {
     }, 250);
   };
 
-  const handleStartAmrap = async (circuitId: string, totalMin: number) => {
+  const handleStartAmrap = async (circuitId: string, totalMin: number, pacingSec?: number) => {
     if (activeMasterTimer && activeMasterTimer.circuitId === circuitId) {
       if (masterTimerIntervalRef.current) safeClearInterval(masterTimerIntervalRef.current);
       masterTimerIntervalRef.current = null;
@@ -1043,27 +1055,43 @@ export default function App() {
       if (state) await saveGymState(state);
       return;
     }
+
     initAudio();
     if (state) await saveGymState(state);
+
     const absoluteStartTime = Date.now();
     const duration = totalMin * 60;
+    let lastAnnouncedPacing = 0;
 
     setActiveMasterTimer({
       circuitId,
       type: 'amrap',
-      remainingSec: duration
+      remainingSec: duration,
+      pacingSec
     });
 
     masterTimerIntervalRef.current = safeSetInterval(() => {
       const elapsedSec = (Date.now() - absoluteStartTime) / 1000;
       const remaining = Math.max(0, Math.ceil(duration - elapsedSec));
 
+      // Controllo Pacing (Ghost Pacer)
+      if (pacingSec && pacingSec > 0 && remaining > 0) {
+        const currentPacingInterval = Math.floor(elapsedSec / pacingSec);
+        if (currentPacingInterval > lastAnnouncedPacing) {
+          lastAnnouncedPacing = currentPacingInterval;
+          // Suona il beep se l'app non è in ritardo di oltre 5s (es. risveglio da background)
+          if (elapsedSec - (currentPacingInterval * pacingSec) < 5) {
+            playShortBeep();
+          }
+        }
+      }
+
       if (remaining <= 0) {
         if (masterTimerIntervalRef.current) safeClearInterval(masterTimerIntervalRef.current);
         masterTimerIntervalRef.current = null;
         setActiveMasterTimer(null);
         playTrumpet();
-        showToast('AMRAP Terminato! 🏆');
+        showToast('AMRAP Terminato!');
       } else {
         setActiveMasterTimer((prev) => (prev ? { ...prev, remainingSec: remaining } : null));
       }
@@ -1493,9 +1521,12 @@ export default function App() {
                     isMasterTimerRunning={activeMasterTimer?.circuitId === ex.id}
                     masterTimerRemainingSec={activeMasterTimer?.remainingSec || 0}
                     activeEmomRound={activeMasterTimer?.activeEmomRound ?? -1}
+                    onEmomCriticalRest={(remSec) => {
+                      showToast(`⚠️ EMOM: Solo ${remSec}s di recupero! Valuta di scalare reps o carico al prossimo giro.`, true);
+                    }}
                     onOpenVideo={(url) => setVideoModalUrl(url)}
                     onOpenEffortModal={(setId, isRpe) => setEffortTarget({ setId, isRpe })}
-                    onStartAmrapTimer={(min) => handleStartAmrap(ex.id, min)}
+                    onStartAmrapTimer={(min, pacingSec) => handleStartAmrap(ex.id, min, pacingSec)}
                     onStartEmomTimer={(min, sec) => handleStartEmom(ex.id, min, sec)}
                     onAddAmrapRound={async () => {
                       let nextToSave: AppState | null = null;

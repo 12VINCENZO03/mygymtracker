@@ -27,7 +27,7 @@ interface CircuitCardProps {
   onOpenEffortModal: (setId: string, isRpe: boolean) => void;
   onOpenVideo: (url: string) => void;
   onAddAmrapRound: () => void;
-  onStartAmrapTimer: (totalMin: number) => void;
+  onStartAmrapTimer: (totalMin: number, pacingSec?: number) => void;
   onStartEmomTimer: (totalMin: number, intervalSec: number) => void;
   onStartRoundRest: (seconds: number, roundIndex: number) => void;
   onRunInlineTimer: (setId: string, durationSec: number, pauseSec: number, prefill: { weight: string; rir?: string; rpe?: string }) => void;
@@ -35,6 +35,7 @@ interface CircuitCardProps {
   isMasterTimerRunning: boolean;
   masterTimerRemainingSec: number;
   activeEmomRound: number;
+  onEmomCriticalRest?: (remainingSec: number) => void;
 }
 
 export const CircuitCard: React.FC<CircuitCardProps> = ({
@@ -67,7 +68,8 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
   activeInlineTimerSec,
   isMasterTimerRunning,
   masterTimerRemainingSec,
-  activeEmomRound
+  activeEmomRound,
+  onEmomCriticalRest
 }) => {
   const pressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isLongPressRef = useRef(false);
@@ -209,16 +211,29 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
           )}
 
           {isAmrap && (
-            <div className="flex items-center bg-zinc-950 border border-zinc-800/80 rounded-2xl p-2 flex-1 min-w-[100px] shadow-inner">
-              <span className="text-[9px] text-zinc-500 font-extrabold uppercase ml-2 w-16 tracking-wider">Min. Totali</span>
-              <input
-                type="number"
-                min={1}
-                value={circuit.amrapTotalMin !== undefined ? circuit.amrapTotalMin : 10}
-                onChange={(e) => onUpdateCircuit('amrapTotalMin', parseInt(e.target.value, 10) || 0)}
-                className="bg-transparent text-white font-bold w-full text-center outline-none text-sm"
-              />
-            </div>
+            <>
+              <div className="flex items-center bg-zinc-950 border border-zinc-800/80 rounded-2xl p-2 flex-1 min-w-[100px] shadow-inner">
+                <span className="text-[9px] text-zinc-500 font-extrabold uppercase ml-2 w-16 tracking-wider">Min. Totali</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={circuit.amrapTotalMin !== undefined ? circuit.amrapTotalMin : 10}
+                  onChange={(e) => onUpdateCircuit('amrapTotalMin', parseInt(e.target.value, 10) || 0)}
+                  className="bg-transparent text-white font-bold w-full text-center outline-none text-sm"
+                />
+              </div>
+              <div className="flex items-center bg-zinc-950 border border-zinc-800/80 rounded-2xl p-2 flex-1 min-w-[100px] shadow-inner">
+                <span className="text-[9px] text-zinc-500 font-extrabold uppercase ml-2 w-16 tracking-wider">Target Giri</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={circuit.rounds !== undefined ? circuit.rounds : 0}
+                  onChange={(e) => onUpdateCircuit('rounds', parseInt(e.target.value, 10) || 0)}
+                  placeholder="Opzionale"
+                  className="bg-transparent text-white font-bold w-full text-center outline-none text-sm"
+                />
+              </div>
+            </>
           )}
         </div>
 
@@ -434,6 +449,16 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
     isLongPressRef.current = false;
     pressTimerRef.current = setTimeout(() => {
       isLongPressRef.current = true;
+      
+      // Controllo PT: Siamo sotto i 10 secondi nel giro corrente?
+      const setId = `${subId}-${roundIdx}`;
+      const isCurrentlyChecked = Boolean(state.checkedSets[setId]);
+      if (!isCurrentlyChecked && isEmom && isMasterTimerRunning && roundIdx === activeEmomRound) {
+        if (masterTimerRemainingSec > 0 && masterTimerRemainingSec <= 10) {
+          onEmomCriticalRest?.(masterTimerRemainingSec);
+        }
+      }
+
       onLongPressSubSet(subId, roundIdx, pauseSec, prefillData);
     }, 450);
   };
@@ -444,6 +469,15 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
       pressTimerRef.current = null;
     }
     if (!isLongPressRef.current) {
+      // Controllo PT: Siamo sotto i 10 secondi nel giro corrente?
+      const setId = `${subId}-${roundIdx}`;
+      const isCurrentlyChecked = Boolean(state.checkedSets[setId]);
+      if (!isCurrentlyChecked && isEmom && isMasterTimerRunning && roundIdx === activeEmomRound) {
+        if (masterTimerRemainingSec > 0 && masterTimerRemainingSec <= 10) {
+          onEmomCriticalRest?.(masterTimerRemainingSec);
+        }
+      }
+
       onToggleSubSet(subId, roundIdx, pauseSec, prefillData);
     }
   };
@@ -497,12 +531,23 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
             <div className="text-3xl font-black text-amber-400 font-mono tracking-wider tabular-nums mt-0.5 drop-shadow-[0_0_12px_rgba(251,191,36,0.25)]">
               {isMasterTimerRunning ? formatTime(masterTimerRemainingSec) : `${circuit.amrapTotalMin || 10}:00`}
             </div>
+            {Boolean(circuit.rounds && circuit.rounds > 0) && (
+              <div className="text-[10px] text-zinc-400 mt-1 font-bold tracking-wide">
+                Target: {circuit.rounds} giri (Pace: {formatTime(Math.floor(((circuit.amrapTotalMin || 10) * 60) / (circuit.rounds || 1)))} / giro)
+              </div>
+            )}
           </div>
           <div className="flex gap-2">
             <button
               type="button"
               disabled={!isWorkoutActive}
-              onClick={() => onStartAmrapTimer(circuit.amrapTotalMin || 10)}
+              onClick={() => {
+                const totalMins = circuit.amrapTotalMin || 10;
+                const targetRounds = circuit.rounds || 0;
+                // Calcola i secondi per ogni giro. Es: 12 min / 8 giri = 90 secondi a giro
+                const pacingSec = targetRounds > 0 ? Math.floor((totalMins * 60) / targetRounds) : undefined;
+                onStartAmrapTimer(totalMins, pacingSec);
+              }}
               className={`px-4 py-3 rounded-2xl font-black text-xs transition-all active:scale-95 shadow-sm ${
                 isMasterTimerRunning
                   ? 'bg-rose-500 text-white shadow-rose-500/20'

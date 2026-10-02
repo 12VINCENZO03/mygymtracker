@@ -32,14 +32,23 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+  // Motore di scroll robusto: calcola la posizione esatta in pixel
   useEffect(() => {
-    if (scrollContainerRef.current) {
-      const activeEl = scrollContainerRef.current.querySelector('[data-active="true"]');
-      if (activeEl) {
-        activeEl.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    if (!scrollContainerRef.current) return;
+    const container = scrollContainerRef.current;
+    
+    // Usiamo setTimeout per aggirare il problema di rendering istantaneo di WebKit su iOS al reload
+    const timer = setTimeout(() => {
+      const activeBtn = document.getElementById(`tab-btn-${activeTabId}`);
+      if (activeBtn) {
+        // Calcola il centro esatto per posizionare la tab in mezzo allo schermo
+        const scrollPosition = activeBtn.offsetLeft - (container.clientWidth / 2) + (activeBtn.clientWidth / 2);
+        container.scrollTo({ left: scrollPosition, behavior: 'smooth' });
       }
-    }
-  }, [activeTabId]);
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [activeTabId, tabs.length]);
 
   return (
     <header className="header-safe-top bg-zinc-950/80 backdrop-blur-xl sticky top-0 z-40 border-b border-zinc-800/50">
@@ -50,7 +59,6 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="animate-wave">👋</span>
           </h1>
         </div>
-
         <div className="flex items-center gap-3">
           <div className="bg-emerald-500/15 text-emerald-400 px-3 py-1.5 rounded-full text-xs font-black flex items-center gap-1.5 border border-emerald-500/20 shadow-inner">
             <span>🔥</span>
@@ -80,8 +88,8 @@ export const Header: React.FC<HeaderProps> = ({
             return (
               <button
                 key={tab.id}
+                id={`tab-btn-${tab.id}`}
                 type="button"
-                data-active={isActive}
                 onClick={() => onSelectTab(tab.id)}
                 className={`px-4 py-3 whitespace-nowrap text-xs font-bold transition border-b-2 flex items-center gap-2 outline-none shrink-0 ${
                   isActive
@@ -98,7 +106,7 @@ export const Header: React.FC<HeaderProps> = ({
             return (
               <div
                 key={tab.id}
-                data-active={isActive}
+                id={`tab-btn-${tab.id}`}
                 className={`px-2 py-1.5 border-b-2 flex items-center gap-1.5 shrink-0 relative bg-zinc-900/60 rounded-t-xl border border-b-0 border-zinc-800/80 ${
                   isActive ? 'border-emerald-500/60 bg-emerald-950/20' : ''
                 }`}
@@ -121,7 +129,6 @@ export const Header: React.FC<HeaderProps> = ({
                     <i className="fa-solid fa-chevron-right" />
                   </button>
                 </div>
-
                 <input
                   type="text"
                   value={tab.name}
@@ -129,7 +136,6 @@ export const Header: React.FC<HeaderProps> = ({
                   onClick={() => onSelectTab(tab.id)}
                   className="bg-zinc-800 text-white font-bold py-1 px-2 text-xs w-28 rounded-lg outline-none border border-zinc-700 focus:border-emerald-500"
                 />
-
                 <button
                   type="button"
                   onClick={() => onDeleteTab(tab.id)}
@@ -144,8 +150,8 @@ export const Header: React.FC<HeaderProps> = ({
           return (
             <button
               key={tab.id}
+              id={`tab-btn-${tab.id}`}
               type="button"
-              data-active={isActive}
               onClick={() => onSelectTab(tab.id)}
               className={`px-4 py-3 whitespace-nowrap text-xs font-bold transition border-b-2 flex items-center gap-1.5 outline-none shrink-0 ${
                 isActive

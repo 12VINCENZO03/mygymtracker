@@ -30,8 +30,8 @@ export function calculateVolumeFromSessionV2(session: WorkoutSessionV2): number 
             const reps = set.reps || 0;
             const w = set.weight || 0;
             if (sub.type === 'weight' || !sub.type) vol += reps * w;
-            else if (sub.type === 'bodyweight') vol += reps * (w + bw);
-            else if (sub.type === 'time') vol += bw * ((set.durationSec || 60) / 10);
+            else if (sub.type === 'bodyweight') vol += reps * w; // Conta solo la zavorra esterna!
+            // Il type 'time' e 'cardio' non devono aggiungere "finti kg" al tonnellaggio totale.
           }
         }
       }
@@ -41,8 +41,8 @@ export function calculateVolumeFromSessionV2(session: WorkoutSessionV2): number 
         const reps = set.reps || 0;
         const w = set.weight || 0;
         if (block.type === 'weight' || !block.type) vol += reps * w;
-        else if (block.type === 'bodyweight') vol += reps * (w + bw);
-        else if (block.type === 'time') vol += bw * ((set.durationSec || 60) / 10);
+        else if (block.type === 'bodyweight') vol += reps * w; // Conta solo la zavorra esterna!
+        // Il type 'time' e 'cardio' non devono aggiungere "finti kg" al tonnellaggio totale.
       }
     }
   }
