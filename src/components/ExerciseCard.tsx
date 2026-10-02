@@ -16,9 +16,9 @@ interface ExerciseCardProps {
   onMoveEx: (dir: number) => void;
   onSaveWeight: (val: string) => void;
   onSaveSetWeight: (setId: string, val: string) => void;
-  onSaveCustomField: (setId: string, fieldId: string, val: string) => void; // 🔴 AGGIUNTO
-  onToggleSet: (setIndex: number, pauseSec: number, prefill: { reps: string; weight: string; rir?: string; rpe?: string }) => void;
-  onLongPressSet: (setIndex: number, pauseSec: number, prefill: { reps: string; weight: string; rir?: string; rpe?: string }) => void;
+  onSaveCustomField: (setId: string, fieldId: string, val: string) => void;
+  onToggleSet: (setIndex: number, pauseSec: number, prefill: { reps: string; weight: string; rir?: string; rpe?: string; customFields?: Record<string, string> }) => void;
+  onLongPressSet: (setIndex: number, pauseSec: number, prefill: { reps: string; weight: string; rir?: string; rpe?: string; customFields?: Record<string, string> }) => void;
   onOpenEffortModal: (setId: string, isRpe: boolean) => void;
   onOpenVideo: (url: string) => void;
   onRunInlineTimer: (setId: string, durationSec: number, pauseSec: number, prefill: { weight: string; rir?: string; rpe?: string }) => void;
@@ -51,8 +51,9 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
 
   // 🔴 CANONICAL V2: Ultima prestazione letta dalle sessioni storiche immutabili
   const lastPerf = getLastExercisePerformance(state.sessionsV2, ex.exerciseId, ex.name);
-  const currentWeight = state.weights[ex.id] || (lastPerf?.weight !== undefined ? String(lastPerf.weight) : '');
-  const coachAdvice = getExerciseCoachAdvice(state, ex.id, ex.reps, ex.metricType, false, ex.name, ex.exerciseId);
+  const coachAdvice = React.useMemo(() => {
+    return getExerciseCoachAdvice(state, ex.id, ex.reps, ex.metricType, false, ex.name, ex.exerciseId);
+  }, [state.sessionsV2, state.bodyGoal, state.deloadActive, ex.id, ex.reps, ex.metricType, ex.name, ex.exerciseId]);
 
   const getHistoricalSetData = (setIdx: number) => {
     return getHistoricalSetDataV2(state.sessionsV2, setIdx + 1, ex.exerciseId, ex.name);
@@ -209,13 +210,17 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
     }, 450);
   };
 
-  const handlePointerUp = (setIndex: number, pauseSec: number, prefillData: any) => {
+  const handlePointerUp = (setIndex: number, pauseSec: number, prefillData: any, actualReps: string) => {
     if (pressTimerRef.current) {
       clearTimeout(pressTimerRef.current);
       pressTimerRef.current = null;
     }
     if (!isLongPressRef.current) {
-      onToggleSet(setIndex, pauseSec, prefillData);
+      if (isNaN(Number(actualReps))) {
+        onLongPressSet(setIndex, pauseSec, prefillData);
+      } else {
+        onToggleSet(setIndex, pauseSec, prefillData);
+      }
     }
   };
 
@@ -335,7 +340,8 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
             reps: actualReps,
             weight: displayWeight,
             rir: !isCardio && displayEffort !== undefined && displayEffort !== '' ? String(displayEffort) : undefined,
-            rpe: isCardio && displayEffort !== undefined && displayEffort !== '' ? String(displayEffort) : undefined
+            rpe: isCardio && displayEffort !== undefined && displayEffort !== '' ? String(displayEffort) : undefined,
+            customFields: hist?.customFields || {}
           };
 
           return (
@@ -381,7 +387,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                     type="button"
                     disabled={!isWorkoutActive}
                     onPointerDown={() => handlePointerDown(setIdx, prefillData)}
-                    onPointerUp={() => handlePointerUp(setIdx, ex.pause || 0, prefillData)}
+                    onPointerUp={() => handlePointerUp(setIdx, ex.pause || 0, prefillData, actualReps)}
                     onPointerLeave={handlePointerCancel}
                     className={`w-28 py-3.5 rounded-2xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
                       isChecked

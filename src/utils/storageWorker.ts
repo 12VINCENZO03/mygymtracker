@@ -29,30 +29,32 @@ const workerCode = `
     if (e.data.action === 'save') {
       try {
         const database = await initDB();
-        const tx = database.transaction(['store', 'sessions'], 'readwrite');
+        const payload = e.data.payload;
+        const hasSessions = Boolean(payload && Array.isArray(payload.sessionsV2));
         
-        const fullState = e.data.payload;
+        const storeNames = hasSessions ? ['store', 'sessions'] : ['store'];
+        const tx = database.transaction(storeNames, 'readwrite');
         
-        // Estraiamo la lista delle sessioni V2 per salvarla nel cassetto isolato
-        const sessions = fullState.sessionsV2 || [];
-        
-        const hotState = { ...fullState };
+        const hotState = { ...payload };
         delete hotState.sessionsV2;
         tx.objectStore('store').put(hotState, 'state');
         
-        const sessionStore = tx.objectStore('sessions');
-        // Rimuoviamo l'eventuale chiave monolitica legacy 'history'
-        try { sessionStore.delete('history'); } catch (err) {}
-        
-        // Salviamo ciascuna sessione V2 come record singolo indicizzato con il proprio id
-        for (let i = 0; i < sessions.length; i++) {
-          const session = sessions[i];
-          if (session && session.id) {
-            sessionStore.put(session, session.id);
+        if (hasSessions) {
+          const sessions = payload.sessionsV2 || [];
+          const sessionStore = tx.objectStore('sessions');
+          // Rimuoviamo l'eventuale chiave monolitica legacy 'history'
+          try { sessionStore.delete('history'); } catch (err) {}
+          
+          // Salviamo ciascuna sessione V2 come record singolo indicizzato con il proprio id
+          for (let i = 0; i < sessions.length; i++) {
+            const session = sessions[i];
+            if (session && session.id) {
+              sessionStore.put(session, session.id);
+            }
           }
         }
         
-        tx.oncomplete = () => self.postMessage({ success: true, id: e.data.id, revision: fullState.revision });
+        tx.oncomplete = () => self.postMessage({ success: true, id: e.data.id, revision: payload.revision });
         tx.onerror = (err) => self.postMessage({ success: false, error: 'Transaction error: ' + err, id: e.data.id });
       } catch (err) {
         self.postMessage({ success: false, error: err.message, id: e.data.id });

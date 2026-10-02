@@ -44,19 +44,18 @@ import { SyncModal } from './components/SyncModal';
 import { HistoryModal } from './components/HistoryModal';
 import { VideoModal } from './components/VideoModal';
 
-// 🔴 NUOVO: La Funzione Protettrice. Pulisce l'input da lettere, virgole e numeri negativi
 const sanitizeNumericInput = (val: string | number): string => {
   if (val === undefined || val === null) return '';
   
-  // 1. Sostituisce la virgola col punto e rimuove TUTTO ciò che non è numero o punto
-  let cleaned = String(val).replace(',', '.').replace(/[^0-9.]/g, '');
+  // 1. Sostituisce la virgola col punto e rimuove TUTTO ciò che non è numero, punto o meno
+  let cleaned = String(val).replace(',', '.').replace(/[^0-9.\-]/g, '');
   
-  // 2. Se è vuoto o c'è solo un punto, restituisce stringa vuota
-  if (cleaned === '' || cleaned === '.') return '';
+  // 2. Se è vuoto o c'è solo un punto/trattino, restituisce stringa vuota
+  if (cleaned === '' || cleaned === '.' || cleaned === '-') return '';
   
-  // 3. Converte in numero e impedisce che sia minore di zero
+  // 3. Converte in numero
   const parsed = parseFloat(cleaned);
-  return !isNaN(parsed) ? Math.max(0, parsed).toString() : '';
+  return !isNaN(parsed) ? parsed.toString() : '';
 };
 
 export default function App() {
@@ -190,56 +189,34 @@ export default function App() {
     });
   }, []);
 
-  const handleSaveWeight = useCallback(async (id: string, val: string | number) => {
+  const handleSaveWeight = useCallback((id: string, val: string | number) => {
     const cleanVal = sanitizeNumericInput(val);
-    let nextToSave: AppState | null = null;
 
     setState((prev) => {
       if (!prev) return null;
       if (prev.weights[id] === cleanVal) return prev;
-      const next = { ...prev, weights: { ...prev.weights, [id]: cleanVal } };
-      nextToSave = next;
-      return next;
+      return { ...prev, weights: { ...prev.weights, [id]: cleanVal } };
     });
-
-    if (nextToSave) {
-      await saveGymState(nextToSave);
-    }
   }, []);
 
-  const handleSaveSetWeight = useCallback(async (setId: string, val: string | number) => {
+  const handleSaveSetWeight = useCallback((setId: string, val: string | number) => {
     const cleanVal = sanitizeNumericInput(val);
-    let nextToSave: AppState | null = null;
 
     setState((prev) => {
       if (!prev) return null;
       if (prev.setWeights[setId] === cleanVal) return prev;
-      const nextState = { ...prev, setWeights: { ...prev.setWeights, [setId]: cleanVal } };
-      nextToSave = nextState;
-      return nextState;
+      return { ...prev, setWeights: { ...prev.setWeights, [setId]: cleanVal } };
     });
-
-    if (nextToSave) {
-      await saveGymState(nextToSave);
-    }
   }, []);
 
   // 🔴 NUOVO: Salvataggio campi cardio avanzati (Velocità, Inclinazione, ecc.)
-  const handleSaveCustomField = useCallback(async (setId: string, fieldId: string, val: string) => {
-    let nextToSave: AppState | null = null;
-
+  const handleSaveCustomField = useCallback((setId: string, fieldId: string, val: string) => {
     setState((prev) => {
       if (!prev) return null;
       const allFields = prev.setCustomFields || {};
       const currentFields = allFields[setId] || {};
-      const next = { ...prev, setCustomFields: { ...allFields, [setId]: { ...currentFields, [fieldId]: val } } };
-      nextToSave = next;
-      return next;
+      return { ...prev, setCustomFields: { ...allFields, [setId]: { ...currentFields, [fieldId]: val } } };
     });
-
-    if (nextToSave) {
-      await saveGymState(nextToSave);
-    }
   }, []);
 
 
@@ -515,7 +492,7 @@ export default function App() {
                 parseInt(String(rawReps)) || undefined,
                 parseFloat(String(rawWeight)) || undefined,
                 parseFloat(String(rawDuration)) || undefined,
-                rawRir === '-1' || rawRir === 'CED' ? undefined : parseFloat(String(rawRir)),
+                rawRir === '' || rawRir == null || rawRir === '-1' || rawRir === 'CED' ? undefined : parseFloat(String(rawRir)),
                 parseFloat(String(rawRpe)) || undefined
               );
               completedSets.push({
@@ -562,7 +539,7 @@ export default function App() {
                   parseInt(String(rawReps)) || undefined,
                   parseFloat(String(rawWeight)) || undefined,
                   parseFloat(String(rawDuration)) || undefined,
-                  rawRir === '-1' || rawRir === 'CED' ? undefined : parseFloat(String(rawRir)),
+                  rawRir === '' || rawRir == null || rawRir === '-1' || rawRir === 'CED' ? undefined : parseFloat(String(rawRir)),
                   parseFloat(String(rawRpe)) || undefined
                 );
                 return {
@@ -650,9 +627,15 @@ export default function App() {
 
         nextSessionsV2.unshift(v2Session);
 
+        const nextDeloadDates = [...(state.deloadDates || [])];
+        if (state.deloadActive && !nextDeloadDates.includes(todayDateStr)) {
+          nextDeloadDates.push(todayDateStr);
+        }
+
         // Assemblaggio finale
         const newState: AppState = {
           ...state,
+          deloadDates: nextDeloadDates,
           activeWorkouts: nextActiveWorkouts,
           registryV2: nextRegistry,
           sessionsV2: nextSessionsV2,
@@ -666,7 +649,7 @@ export default function App() {
           setCustomFields: {}
         };
 
-        await saveGymState(newState);
+        await saveGymState(newState, true);
         setState(newState);
         setSummaryData({ newSnapshot: v2Session, prevSnapshot });
       } else {
@@ -722,7 +705,7 @@ export default function App() {
       };
       
       setState(newState);
-      await saveGymState(newState);
+      await saveGymState(newState, true);
       showToast('Sessione riavviata.');
     }
   };
@@ -731,7 +714,7 @@ export default function App() {
     exId: string,
     setIndex: number,
     pauseSec: number,
-    prefill: { reps: string; weight: string; rir?: string; rpe?: string },
+    prefill: { reps: string; weight: string; rir?: string; rpe?: string; customFields?: Record<string, string> },
     isSub = false,
     circuitId?: string
   ) => {
@@ -746,6 +729,7 @@ export default function App() {
     let nextSetWeights = state.setWeights;
     let nextSetRir = state.setRir;
     let nextSetRpe = state.setRpe;
+    let nextSetCustomFields = state.setCustomFields || {};
 
     if (isChecked) {
       delete nextCheckedSets[setId];
@@ -763,6 +747,10 @@ export default function App() {
       if (prefill.rpe !== undefined && nextSetRpe[setId] === undefined) {
         nextSetRpe = { ...nextSetRpe, [setId]: prefill.rpe };
       }
+      if (prefill.customFields && Object.keys(prefill.customFields).length > 0) {
+        const currentFields = nextSetCustomFields[setId] || {};
+        nextSetCustomFields = { ...nextSetCustomFields, [setId]: { ...prefill.customFields, ...currentFields } };
+      }
     }
 
     const nextState = {
@@ -771,7 +759,8 @@ export default function App() {
       setReps: nextSetReps,
       setWeights: nextSetWeights,
       setRir: nextSetRir,
-      setRpe: nextSetRpe
+      setRpe: nextSetRpe,
+      setCustomFields: nextSetCustomFields
     };
 
     // Gestione Side Effects
@@ -839,7 +828,7 @@ export default function App() {
     exId: string,
     setIndex: number,
     pauseSec: number,
-    prefill: { reps: string; weight: string; rir?: string; rpe?: string },
+    prefill: { reps: string; weight: string; rir?: string; rpe?: string; customFields?: Record<string, string> },
     circuitId?: string
   ) => {
     if (!state) return;
@@ -1157,7 +1146,7 @@ export default function App() {
 
       // 5. Salva i dati canonici
       setState(parsed);
-      await saveGymState(parsed);
+      await saveGymState(parsed, true);
       showToast('Dati ripristinati con successo! 🚀');
       setIsSyncModalOpen(false);
     } catch (e: any) {

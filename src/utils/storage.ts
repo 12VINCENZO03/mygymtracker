@@ -307,10 +307,12 @@ export async function createSafetyBackup(state: AppState, reason: string): Promi
   }
 }
 
+let saveRequestCounter = 0;
+
 /**
  * Carica l'intero stato canonico V2 combinando lo stato leggero con lo storico immutabile.
  */
-export async function saveGymState(state: AppState): Promise<void> {
+export async function saveGymState(state: AppState, sessionsChanged: boolean = false): Promise<void> {
   if (typeof window === 'undefined') return;
   setPersistenceStatus('SAVING');
 
@@ -321,10 +323,11 @@ export async function saveGymState(state: AppState): Promise<void> {
     lastSavedAt: Date.now()
   };
 
+  const hotState = { ...stateToSave };
+  delete (hotState as any).sessionsV2; // Escludiamo lo storico pesante
+
   // 1. IL PARACADUTE SINCRONO
   try {
-    const hotState = { ...stateToSave };
-    delete (hotState as any).sessionsV2; // Escludiamo lo storico pesante
     localStorage.setItem('mygym_state', JSON.stringify(hotState));
   } catch (e) {
     console.warn('Impossibile salvare su localStorage', e);
@@ -335,7 +338,7 @@ export async function saveGymState(state: AppState): Promise<void> {
     const worker = storageWorker;
     if (worker) {
       await new Promise<void>((resolve, reject) => {
-        const reqId = Date.now();
+        const reqId = ++saveRequestCounter;
         const handler = (msgEv: MessageEvent) => {
           if (msgEv.data && msgEv.data.id === reqId) {
             worker.removeEventListener('message', handler);
@@ -344,26 +347,30 @@ export async function saveGymState(state: AppState): Promise<void> {
           }
         };
         worker.addEventListener('message', handler);
-        worker.postMessage({ action: 'save', payload: stateToSave, id: reqId });
+        worker.postMessage({
+          action: 'save',
+          payload: sessionsChanged ? stateToSave : hotState,
+          id: reqId
+        });
       });
     } else {
       const db = await initDB();
       await new Promise<void>((resolve, reject) => {
-        const tx = db.transaction(['store', 'sessions'], 'readwrite');
-        const sessions = stateToSave.sessionsV2 || [];
-        const hotState = { ...stateToSave };
-        delete (hotState as any).sessionsV2;
+        const tx = db.transaction(sessionsChanged ? ['store', 'sessions'] : ['store'], 'readwrite');
         tx.objectStore('store').put(hotState, 'state');
         
-        const sessionStore = tx.objectStore('sessions');
-        // Rimuoviamo l'eventuale chiave monolitica legacy 'history'
-        try { sessionStore.delete('history'); } catch (err) {}
-        
-        // Salvataggio atomico record per record
-        for (let i = 0; i < sessions.length; i++) {
-          const s = sessions[i];
-          if (s && s.id) {
-            sessionStore.put(s, s.id);
+        if (sessionsChanged) {
+          const sessions = stateToSave.sessionsV2 || [];
+          const sessionStore = tx.objectStore('sessions');
+          // Rimuoviamo l'eventuale chiave monolitica legacy 'history'
+          try { sessionStore.delete('history'); } catch (err) {}
+          
+          // Salvataggio atomico record per record
+          for (let i = 0; i < sessions.length; i++) {
+            const s = sessions[i];
+            if (s && s.id) {
+              sessionStore.put(s, s.id);
+            }
           }
         }
         

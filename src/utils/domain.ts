@@ -140,7 +140,7 @@ export function computeStreakFromSessions(
   const todayDate = parseDate(todayStr);
   
   // Quanti giorni interi sono passati dall'ultimo allenamento?
-  const daysSinceLast = Math.floor((todayDate.getTime() - lastWorkoutDate.getTime()) / msPerDay);
+  const daysSinceLast = Math.round((todayDate.getTime() - lastWorkoutDate.getTime()) / msPerDay);
 
   // FINESTRA DI TOLLERANZA PT: Se l'ultimo allenamento risale a PIÙ di 3 giorni fa (> 72h), la streak è persa.
   if (daysSinceLast > 3) {
@@ -155,7 +155,7 @@ export function computeStreakFromSessions(
     const prev = parseDate(uniqueDates[i + 1]);
     
     // Distanza in giorni tra un allenamento e quello precedente
-    const gap = Math.floor((cur.getTime() - prev.getTime()) / msPerDay);
+    const gap = Math.round((cur.getTime() - prev.getTime()) / msPerDay);
 
     // Se l'intervallo è tra 1 e 3 giorni (recupero fisiologico valido), la streak aumenta
     if (gap >= 1 && gap <= 3) {

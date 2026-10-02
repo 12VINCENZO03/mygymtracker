@@ -106,8 +106,9 @@ export function getFatigueTrendAlert(effHistory: WeightHistoryEntry[]): string |
     if (!effHistory || effHistory.length < 4) return null;
     const rirOf = (h: WeightHistoryEntry) => {
       const v = Object.values(h.rirs || {})
-        .filter((r) => r !== '' && !isNaN(Number(r)))
-        .map(Number);
+        .filter((r) => r !== '')
+        .map((r) => (r === 'CED' || r === '-1') ? -1 : Number(r))
+        .filter((num) => !isNaN(num));
       return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
     };
     const recentRirs = effHistory.slice(0, 2).map(rirOf).filter((v): v is number => v !== null);
@@ -137,10 +138,14 @@ export function extractExerciseHistoryFromSessions(
   exerciseName?: string
 ): WeightHistoryEntry[] {
   if (!sessions) return [];
-  const entries: WeightHistoryEntry[] = [];
   const targetName = exerciseName ? exerciseName.trim().toLowerCase() : '';
+  const dateMap = new Map<string, {
+    date: string;
+    sets: Array<{ weight: number; reps: number | string; rir?: string; rpe?: string }>;
+  }>();
 
   for (const session of sessions) {
+    if (!session.date) continue;
     for (const block of session.blocks) {
       if ('rounds' in block) {
         for (const round of block.rounds) {
@@ -148,23 +153,18 @@ export function extractExerciseHistoryFromSessions(
             const matchId = exerciseId && sub.exerciseId === exerciseId;
             const matchName = targetName && sub.nameSnapshot.trim().toLowerCase() === targetName;
             if (matchId || (!exerciseId && matchName)) {
-              const reps: Record<string, string> = {};
-              const weights: Record<string, string> = {};
-              const rirs: Record<string, string> = {};
-              const rpes: Record<string, string> = {};
-              let primaryW = '0';
+              if (!dateMap.has(session.date)) {
+                dateMap.set(session.date, { date: session.date, sets: [] });
+              }
+              const entry = dateMap.get(session.date)!;
               sub.sets.forEach((s) => {
-                const sId = String(s.index - 1);
-                if (s.reps !== undefined) reps[sId] = String(s.reps);
-                if (s.weight !== undefined) {
-                  weights[sId] = String(s.weight);
-                  primaryW = String(s.weight);
-                }
-                if (s.rir !== undefined) rirs[sId] = String(s.rir);
-                if (s.isCed) rirs[sId] = 'CED';
-                if (s.rpe !== undefined) rpes[sId] = String(s.rpe);
+                entry.sets.push({
+                  weight: s.weight !== undefined ? s.weight : 0,
+                  reps: s.reps !== undefined ? s.reps : '',
+                  rir: s.isCed ? 'CED' : s.rir !== undefined ? String(s.rir) : undefined,
+                  rpe: s.rpe !== undefined ? String(s.rpe) : undefined
+                });
               });
-              entries.push({ date: session.date, weight: primaryW, weights, reps, rirs, rpes });
             }
           }
         }
@@ -172,27 +172,51 @@ export function extractExerciseHistoryFromSessions(
         const matchId = exerciseId && block.exerciseId === exerciseId;
         const matchName = targetName && block.nameSnapshot.trim().toLowerCase() === targetName;
         if (matchId || (!exerciseId && matchName)) {
-          const reps: Record<string, string> = {};
-          const weights: Record<string, string> = {};
-          const rirs: Record<string, string> = {};
-          const rpes: Record<string, string> = {};
-          let primaryW = '0';
+          if (!dateMap.has(session.date)) {
+            dateMap.set(session.date, { date: session.date, sets: [] });
+          }
+          const entry = dateMap.get(session.date)!;
           block.sets.forEach((s) => {
-            const sId = String(s.index - 1);
-            if (s.reps !== undefined) reps[sId] = String(s.reps);
-            if (s.weight !== undefined) {
-              weights[sId] = String(s.weight);
-              primaryW = String(s.weight);
-            }
-            if (s.rir !== undefined) rirs[sId] = String(s.rir);
-            if (s.isCed) rirs[sId] = 'CED';
-            if (s.rpe !== undefined) rpes[sId] = String(s.rpe);
+            entry.sets.push({
+              weight: s.weight !== undefined ? s.weight : 0,
+              reps: s.reps !== undefined ? s.reps : '',
+              rir: s.isCed ? 'CED' : s.rir !== undefined ? String(s.rir) : undefined,
+              rpe: s.rpe !== undefined ? String(s.rpe) : undefined
+            });
           });
-          entries.push({ date: session.date, weight: primaryW, weights, reps, rirs, rpes });
         }
       }
     }
   }
+
+  const entries: WeightHistoryEntry[] = [];
+  for (const [date, data] of dateMap.entries()) {
+    if (data.sets.length === 0) continue;
+    const reps: Record<string, string> = {};
+    const weights: Record<string, string> = {};
+    const rirs: Record<string, string> = {};
+    const rpes: Record<string, string> = {};
+    let maxW = 0;
+
+    data.sets.forEach((s, idx) => {
+      const sId = String(idx);
+      if (s.reps !== undefined && s.reps !== '') reps[sId] = String(s.reps);
+      weights[sId] = String(s.weight);
+      if (s.weight > maxW) maxW = s.weight;
+      if (s.rir !== undefined) rirs[sId] = s.rir;
+      if (s.rpe !== undefined) rpes[sId] = s.rpe;
+    });
+
+    entries.push({
+      date,
+      weight: String(maxW),
+      weights,
+      reps,
+      rirs,
+      rpes
+    });
+  }
+
   return entries;
 }
 
@@ -245,7 +269,7 @@ export function getExerciseCoachAdvice(
       const w3 = parseFloat(history[2].weight) || 0;
       const reps1 = getAvgReps(history[0]);
       const reps3 = getAvgReps(history[2]);
-      if (w1 > 0 && w1 === w2 && w2 === w3 && reps1 <= reps3) {
+      if ((w1 > 0 || metricType === 'bodyweight') && w1 === w2 && w2 === w3 && reps1 <= reps3) {
         return {
           badge: 'stall',
           title: 'Stallo Rilevato',
@@ -292,7 +316,8 @@ export function getExerciseCoachAdvice(
 
         const topWeight = maxW;
         const topReps = parseInt(lastSession.reps[topIdx]) || 0;
-        const topRir = parseFloat(lastSession.rirs[topIdx]);
+        const rawRir = lastSession.rirs[topIdx];
+        const topRir = (rawRir === 'CED' || rawRir === '-1') ? -1 : parseFloat(rawRir);
 
         // Parsing della Doppia Progressione (es. "8-12" -> min: 8, max: 12)
         let minTargetReps = 8;
@@ -392,10 +417,13 @@ export function getGoalCrossInsight(state: AppState, stats: VolumeStats): string
     const now = new Date();
     const past = hist.find((h) => {
       const d = Math.floor((now.getTime() - new Date(h.date).getTime()) / 86400000);
-      return d >= 21 && d <= 42;
+      return d >= 21 && d <= 42 && h.fm !== '' && h.fm != null;
+    }) || hist.find((h) => {
+      const d = Math.floor((now.getTime() - new Date(h.date).getTime()) / 86400000);
+      return d >= 21 && h.fm !== '' && h.fm != null;
     });
     if (!past) return null;
-    const cur = hist[0];
+    const cur = hist.find(h => h.fm !== '' && h.fm != null && h.ffm !== '' && h.ffm != null) || hist[0];
     const curFm = parseFloat(String(cur.fm)) || null;
     const pastFm = parseFloat(String(past.fm)) || null;
     const fmDown = curFm !== null && pastFm !== null && pastFm - curFm >= 0.5;

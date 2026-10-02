@@ -22,8 +22,8 @@ interface CircuitCardProps {
   onMoveSubEx: (subId: string, dir: number) => void;
   onSaveWeight: (subId: string, val: string) => void;
   onSaveCustomField?: (setId: string, fieldId: string, val: string) => void;
-  onToggleSubSet: (subId: string, roundIndex: number, pauseSec: number, prefill: { reps: string; weight: string; rir?: string; rpe?: string }) => void;
-  onLongPressSubSet: (subId: string, roundIndex: number, pauseSec: number, prefill: { reps: string; weight: string; rir?: string; rpe?: string }) => void;
+  onToggleSubSet: (subId: string, roundIndex: number, pauseSec: number, prefill: { reps: string; weight: string; rir?: string; rpe?: string; customFields?: Record<string, string> }) => void;
+  onLongPressSubSet: (subId: string, roundIndex: number, pauseSec: number, prefill: { reps: string; weight: string; rir?: string; rpe?: string; customFields?: Record<string, string> }) => void;
   onOpenEffortModal: (setId: string, isRpe: boolean) => void;
   onOpenVideo: (url: string) => void;
   onAddAmrapRound: () => void;
@@ -85,6 +85,16 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
   }
 
   const amrapRoundsCount = state.amrapRounds[circuit.id] || 0;
+
+  const subCoachAdvices = React.useMemo(() => {
+    const map: Record<string, ReturnType<typeof getExerciseCoachAdvice>> = {};
+    circuit.exercises.forEach((sub) => {
+      if (sub.metricType !== 'rest') {
+        map[sub.id] = getExerciseCoachAdvice(state, sub.id, sub.reps || '10', sub.metricType, true, sub.name, sub.exerciseId);
+      }
+    });
+    return map;
+  }, [state.sessionsV2, state.bodyGoal, state.deloadActive, circuit.exercises]);
 
   if (isEditMode) {
     return (
@@ -463,7 +473,7 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
     }, 450);
   };
 
-  const handlePointerUp = (subId: string, roundIdx: number, pauseSec: number, prefillData: any) => {
+  const handlePointerUp = (subId: string, roundIdx: number, pauseSec: number, prefillData: any, actualReps: string) => {
     if (pressTimerRef.current) {
       clearTimeout(pressTimerRef.current);
       pressTimerRef.current = null;
@@ -478,7 +488,11 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
         }
       }
 
-      onToggleSubSet(subId, roundIdx, pauseSec, prefillData);
+      if (isNaN(Number(actualReps))) {
+        onLongPressSubSet(subId, roundIdx, pauseSec, prefillData);
+      } else {
+        onToggleSubSet(subId, roundIdx, pauseSec, prefillData);
+      }
     }
   };
 
@@ -618,7 +632,7 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
           const lastSubPerf = getLastExercisePerformance(state.sessionsV2, sub.exerciseId, sub.name);
           const currentWeight = state.weights[sub.id] || (lastSubPerf?.weight !== undefined ? String(lastSubPerf.weight) : '');
           const letter = String.fromCharCode(65 + sIdx);
-          const coachAdvice = getExerciseCoachAdvice(state, sub.id, sub.reps || '10', sub.metricType, true, sub.name, sub.exerciseId);
+          const coachAdvice = subCoachAdvices[sub.id];
 
           return (
             <div key={sub.id} className="bg-zinc-950/50 p-4 rounded-3xl border border-zinc-800/60 shadow-sm">
@@ -723,7 +737,8 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                     reps: actualReps,
                     weight: displayWeight,
                     rir: !isCardio && displayEffort !== undefined && displayEffort !== '' ? String(displayEffort) : undefined,
-                    rpe: isCardio && displayEffort !== undefined && displayEffort !== '' ? String(displayEffort) : undefined
+                    rpe: isCardio && displayEffort !== undefined && displayEffort !== '' ? String(displayEffort) : undefined,
+                    customFields: histSet?.customFields || {}
                   };
                   
                   let emomClass = '';
@@ -746,7 +761,7 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                         type="button"
                         disabled={!isWorkoutActive}
                         onPointerDown={() => handlePointerDown(sub.id, rIdx, sub.pause || 0, prefillData)}
-                        onPointerUp={() => handlePointerUp(sub.id, rIdx, sub.pause || 0, prefillData)}
+                        onPointerUp={() => handlePointerUp(sub.id, rIdx, sub.pause || 0, prefillData, actualReps)}
                         onPointerLeave={handlePointerCancel}
                         className={`w-28 py-3.5 rounded-2xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
                           isChecked
