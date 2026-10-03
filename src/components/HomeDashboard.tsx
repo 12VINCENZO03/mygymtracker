@@ -257,7 +257,14 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
           </h3>
           <p className="text-[10px] text-zinc-500 mt-0.5">Indice cumulativo di fatica (Tempo × RIR)</p>
         </div>
-        <div className="text-xl font-black text-amber-400">{loadOggi.toLocaleString()}</div>
+        <div className="text-right flex flex-col items-end">
+          <div className="text-xl font-black text-amber-400">{loadOggi.load.toLocaleString()}</div>
+          {loadOggi.isEstimated && (
+            <div className="text-[9px] font-extrabold text-amber-500/80 uppercase tracking-wider mt-1 border border-amber-500/30 bg-amber-950/40 px-2 py-0.5 rounded flex items-center gap-1">
+              <i className="fa-solid fa-circle-exclamation" /> Stima (Inserisci RPE/RIR)
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

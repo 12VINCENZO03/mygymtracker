@@ -196,25 +196,44 @@ export function getTabCompletionStats(
   return { count, lastCompletedAt, lastDateStr };
 }
 
-export function calculateTodayLoad(sessions: WorkoutSessionV2[], todayStr: string): number {
+export function calculateTodayLoad(sessions: WorkoutSessionV2[], todayStr: string): { load: number; isEstimated: boolean } {
   let load = 0;
-  if (!sessions) return load;
-  const todaySessions = sessions.filter(s => s.date === todayStr);
+  let isEstimated = false;
+  if (!sessions) return { load, isEstimated };
+  const todaySessions = sessions.filter(s => s && s.date === todayStr);
   todaySessions.forEach(session => {
+    if (!session || !Array.isArray(session.blocks)) return;
     session.blocks.forEach(block => {
+      if (!block || typeof block !== 'object') return;
       const processSets = (sets: WorkoutSetV2[]) => {
+        if (!Array.isArray(sets)) return;
         sets.forEach(set => {
+          if (!set || typeof set !== 'object') return;
           const duration = set.durationSec || (set.reps ? Number(set.reps) * 3 : 60);
-          const effort = set.rpe !== undefined ? set.rpe : (set.rir !== undefined ? (10 - set.rir) : 8);
+          let effort: number;
+          if (set.rpe !== undefined && set.rpe !== null && !isNaN(Number(set.rpe))) {
+            effort = Number(set.rpe);
+          } else if (set.rir !== undefined && set.rir !== null && !isNaN(Number(set.rir))) {
+            effort = 10 - Number(set.rir);
+          } else {
+            effort = 8;
+            isEstimated = true;
+          }
           load += (duration / 60) * effort;
         });
       };
-      if ('rounds' in block) {
-        block.rounds.forEach(r => r.exercises.forEach(sub => processSets(sub.sets)));
-      } else {
-        processSets(block.sets);
+      if ('rounds' in block && Array.isArray((block as any).rounds)) {
+        (block as any).rounds.forEach((r: any) => {
+          if (r && Array.isArray(r.exercises)) {
+            r.exercises.forEach((sub: any) => {
+              if (sub && Array.isArray(sub.sets)) processSets(sub.sets);
+            });
+          }
+        });
+      } else if (Array.isArray((block as any).sets)) {
+        processSets((block as any).sets);
       }
     });
   });
-  return Math.round(load);
+  return { load: Math.round(load), isEstimated };
 }
