@@ -1,5 +1,5 @@
-import { WorkoutSessionV2 } from '../types/v2';
-import { AppState, MetricType, WeightHistoryEntry } from '../types/gym';
+import { WorkoutSessionV2, CircuitSnapshotV2 } from '../types/v2';
+import { AppState, MetricType, WeightHistoryEntry, SupersetExercise } from '../types/gym';
 import { getTodayStr } from './storage';
 
 export interface VolumeStats {
@@ -22,7 +22,7 @@ export function calculateVolumeFromSessionV2(session: WorkoutSessionV2): number 
   if (!session || !session.blocks || !Array.isArray(session.blocks)) return vol;
   
   for (const block of session.blocks) {
-    // AGGIUNTO: type check difensivo
+    // Controllo di tipo difensivo
     if (!block || typeof block !== 'object') continue;
     
     if ('rounds' in block && Array.isArray((block as any).rounds)) {
@@ -96,12 +96,19 @@ export function calculateAllVolumeStatsV2(sessionsV2: WorkoutSessionV2[]): Volum
   return stats;
 }
 
-
 function getAvgReps(histEntry: WeightHistoryEntry): number {
   const r = Object.values(histEntry.reps || {})
     .filter((v) => v !== '' && !isNaN(Number(v)))
     .map(Number);
   return r.length ? r.reduce((a, b) => a + b, 0) / r.length : 0;
+}
+
+function getAvgRir(histEntry: WeightHistoryEntry): number | null {
+  const v = Object.values(histEntry.rirs || {})
+    .filter((r) => r !== '')
+    .map((r) => (r === 'CED' || r === '-1') ? -1 : Number(r))
+    .filter((num) => !isNaN(num));
+  return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
 }
 
 export function getFatigueTrendAlert(effHistory: WeightHistoryEntry[]): string | null {
@@ -279,7 +286,7 @@ export function getExerciseCoachAdvice(
     const lastSession = history[0];
     const fatigueAlert = isWeightType ? getFatigueTrendAlert(history) : null;
 
-    // Controllo Stallo avanzato (3 sessioni identiche in carico e ripetizioni medie non migliorate)
+    // Controllo Stallo avanzato (3 sessioni identiche in carico e ripetizioni medie non migliorate con verifica RIR)
     if (history.length >= 3 && isWeightType) {
       const w1 = parseFloat(history[0].weight) || 0;
       const w2 = parseFloat(history[1].weight) || 0;
@@ -288,26 +295,60 @@ export function getExerciseCoachAdvice(
       const reps3 = getAvgReps(history[2]);
 
       if ((w1 > 0 || metricType === 'bodyweight') && w1 === w2 && w2 === w3 && reps1 <= reps3) {
-        return {
-          badge: 'stall',
-          title: 'Segnale di Stallo Rilevato',
-          message: `DIAGNOSI: 3 esposizioni con ${w1}kg senza miglioramento di volume medio. AZIONE: Non forzare il carico. Valuta un back-off (riduci 10%) o aumenta le pause di 30s per smaltire fatica.`,
-          fatigueAlert: fatigueAlert || undefined
-        };
+        const avgRir1 = getAvgRir(history[0]);
+        const avgRir3 = getAvgRir(history[2]);
+
+        // Se reps stabili ma RIR migliorato (avgRir1 < avgRir3: fatica percepita minore, più reps in reserve)
+        if (avgRir1 !== null && avgRir3 !== null && avgRir1 < avgRir3) {
+          return {
+            badge: 'info',
+            title: 'Efficienza Neurale',
+            message: 'Carico e volume stabili, ma la tua tolleranza allo sforzo è migliorata. Il peso pesa meno. Consolida o preparati a salire.'
+          };
+        }
+
+        // Stallo effettivo: volume non sale e fatica non scende
+        if (avgRir1 === null || avgRir3 === null || avgRir1 >= avgRir3) {
+          return {
+            badge: 'stall',
+            title: 'Segnale di Stallo Rilevato',
+            message: `DIAGNOSI: 3 esposizioni con ${w1}kg senza miglioramento di volume medio. AZIONE: Non forzare il carico. Valuta un back-off (riduci 10%) o aumenta le pause di 30s per smaltire fatica.`,
+            fatigueAlert: fatigueAlert || undefined
+          };
+        }
       }
     }
 
+    // Cardio: Rispetto rigoroso di Zone 2 (LISS) e soglie RPE
     if (metricType === 'cardio') {
       if (lastSession.rpes) {
         const validRpes = Object.values(lastSession.rpes).map(Number).filter((r) => !isNaN(r));
         if (validRpes.length > 0) {
           const avgRpe = validRpes.reduce((a, b) => a + b, 0) / validRpes.length;
-          if (avgRpe <= 5) {
-            return { badge: 'increase', title: 'Sforzo Leggero', message: `DIAGNOSI: RPE medio ${avgRpe.toFixed(1)}. AZIONE: Il protocollo è assorbito bene, puoi aumentare l'inclinazione, la resistenza o il passo.` };
+          if (avgRpe <= 3) {
+            return {
+              badge: 'increase',
+              title: 'Sforzo Blando',
+              message: `DIAGNOSI: RPE medio ${avgRpe.toFixed(1)} <= 3. AZIONE: Sforzo troppo blando, puoi aumentare l'inclinazione, la resistenza o il passo.`
+            };
+          } else if (avgRpe <= 6) {
+            return {
+              badge: 'maintain',
+              title: 'Base Aerobica (Zone 2)',
+              message: 'Sforzo ottimale per LISS e recupero attivo. Non aumentare intensità se il target non è anaerobico.'
+            };
           } else if (avgRpe <= 7) {
-            return { badge: 'maintain', title: 'Zona Moderata', message: `DIAGNOSI: RPE ${avgRpe.toFixed(1)}. AZIONE: Ottimo equilibrio aerobico, mantieni i parametri attuali.` };
+            return {
+              badge: 'maintain',
+              title: 'Zona Moderata',
+              message: `DIAGNOSI: RPE ${avgRpe.toFixed(1)}. AZIONE: Ottimo equilibrio aerobico, mantieni i parametri attuali.`
+            };
           } else {
-            return { badge: 'maintain', title: 'Sforzo Intenso', message: `DIAGNOSI: RPE ${avgRpe.toFixed(1)}. AZIONE: Sessione spinta al limite, consolida questo livello senza aumentare.` };
+            return {
+              badge: 'maintain',
+              title: 'Sforzo Intenso',
+              message: `DIAGNOSI: RPE ${avgRpe.toFixed(1)}. AZIONE: Sessione spinta al limite, consolida questo livello senza aumentare.`
+            };
           }
         }
       }
@@ -370,6 +411,28 @@ export function getExerciseCoachAdvice(
         else if (state.bodyGoal === 'cut') { upThreshold = 2.0; }
 
         const diagContext = `DIAGNOSI: Top set ${bestTopSet.reps}x${maxW > 0 ? maxW : 'BW'}${maxW > 0 ? 'kg' : ''} (RIR ${bestTopSet.rir}). RIR Medio: ${avgRir.toFixed(1)}. Serie peggiore al carico: ${minRepsInTopSets} reps.`;
+
+        // 3. INTEGRAZIONE MODELLI DI PROGRESSIONE (exDef: isolamento o TUT)
+        const isIsolationOrTut = exDef && (
+          exDef.progressionModel === 'time_under_tension' ||
+          (typeof exDef.movementPattern === 'string' && exDef.movementPattern.includes('isolation'))
+        );
+
+        if (isIsolationOrTut) {
+          if (minRepsInTopSets >= minTarget && avgRir >= 2.0) {
+            return {
+              badge: 'increase',
+              title: 'Overload Isolamento Sbloccato',
+              message: `${diagContext} AZIONE: Nessun drop-off tra le serie (minimo ${minRepsInTopSets} reps >= target ${minTarget}) e margine eccellente (RIR medio ${avgRir.toFixed(1)} >= 2.0). Puoi salire di carico a ${maxW + jump}kg.`
+            };
+          } else {
+            return {
+              badge: 'maintain',
+              title: 'Consolidamento Isolamento',
+              message: `${diagContext} AZIONE: Sugli esercizi di isolamento il drop-off tra le serie deve essere nullo prima di salire di peso (almeno ${minTarget} reps in tutte le serie e RIR medio >= 2.0). Consolida a ${maxW > 0 ? maxW + 'kg' : 'BW'}.`
+            };
+          }
+        }
 
         // 1. CORPO LIBERO PURO
         if (metricType === 'bodyweight' && maxW === 0) {
@@ -472,6 +535,101 @@ export function getGoalCrossInsight(state: AppState, stats: VolumeStats): string
     }
     return null;
   } catch {
+    return null;
+  }
+}
+
+/**
+ * Analisi Ecosistema Circuiti
+ * Confronta le ripetizioni del round 0 con il round 2 (o l'ultimo disponibile).
+ * Se il crollo medio supera il 30%, consiglia un aumento della pausa tra i round.
+ */
+export function getCircuitCoachAdvice(state: AppState, circuit: SupersetExercise): CoachAdvice | null {
+  try {
+    if (!state.sessionsV2 || state.sessionsV2.length === 0 || !circuit || !Array.isArray(circuit.exercises) || circuit.exercises.length === 0) {
+      return null;
+    }
+
+    const circuitName = (circuit.name || '').trim().toLowerCase();
+    const exIds = new Set(circuit.exercises.map((e) => e.exerciseId || e.id));
+    const exNames = new Set(circuit.exercises.map((e) => (e.name || '').trim().toLowerCase()));
+
+    let targetCircuitBlock: CircuitSnapshotV2 | null = null;
+    for (const session of state.sessionsV2) {
+      if (!session || !Array.isArray(session.blocks)) continue;
+      for (const b of session.blocks) {
+        if (!b || typeof b !== 'object' || !('rounds' in b)) continue;
+        const circ = b as CircuitSnapshotV2;
+        const nameMatches = circuitName && (circ.nameSnapshot || '').trim().toLowerCase() === circuitName;
+        const hasMatchingExercises = Array.isArray(circ.rounds) && circ.rounds.some((r) =>
+          Array.isArray(r.exercises) && r.exercises.some((sub) =>
+            (sub.exerciseId && exIds.has(sub.exerciseId)) ||
+            (sub.nameSnapshot && exNames.has(sub.nameSnapshot.trim().toLowerCase()))
+          )
+        );
+
+        if (nameMatches || hasMatchingExercises) {
+          targetCircuitBlock = circ;
+          break;
+        }
+      }
+      if (targetCircuitBlock) break;
+    }
+
+    if (!targetCircuitBlock || !Array.isArray(targetCircuitBlock.rounds) || targetCircuitBlock.rounds.length < 2) {
+      return null;
+    }
+
+    const rounds = targetCircuitBlock.rounds;
+    const firstRound = rounds[0];
+    const compareRound = rounds.length >= 3 ? rounds[2] : rounds[rounds.length - 1];
+
+    if (!firstRound || !compareRound || !Array.isArray(firstRound.exercises) || !Array.isArray(compareRound.exercises)) {
+      return null;
+    }
+
+    const dropPcts: number[] = [];
+
+    for (const subEx of circuit.exercises) {
+      const subId = subEx.exerciseId || subEx.id;
+      const subName = (subEx.name || '').trim().toLowerCase();
+
+      const subR0 = firstRound.exercises.find((e) =>
+        (subId && e.exerciseId === subId) ||
+        (subName && (e.nameSnapshot || '').trim().toLowerCase() === subName)
+      );
+
+      const subRCompare = compareRound.exercises.find((e) =>
+        (subId && e.exerciseId === subId) ||
+        (subName && (e.nameSnapshot || '').trim().toLowerCase() === subName)
+      );
+
+      if (!subR0 || !subRCompare) continue;
+
+      const reps0 = Array.isArray(subR0.sets) && subR0.sets[0] ? (Number(subR0.sets[0].reps) || 0) : 0;
+      const repsCompare = Array.isArray(subRCompare.sets) && subRCompare.sets[0] ? (Number(subRCompare.sets[0].reps) || 0) : 0;
+
+      if (reps0 > 0) {
+        const dropPct = (reps0 - repsCompare) / reps0;
+        dropPcts.push(dropPct);
+      }
+    }
+
+    if (dropPcts.length === 0) return null;
+
+    const avgDrop = dropPcts.reduce((a, b) => a + b, 0) / dropPcts.length;
+
+    if (avgDrop > 0.30) {
+      return {
+        badge: 'info',
+        title: 'Debito Sistemico',
+        message: 'Crollo netto di ripetizioni dopo il primo giro. Aumenta la pausa tra i round di 30-45s invece di scalare i carichi.'
+      };
+    }
+
+    return null;
+  } catch (err) {
+    console.warn('Errore analisi Circuito:', err);
     return null;
   }
 }

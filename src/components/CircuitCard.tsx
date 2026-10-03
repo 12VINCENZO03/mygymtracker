@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { AppState, SupersetExercise } from '../types/gym';
 import { formatTime } from '../utils/storage';
-import { getExerciseCoachAdvice } from '../utils/coach';
+import { getExerciseCoachAdvice, getCircuitCoachAdvice } from '../utils/coach';
 import { getLastExercisePerformance, getHistoricalSetDataV2 } from '../utils/domain';
 
 interface CircuitCardProps {
@@ -95,6 +95,10 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
     });
     return map;
   }, [state.sessionsV2, state.bodyGoal, state.deloadActive, circuit.exercises]);
+
+  const circuitCoachAdvice = React.useMemo(() => {
+    return getCircuitCoachAdvice(state, circuit);
+  }, [state.sessionsV2, circuit]);
 
   if (isEditMode) {
     return (
@@ -536,6 +540,19 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
           </h3>
         </div>
       </div>
+
+      {/* Circuit Ecosystem Coach Advice */}
+      {circuitCoachAdvice && circuitCoachAdvice.message && !isEditMode && (
+        <div className="mx-2 mb-4 bg-indigo-950/40 border border-indigo-700/60 text-indigo-200 text-xs p-3.5 rounded-2xl flex items-start gap-3 shadow-inner">
+          <i className="fa-solid fa-bolt text-indigo-400 mt-0.5 text-sm shrink-0 opacity-90" />
+          <div className="leading-relaxed">
+            <span className="font-extrabold uppercase text-[10px] tracking-wider text-indigo-400 block mb-0.5">
+              {circuitCoachAdvice.title}
+            </span>
+            {circuitCoachAdvice.message}
+          </div>
+        </div>
+      )}
 
       {/* AMRAP or EMOM Timers */}
       {isAmrap && (
