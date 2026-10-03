@@ -43,44 +43,44 @@ export const RestTimerBubble: React.FC<RestTimerBubbleProps> = ({
       onClick={() => setIsExpanded(!isExpanded)}
       role="button"
       tabIndex={0}
-      className={`fixed top-16 left-1/2 -translate-x-1/2 z-50 cursor-pointer shadow-2xl backdrop-blur-2xl bg-black/90 border border-zinc-800/80 text-white select-none ${
+      className={`fixed top-3 left-1/2 -translate-x-1/2 z-50 cursor-pointer shadow-2xl backdrop-blur-2xl bg-zinc-950/95 border border-zinc-800 text-white select-none ${
         isExpanded
-          ? 'px-5 py-4 rounded-[2rem] w-[90vw] max-w-sm flex flex-col gap-3.5 ring-2 ring-emerald-500/30 shadow-[0_10px_30px_rgba(0,0,0,0.8)]'
-          : 'px-4 py-2 rounded-full flex items-center gap-3 ring-1 ring-zinc-700/60 hover:scale-105 active:scale-95 shadow-lg'
+          ? 'px-5 py-4 rounded-[2rem] w-[90vw] max-w-sm flex flex-col gap-3.5 ring-2 ring-emerald-500/40 shadow-[0_15px_40px_rgba(0,0,0,0.9)]'
+          : 'px-3.5 py-1.5 rounded-full flex items-center gap-2.5 ring-1 ring-zinc-700/80 hover:scale-105 active:scale-95 shadow-xl'
       }`}
     >
       {!isExpanded ? (
-        /* Stato Compatto: Capsula orizzontale stile Dynamic Island */
-        <div className="flex items-center gap-3">
-          <div className="relative w-7 h-7 flex items-center justify-center">
+        /* Stato Compatto: Più compatto, posizionato in alto senza coprire nulla */
+        <div className="flex items-center gap-2.5">
+          <div className="relative w-6 h-6 flex items-center justify-center">
             <svg className="absolute inset-0 w-full h-full -rotate-90">
-              <circle cx="14" cy="14" r="11" strokeWidth="2.5" stroke="currentColor" fill="transparent" className="text-zinc-800" />
+              <circle cx="12" cy="12" r="9.5" strokeWidth="2.5" stroke="currentColor" fill="transparent" className="text-zinc-800" />
               <circle
-                cx="14"
-                cy="14"
-                r="11"
+                cx="12"
+                cy="12"
+                r="9.5"
                 strokeWidth="2.5"
                 stroke="currentColor"
                 fill="transparent"
-                strokeDasharray={2 * Math.PI * 11}
-                strokeDashoffset={2 * Math.PI * 11 * (1 - progress)}
+                strokeDasharray={2 * Math.PI * 9.5}
+                strokeDashoffset={2 * Math.PI * 9.5 * (1 - progress)}
                 strokeLinecap="round"
                 className={`transition-all duration-1000 linear ${isFinishing ? 'text-white animate-pulse' : 'text-emerald-400'}`}
               />
             </svg>
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping absolute" />
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping absolute" />
           </div>
           <div className="flex items-center gap-2">
-            <span className={`text-sm font-mono font-black tracking-tight ${isFinishing ? 'text-emerald-400' : 'text-white'}`}>
+            <span className={`text-xs font-mono font-black tracking-tight ${isFinishing ? 'text-emerald-400' : 'text-white'}`}>
               {formatTime(remainingSeconds)}
             </span>
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-zinc-400 border-l border-zinc-800 pl-2">
+            <span className="text-[9px] font-extrabold uppercase tracking-wider text-zinc-400 border-l border-zinc-800 pl-2">
               Salta
             </span>
           </div>
         </div>
       ) : (
-        /* Stato Espanso: Card Capsula Ricca */
+        /* Stato Espanso */
         <div className="flex flex-col w-full">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
