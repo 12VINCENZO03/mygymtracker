@@ -3,7 +3,8 @@ import {
   AppState,
   BodyGoal,
   SingleExercise,
-  SupersetExercise
+  SupersetExercise,
+  PersistentMasterTimer
 } from './types/gym';
 import {
   WorkoutSessionV2,
@@ -35,7 +36,6 @@ import { SideMenu } from './components/SideMenu';
 import { HomeDashboard } from './components/HomeDashboard';
 import { ExerciseCard } from './components/ExerciseCard';
 import { CircuitCard } from './components/CircuitCard';
-import { RestTimerBubble } from './components/RestTimerBubble';
 import { EffortModal } from './components/EffortModal';
 import { SummaryModal } from './components/SummaryModal';
 import { BiaModal } from './components/BiaModal';
@@ -360,24 +360,19 @@ export default function App() {
 
   const cleanupCircuitOrphanData = (nextState: AppState, circuit: SupersetExercise) => {
     delete nextState.amrapRounds[circuit.id];
-
     Object.keys(nextState.checkedSets).forEach((key) => {
       if (key.startsWith(`${circuit.id}-round-`)) {
         delete nextState.checkedSets[key];
       }
     });
-
     circuit.exercises.forEach((sub) => {
       cleanupOrphanDataForId(nextState, sub.id);
     });
-
-    // 🔴 FASE 2: Pulizia Timer Fantasma
-    if (activeMasterTimer?.circuitId === circuit.id) {
-      if (masterTimerIntervalRef.current) {
-        safeClearInterval(masterTimerIntervalRef.current);
-        masterTimerIntervalRef.current = null;
-      }
-      setActiveMasterTimer(null);
+    
+    // FASE 2: Pulizia Timer Fantasma dalla persistenza
+    if (nextState.activeMasterTimer?.circuitId === circuit.id) {
+      nextState.activeMasterTimer = null;
+      // Il cleanup dell'intervallo verrà gestito in automatico dal useEffect
     }
   };
 
@@ -412,6 +407,12 @@ export default function App() {
           }
         }
       });
+      if (masterTimerIntervalRef.current) {
+        safeClearInterval(masterTimerIntervalRef.current);
+        masterTimerIntervalRef.current = null;
+      }
+      setActiveMasterTimer(null);
+      newState.activeMasterTimer = null;
     };
 
     const hasSessionToday = (newState.sessionsV2 || []).some(s => s.planId === tabId && s.date === todayStr);
@@ -446,6 +447,11 @@ export default function App() {
       if (!currentTab) return;
       skipRestTimer();
       releaseWakeLock();
+      if (masterTimerIntervalRef.current) {
+        safeClearInterval(masterTimerIntervalRef.current);
+        masterTimerIntervalRef.current = null;
+      }
+      setActiveMasterTimer(null);
 
       const workoutState = state.activeWorkouts[tabId] || { startTime: Date.now() };
       const diff = Date.now() - (workoutState.startTime || Date.now());
@@ -635,6 +641,7 @@ export default function App() {
         // Assemblaggio finale
         const newState: AppState = {
           ...state,
+          activeMasterTimer: null, // 🔥 Spegne il timer se termini l'allenamento
           deloadDates: nextDeloadDates,
           activeWorkouts: nextActiveWorkouts,
           registryV2: nextRegistry,
@@ -653,7 +660,7 @@ export default function App() {
         setState(newState);
         setSummaryData({ newSnapshot: v2Session, prevSnapshot });
       } else {
-        const newState = { ...state, activeWorkouts: nextActiveWorkouts };
+        const newState = { ...state, activeWorkouts: nextActiveWorkouts, activeMasterTimer: null };
         await saveGymState(newState);
         setState(newState);
         showToast('Allenamento terminato (nessuna serie registrata).');
@@ -666,6 +673,12 @@ export default function App() {
   const handleResetSession = async (tabId: string) => {
     if (!state) return;
     if (confirm('Vuoi davvero azzerare la sessione odierna in questa scheda?')) {
+      if (masterTimerIntervalRef.current) {
+        safeClearInterval(masterTimerIntervalRef.current);
+        masterTimerIntervalRef.current = null;
+      }
+      setActiveMasterTimer(null);
+
       const nextCheckedSets = { ...state.checkedSets };
       const nextSetReps = { ...state.setReps };
       const nextSetRir = { ...state.setRir };
@@ -701,7 +714,8 @@ export default function App() {
         setReps: nextSetReps,
         setRir: nextSetRir,
         setRpe: nextSetRpe,
-        amrapRounds: nextAmrapRounds
+        amrapRounds: nextAmrapRounds,
+        activeMasterTimer: null
       };
       
       setState(newState);
@@ -986,117 +1000,130 @@ export default function App() {
     }, 250);
   };
 
+  // 3. SOSTITUISCI handleStartEmom e handleStartAmrap CON QUESTE
   const handleStartEmom = async (circuitId: string, totalMin: number, intervalSec: number) => {
-    if (activeMasterTimer && activeMasterTimer.circuitId === circuitId) {
-      if (masterTimerIntervalRef.current) safeClearInterval(masterTimerIntervalRef.current);
-      masterTimerIntervalRef.current = null;
-      setActiveMasterTimer(null);
-      if (state) await saveGymState(state);
+    if (state?.activeMasterTimer?.circuitId === circuitId) {
+      const newState = { ...state, activeMasterTimer: null };
+      setState(newState);
+      await saveGymState(newState);
       return;
     }
     initAudio();
-    if (state) await saveGymState(state);
-    const absoluteStartTime = Date.now();
-    const totalRounds = Math.ceil((totalMin * 60) / intervalSec);
-    let lastAnnouncedRound = 0; // Il round 0 è appena iniziato
-
-    setActiveMasterTimer({
-      circuitId,
-      type: 'emom',
-      remainingSec: intervalSec,
-      activeEmomRound: 0,
-      totalRounds,
-      intervalSec
-    });
-
-    masterTimerIntervalRef.current = safeSetInterval(() => {
-      const elapsedSec = (Date.now() - absoluteStartTime) / 1000;
-      const currentRound = Math.floor(elapsedSec / intervalSec);
-
-      if (currentRound >= totalRounds) {
-        if (masterTimerIntervalRef.current) safeClearInterval(masterTimerIntervalRef.current);
-        masterTimerIntervalRef.current = null;
-        setActiveMasterTimer(null);
-        playTrumpet();
-        showToast('EMOM Completato con successo! 🏆');
-        return;
+    const newState = {
+      ...state!,
+      activeMasterTimer: {
+        circuitId,
+        type: 'emom' as const,
+        startTimestamp: Date.now(),
+        durationSec: totalMin * 60,
+        intervalSec
       }
-
-      const remaining = Math.max(0, Math.ceil((currentRound + 1) * intervalSec - elapsedSec));
-
-      // Suona solo se c'è un cambio round E sono passati meno di 5 sec (evita spam arretrato da background iOS)
-      if (currentRound > lastAnnouncedRound) {
-        lastAnnouncedRound = currentRound;
-        let nextToSave: AppState | null = null;
-        setState((prev) => {
-          if (!prev) return null;
-          const next = {
-            ...prev,
-            checkedSets: { ...prev.checkedSets, [`${circuitId}-round-${currentRound - 1}`]: true }
-          };
-          nextToSave = next;
-          return next;
-        });
-        if (nextToSave) saveGymState(nextToSave).catch(() => {});
-        if (elapsedSec - (currentRound * intervalSec) < 5) {
-          playTrumpet();
-        }
-      }
-
-      setActiveMasterTimer((prev) => (prev ? { ...prev, remainingSec: remaining, activeEmomRound: currentRound } : null));
-    }, 250);
+    };
+    setState(newState);
+    await saveGymState(newState, true); // Sincrono
   };
 
   const handleStartAmrap = async (circuitId: string, totalMin: number, pacingSec?: number) => {
-    if (activeMasterTimer && activeMasterTimer.circuitId === circuitId) {
-      if (masterTimerIntervalRef.current) safeClearInterval(masterTimerIntervalRef.current);
-      masterTimerIntervalRef.current = null;
+    if (state?.activeMasterTimer?.circuitId === circuitId) {
+      const newState = { ...state, activeMasterTimer: null };
+      setState(newState);
+      await saveGymState(newState);
+      return;
+    }
+    initAudio();
+    const newState = {
+      ...state!,
+      activeMasterTimer: {
+        circuitId,
+        type: 'amrap' as const,
+        startTimestamp: Date.now(),
+        durationSec: totalMin * 60,
+        pacingSec
+      }
+    };
+    setState(newState);
+    await saveGymState(newState, true); // Sincrono
+  };
+
+  // 4. 🔥 AGGIUNGI QUESTO USE_EFFECT SUBITO SOTTO AGLI ALTRI (Il cuore dell'Anti-Crash)
+  useEffect(() => {
+    const pTimer = state?.activeMasterTimer;
+
+    // Se non c'è timer persistente, distruggi eventuali intervalli orfani in UI
+    if (!pTimer) {
+      if (masterTimerIntervalRef.current) {
+        safeClearInterval(masterTimerIntervalRef.current);
+        masterTimerIntervalRef.current = null;
+      }
       setActiveMasterTimer(null);
-      if (state) await saveGymState(state);
       return;
     }
 
-    initAudio();
-    if (state) await saveGymState(state);
+    // Se l'intervallo gira già per questo specifico timer, non fare nulla (evita loop e re-render fatali)
+    if (masterTimerIntervalRef.current) return;
 
-    const absoluteStartTime = Date.now();
-    const duration = totalMin * 60;
-    let lastAnnouncedPacing = 0;
+    const { circuitId, type, startTimestamp, durationSec, intervalSec, pacingSec } = pTimer;
+    const totalRounds = type === 'emom' ? Math.ceil(durationSec / (intervalSec || 60)) : undefined;
 
-    setActiveMasterTimer({
-      circuitId,
-      type: 'amrap',
-      remainingSec: duration,
-      pacingSec
-    });
+    let lastAnnouncedRoundOrPacing = 0;
 
+    // Boot: eseguiamo subito per evitare il lag di 1 secondo all'avvio o al rientro dall'app
+    const initialElapsed = (Date.now() - startTimestamp) / 1000;
+    if (type === 'emom') {
+      lastAnnouncedRoundOrPacing = Math.floor(initialElapsed / (intervalSec || 60));
+      setActiveMasterTimer({ circuitId, type, remainingSec: (intervalSec || 60), activeEmomRound: lastAnnouncedRoundOrPacing, totalRounds, intervalSec });
+    } else {
+      lastAnnouncedRoundOrPacing = pacingSec ? Math.floor(initialElapsed / pacingSec) : 0;
+      setActiveMasterTimer({ circuitId, type, remainingSec: Math.max(0, durationSec - initialElapsed), pacingSec });
+    }
+
+    // Loop vitale a 250ms per massima fluidità
     masterTimerIntervalRef.current = safeSetInterval(() => {
-      const elapsedSec = (Date.now() - absoluteStartTime) / 1000;
-      const remaining = Math.max(0, Math.ceil(duration - elapsedSec));
+      const elapsedSec = (Date.now() - startTimestamp) / 1000;
+      const remainingTotal = Math.max(0, Math.ceil(durationSec - elapsedSec));
 
-      // Controllo Pacing (Ghost Pacer)
-      if (pacingSec && pacingSec > 0 && remaining > 0) {
-        const currentPacingInterval = Math.floor(elapsedSec / pacingSec);
-        if (currentPacingInterval > lastAnnouncedPacing) {
-          lastAnnouncedPacing = currentPacingInterval;
-          // Suona il beep se l'app non è in ritardo di oltre 5s (es. risveglio da background)
-          if (elapsedSec - (currentPacingInterval * pacingSec) < 5) {
-            playShortBeep();
-          }
-        }
-      }
-
-      if (remaining <= 0) {
-        if (masterTimerIntervalRef.current) safeClearInterval(masterTimerIntervalRef.current);
+      if (remainingTotal <= 0) {
+        safeClearInterval(masterTimerIntervalRef.current!);
         masterTimerIntervalRef.current = null;
         setActiveMasterTimer(null);
         playTrumpet();
-        showToast('AMRAP Terminato!');
+        showToast(type === 'emom' ? 'EMOM Completato con successo!' : 'AMRAP Terminato!');
+        
+        // Rimuove silenziosamente il timer dallo stato persistente
+        setState(prev => prev ? { ...prev, activeMasterTimer: null } : null);
+        return;
+      }
+
+      if (type === 'emom') {
+        const intSec = intervalSec || 60;
+        const currentRound = Math.floor(elapsedSec / intSec);
+        const remainingRound = Math.max(0, Math.ceil((currentRound + 1) * intSec - elapsedSec));
+
+        if (currentRound > lastAnnouncedRoundOrPacing) {
+          lastAnnouncedRoundOrPacing = currentRound;
+          // Spunta automatica in sicurezza
+          setState(prev => prev ? { ...prev, checkedSets: { ...prev.checkedSets, [`${circuitId}-round-${currentRound - 1}`]: true } } : null);
+          
+          // Suona solo se Safari non stava dormendo da ore (evita spam di suoni arretrati)
+          if (elapsedSec - (currentRound * intSec) < 5) playTrumpet();
+        }
+        setActiveMasterTimer({ circuitId, type, remainingSec: remainingRound, activeEmomRound: currentRound, totalRounds, intervalSec });
+      
       } else {
-        setActiveMasterTimer((prev) => (prev ? { ...prev, remainingSec: remaining } : null));
+        // AMRAP
+        if (pacingSec && pacingSec > 0) {
+          const currentPacing = Math.floor(elapsedSec / pacingSec);
+          if (currentPacing > lastAnnouncedRoundOrPacing) {
+            lastAnnouncedRoundOrPacing = currentPacing;
+            if (elapsedSec - (currentPacing * pacingSec) < 5) playShortBeep();
+          }
+        }
+        setActiveMasterTimer({ circuitId, type, remainingSec: remainingTotal, pacingSec });
       }
     }, 250);
-  };
+
+  // NOTA BENE: Questo useEffect si riattiva SOLO se cambia il timestamp di avvio (quindi quando crei un NUOVO timer)
+  }, [state?.activeMasterTimer?.startTimestamp]);
 
   const handlePdfUpload = async (file: File) => {
     showToast('Analisi referto BIA in corso...');
@@ -1193,14 +1220,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Floating Rest Timer Bubble */}
-      <RestTimerBubble
-        isActive={isRestTimerActive}
-        remainingSeconds={restTimerSeconds}
-        onSkip={skipRestTimer}
-        nextExerciseName={currentTab?.exercises[0]?.name}
-        nextExerciseLoad={currentTab?.exercises[0] && 'id' in currentTab.exercises[0] ? state.weights[currentTab.exercises[0].id] : undefined}
-      />
+
 
       {/* Header */}
       <Header
@@ -1290,6 +1310,9 @@ export default function App() {
             };
           });
         }}
+        isRestTimerActive={isRestTimerActive}
+        restTimerSeconds={restTimerSeconds}
+        onSkipTimer={skipRestTimer}
       />
 
       {/* Main Content Area */}
@@ -1434,7 +1457,7 @@ export default function App() {
                   <ExerciseCard
                     key={ex.id}
                     ex={ex}
-                    index={exIdx + 1}
+                    index={exIdx}
                     isFirst={isFirst}
                     isLast={isLast}
                     isWorkoutActive={isWorkoutActive}

@@ -214,6 +214,7 @@ export const initialDefaultState: AppState = {
   deloadActive: false,
   deloadDates: [],
   currentEffortSelection: null,
+  activeMasterTimer: null,
   lastBackupDate: null,
 
   // 🔴 CANONICAL V2 ENGINE
@@ -587,6 +588,7 @@ export function normalizeState(parsed: any): AppState {
     deloadActive: !!parsed.deloadActive,
     deloadDates: Array.isArray(parsed.deloadDates) ? parsed.deloadDates : [],
     currentEffortSelection: parsed.currentEffortSelection || null,
+    activeMasterTimer: parsed.activeMasterTimer || null,
     lastBackupDate: parsed.lastBackupDate || null,
 
     // CANONICAL V2

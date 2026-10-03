@@ -29,6 +29,7 @@ export interface SingleExercise {
   pause: number;
   metricType: MetricType;
   link?: string;
+  videoUrl?: string;
   workSec?: number;
   cardioMachine?: string;
   repeatSequence?: number;
@@ -44,6 +45,7 @@ export interface SubExercise {
   pause?: number;
   metricType: MetricType;
   link?: string;
+  videoUrl?: string;
   workSec?: number;
   restSeconds?: number;
   cardioMachine?: string;
@@ -111,6 +113,15 @@ export interface PRRecord {
   history: Array<{ date: string; weight: string }>;
 }
 
+export interface PersistentMasterTimer {
+  circuitId: string;
+  type: 'emom' | 'amrap';
+  startTimestamp: number;
+  durationSec: number;
+  intervalSec?: number;
+  pacingSec?: number;
+}
+
 export interface ActiveWorkoutState {
   active: boolean;
   startTime: number | null;
@@ -132,6 +143,7 @@ export interface AppState {
   setRpe: Record<string, string>;
   setCustomFields: Record<string, Record<string, string>>;
   currentEffortSelection: { setId: string; targetId: string; isRpe: boolean } | null;
+  activeMasterTimer: PersistentMasterTimer | null;
   
   // DATI DI DOMINIO
   prs: PRRecord[];

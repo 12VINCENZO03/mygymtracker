@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { WorkoutTab } from '../types/gym';
+import { formatTime } from '../utils/storage';
 
 interface HeaderProps {
   profileName: string;
@@ -14,6 +15,9 @@ interface HeaderProps {
   onDeleteTab: (tabId: string) => void;
   onRenameTab: (tabId: string, name: string) => void;
   onAddTab: () => void;
+  isRestTimerActive?: boolean;
+  restTimerSeconds?: number;
+  onSkipTimer?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -28,7 +32,10 @@ export const Header: React.FC<HeaderProps> = ({
   onMoveTab,
   onDeleteTab,
   onRenameTab,
-  onAddTab
+  onAddTab,
+  isRestTimerActive,
+  restTimerSeconds,
+  onSkipTimer
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -54,10 +61,29 @@ export const Header: React.FC<HeaderProps> = ({
     <header className="header-safe-top shrink-0 bg-zinc-950/80 backdrop-blur-xl z-40 border-b border-zinc-800/50">
       <div className="px-4 sm:px-6 py-3.5 flex justify-between items-center relative z-10">
         <div className="flex items-center gap-2">
-          <h1 className="text-lg sm:text-xl font-black tracking-tight text-emerald-400 flex items-center gap-1.5">
-            Ciao, {profileName.trim() ? profileName.trim() : 'Atleta'}!{' '}
-            <span className="animate-wave">👋</span>
-          </h1>
+          {isRestTimerActive && restTimerSeconds !== undefined ? (
+            <div 
+              onClick={onSkipTimer} 
+              className="flex items-center gap-3 cursor-pointer group"
+            >
+              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/30 group-active:scale-95 transition-transform">
+                <i className="fa-solid fa-stopwatch text-lg animate-pulse" />
+              </div>
+              <div className="flex flex-col justify-center mt-1">
+                <span className="text-[26px] font-mono font-black text-white leading-none tracking-tight">
+                  {formatTime(restTimerSeconds)}
+                </span>
+                <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest mt-1">
+                  Salta Recupero <i className="fa-solid fa-forward-step ml-0.5" />
+                </span>
+              </div>
+            </div>
+          ) : (
+            <h1 className="text-lg sm:text-xl font-black tracking-tight text-emerald-400 flex items-center gap-1.5">
+              <span>Ciao, </span>{profileName.trim() ? profileName.trim() : 'Atleta'}!{' '}
+              <span className="animate-wave">👋</span>
+            </h1>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <div className="bg-emerald-500/15 text-emerald-400 px-3 py-1.5 rounded-full text-xs font-black flex items-center gap-1.5 border border-emerald-500/20 shadow-inner">

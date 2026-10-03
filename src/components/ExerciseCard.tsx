@@ -242,22 +242,27 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
         !isWorkoutActive ? 'opacity-75 grayscale-[20%]' : ''
       }`}
     >
-      {/* Title & Video */}
-      <div className="flex justify-between items-start mb-3">
-        <h3 className="text-lg font-black text-white leading-tight flex items-baseline gap-1.5">
-          <span className="text-emerald-500 font-black opacity-90">{index}.</span>
+      {/* Intestazione Esercizio e Video */}
+      <div className="flex items-center justify-between gap-3 mb-5">
+        <h3 className="text-lg sm:text-xl font-black text-white leading-tight truncate">
+          <span className="text-emerald-500 mr-2">{index + 1}.</span>
           {ex.name}
         </h3>
-        {/* 🔴 BUG FIX: Icona video solo se il link esiste davvero e non è vuoto */}
-        {ex.link && ex.link.trim() !== '' && !isEditMode && (
-          <button
-            type="button"
-            onClick={() => onOpenVideo(ex.link!)}
-            className="text-emerald-400 bg-emerald-950/40 hover:bg-emerald-900/60 p-2.5 rounded-2xl border border-emerald-900/40 transition-all active:scale-[0.96] shadow-sm"
-            title="Guarda video esecuzione"
+        {(ex.videoUrl || ex.link) && (
+          <a
+            href={ex.videoUrl || ex.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => {
+              if (onOpenVideo) {
+                e.preventDefault();
+                onOpenVideo((ex.videoUrl || ex.link)!);
+              }
+            }}
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-zinc-900 text-emerald-400 hover:bg-zinc-800 transition-colors border border-zinc-700/60 shadow-sm shrink-0"
           >
             <i className="fa-solid fa-video text-xs" />
-          </button>
+          </a>
         )}
       </div>
 
