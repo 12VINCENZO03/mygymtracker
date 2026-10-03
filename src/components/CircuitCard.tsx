@@ -86,6 +86,9 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
   }
 
   const amrapRoundsCount = state.amrapRounds[circuit.id] || 0;
+  const roundsArray = isAmrap
+    ? [state.amrapRounds[circuit.id] || 0]
+    : Array.from({ length: totalRounds }).map((_, i) => i);
 
   const subCoachAdvices = React.useMemo(() => {
     const map: Record<string, ReturnType<typeof getExerciseCoachAdvice>> = {};
@@ -544,8 +547,8 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
         </div>
       </div>
 
-      {/* Circuit Ecosystem Coach Advice */}
-      {circuitCoachAdvice && circuitCoachAdvice.message && !isEditMode && (
+      {/* Circuit Ecosystem Coach Advice - Vista Analitica (Solo fuori dal Workout) */}
+      {!isWorkoutActive && circuitCoachAdvice && circuitCoachAdvice.message && !isEditMode && (
         <div className="mx-2 mb-4 bg-indigo-950/40 border border-indigo-700/60 text-indigo-200 text-xs p-3.5 rounded-2xl flex items-start gap-3 shadow-inner">
           <i className="fa-solid fa-bolt text-indigo-400 mt-0.5 text-sm shrink-0 opacity-90" />
           <div className="leading-relaxed">
@@ -635,221 +638,395 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
 
       {/* Sub-exercises list */}
       <div className="space-y-4 pl-2">
-        {circuit.exercises.map((sub, sIdx) => {
-          if (sub.metricType === 'rest') {
+        {isWorkoutActive ? (
+          roundsArray.map((rIdx) => {
+            let emomRoundClass = '';
+            if (isEmom) {
+              if (activeEmomRound === -1 || rIdx > activeEmomRound) {
+                emomRoundClass = 'emom-locked opacity-40 grayscale';
+              } else if (rIdx === activeEmomRound) {
+                emomRoundClass = 'emom-active ring-2 ring-emerald-400 ring-offset-2 ring-offset-zinc-950 rounded-3xl p-1 bg-emerald-950/30 transition-all duration-300 shadow-[0_0_15px_rgba(16,185,129,0.35)]';
+              } else {
+                emomRoundClass = 'opacity-60 transition-opacity duration-300';
+              }
+            }
+
             return (
-              <div
-                key={sub.id}
-                className="p-3 rounded-2xl bg-zinc-950/60 border border-zinc-800/80 text-center text-xs text-zinc-400 flex items-center justify-center gap-2 shadow-inner"
-              >
-                <i className="fa-regular fa-clock text-zinc-500" />
-                <span className="font-medium">Pausa tra gli esercizi: {sub.restSeconds || 30}s</span>
-              </div>
-            );
-          }
-
-          // 🔴 CANONICAL V2: Ultima prestazione letta dalle sessioni storiche immutabili
-          const lastSubPerf = getLastExercisePerformance(state.sessionsV2, sub.exerciseId, sub.name);
-          const currentWeight = state.weights[sub.id] || (lastSubPerf?.weight !== undefined ? String(lastSubPerf.weight) : '');
-          const letter = String.fromCharCode(65 + sIdx);
-          const coachAdvice = subCoachAdvices[sub.id];
-
-          const roundsArray = isAmrap
-            ? [state.amrapRounds[circuit.id] || 0]
-            : Array.from({ length: totalRounds }).map((_, i) => i);
-
-          return (
-            <div key={sub.id} className="bg-zinc-950/50 p-4 rounded-3xl border border-zinc-800/60 shadow-sm">
-              <div className="flex justify-between items-center mb-3">
-                <div className="flex items-baseline gap-2.5">
-                  <span className="text-xs font-black text-emerald-500 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
-                    {letter}
+              <div key={rIdx} className={`bg-zinc-950/60 p-4 rounded-3xl border border-zinc-800/80 shadow-sm space-y-3.5 ${emomRoundClass}`}>
+                <div className="flex items-center justify-between border-b border-zinc-800/60 pb-2.5">
+                  <span className="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                    <i className="fa-solid fa-arrows-spin" />
+                    Giro {rIdx + 1} {isAmrap ? '(Giro Corrente)' : `/ ${totalRounds}`}
                   </span>
-                  <span className="font-extrabold text-sm text-white">{sub.name}</span>
                 </div>
-                {/* 🔴 BUG FIX: Icona video solo se c'è un link reale */}
-                {sub.link && sub.link.trim() !== '' && !isEditMode && (
-                  <button
-                    type="button"
-                    onClick={() => onOpenVideo(sub.link!)}
-                    className="text-emerald-400 bg-emerald-950/40 hover:bg-emerald-900/60 p-2 rounded-xl border border-emerald-900/40 transition-all active:scale-95 shadow-sm"
-                  >
-                    <i className="fa-solid fa-video text-[10px]" />
-                  </button>
-                )}
-              </div>
 
-              {/* Sub Exercise Coach Advice */}
-              {coachAdvice && coachAdvice.message && (
-                <div
-                  className={`p-3 rounded-2xl mb-3 flex items-start gap-2.5 text-xs shadow-inner border ${
-                    coachAdvice.badge === 'increase'
-                      ? 'bg-emerald-950/30 border-emerald-800/40 text-emerald-300'
-                      : coachAdvice.badge === 'stall' || coachAdvice.badge === 'deload'
-                      ? 'bg-amber-950/30 border-amber-800/40 text-amber-300'
-                      : coachAdvice.badge === 'decrease'
-                      ? 'bg-rose-950/30 border-rose-800/40 text-rose-300'
-                      : 'bg-zinc-950/60 border-zinc-800 text-zinc-300'
-                  }`}
-                >
-                  <div className="mt-0.5 shrink-0 opacity-90">
-                    {coachAdvice.badge === 'increase' ? (
-                      <i className="fa-solid fa-arrow-trend-up text-emerald-400" />
-                    ) : coachAdvice.badge === 'stall' ? (
-                      <i className="fa-solid fa-triangle-exclamation text-amber-400" />
-                    ) : (
-                      <i className="fa-solid fa-robot text-emerald-500" />
-                    )}
-                  </div>
-                  <div className="leading-relaxed">
-                    <b className="tracking-wide">{coachAdvice.title}:</b> {coachAdvice.message}
-                  </div>
-                </div>
-              )}
+                <div className="space-y-3">
+                  {circuit.exercises.map((sub, sIdx) => {
+                    if (sub.metricType === 'rest') {
+                      return (
+                        <div
+                          key={sub.id}
+                          className="p-2.5 rounded-2xl bg-zinc-900/60 border border-zinc-800/60 text-center text-xs text-zinc-400 flex items-center justify-center gap-2 shadow-inner"
+                        >
+                          <i className="fa-regular fa-clock text-zinc-500" />
+                          <span className="font-medium">Pausa: {sub.restSeconds || 30}s</span>
+                        </div>
+                      );
+                    }
 
-              {/* Weight Input */}
-              {sub.metricType !== 'cardio' && (
-                <div className="flex items-center bg-zinc-950/80 rounded-2xl p-1.5 mb-3 border border-zinc-800/60 shadow-inner focus-within:border-emerald-500/50 transition-colors">
-                  <div className="px-3 text-zinc-500 text-xs">
-                    <i className="fa-solid fa-weight-hanging" />
-                  </div>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    disabled={!isWorkoutActive}
-                    value={currentWeight}
-                    onChange={(e) => onSaveWeight(sub.id, e.target.value)}
-                    placeholder="Carico (kg)"
-                    className="bg-transparent text-white w-full py-1.5 outline-none font-bold text-xs disabled:opacity-50"
-                  />
-                </div>
-              )}
+                    const lastSubPerf = getLastExercisePerformance(state.sessionsV2, sub.exerciseId, sub.name);
+                    const letter = String.fromCharCode(65 + sIdx);
 
-              {/* Rounds Inputs */}
-              <div className="space-y-2.5">
-                {roundsArray.map((rIdx) => {
-                  const setId = `${sub.id}-${rIdx}`;
-                  const isChecked = Boolean(state.checkedSets[setId]);
-                  const histSet = getHistoricalSetDataV2(state.sessionsV2, rIdx + 1, sub.exerciseId, sub.name);
-                  const defaultTargetReps = histSet?.reps !== undefined ? String(histSet.reps) : (sub.reps || '10');
-                  const actualReps = state.setReps[setId] ?? defaultTargetReps;
+                    const setId = `${sub.id}-${rIdx}`;
+                    const isChecked = Boolean(state.checkedSets[setId]);
+                    const histSet = getHistoricalSetDataV2(state.sessionsV2, rIdx + 1, sub.exerciseId, sub.name);
+                    const defaultTargetReps = histSet?.reps !== undefined ? String(histSet.reps) : (sub.reps || '10');
+                    const actualReps = state.setReps[setId] ?? defaultTargetReps;
 
-                  let displayWeight = state.setWeights?.[setId];
-                  if (displayWeight === undefined) {
-                    for (let j = rIdx - 1; j >= 0; j--) {
-                      const prevId = `${sub.id}-${j}`;
-                      if (state.setWeights?.[prevId] !== undefined) {
-                        displayWeight = state.setWeights[prevId];
-                        break;
+                    let displayWeight = state.setWeights?.[setId];
+                    if (displayWeight === undefined) {
+                      for (let j = rIdx - 1; j >= 0; j--) {
+                        const prevId = `${sub.id}-${j}`;
+                        if (state.setWeights?.[prevId] !== undefined) {
+                          displayWeight = state.setWeights[prevId];
+                          break;
+                        }
+                      }
+                      if (displayWeight === undefined && histSet?.weight !== undefined && histSet.weight !== '') {
+                        displayWeight = String(histSet.weight);
+                      }
+                      if (displayWeight === undefined) {
+                        displayWeight = state.weights[sub.id] || '';
                       }
                     }
-                    if (displayWeight === undefined && histSet?.weight !== undefined && histSet.weight !== '') {
-                      displayWeight = String(histSet.weight);
-                    }
-                    if (displayWeight === undefined) {
-                      displayWeight = state.weights[sub.id] || '';
-                    }
-                  }
 
-                  // 🔴 BUG FIX: Gestione RPE per il Cardio nei Circuiti
-                  const isCardio = sub.metricType === 'cardio';
-                  const currentEffort = isCardio ? state.setRpe[setId] : state.setRir[setId];
-                  const histEffort = isCardio ? histSet?.rpe : histSet?.rir;
-                  const displayEffort = currentEffort !== undefined && currentEffort !== '' ? currentEffort : histEffort;
-                  
-                  const prefillData = {
-                    reps: actualReps,
-                    weight: displayWeight,
-                    rir: !isCardio && displayEffort !== undefined && displayEffort !== '' ? String(displayEffort) : undefined,
-                    rpe: isCardio && displayEffort !== undefined && displayEffort !== '' ? String(displayEffort) : undefined,
-                    customFields: histSet?.customFields || {}
-                  };
-                  
-                  let emomClass = '';
-                  if (isEmom) {
-                    if (activeEmomRound === -1 || rIdx > activeEmomRound) {
-                      emomClass = 'emom-locked opacity-40 grayscale';
-                    } else if (rIdx === activeEmomRound) {
-                      emomClass = 'emom-active ring-2 ring-emerald-400 ring-offset-2 ring-offset-zinc-950 rounded-2xl p-1 bg-emerald-950/30 transition-all duration-300 shadow-[0_0_15px_rgba(16,185,129,0.35)]';
-                    } else {
-                      emomClass = 'opacity-60 transition-opacity duration-300';
-                    }
-                  }
+                    const isCardio = sub.metricType === 'cardio';
+                    const currentEffort = isCardio ? state.setRpe[setId] : state.setRir[setId];
+                    const histEffort = isCardio ? histSet?.rpe : histSet?.rir;
+                    const displayEffort = currentEffort !== undefined && currentEffort !== '' ? currentEffort : histEffort;
 
-                  return (
-                    <div key={rIdx} className="flex flex-col gap-1.5">
-                      <div className={`flex items-center gap-2.5 transition-all duration-300 ${emomClass}`}>
-                        <span className="text-[10px] font-black text-zinc-500 w-12 uppercase bg-zinc-950/80 border border-zinc-800/80 px-2 py-3.5 rounded-2xl text-center shadow-sm shrink-0">
-                          G{rIdx + 1}
-                        </span>
-                        <button
-                          type="button"
-                          disabled={!isWorkoutActive}
-                          onPointerDown={() => handlePointerDown(sub.id, rIdx, sub.pause || 0, prefillData)}
-                          onPointerUp={() => handlePointerUp(sub.id, rIdx, sub.pause || 0, prefillData, actualReps)}
-                          onPointerLeave={handlePointerCancel}
-                          className={`w-28 py-3.5 rounded-2xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
-                            isChecked
-                              ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-emerald-500/20'
-                              : 'bg-zinc-800/80 text-zinc-200 border-zinc-700/60 hover:bg-zinc-700'
-                          }`}
-                        >
-                          {isChecked ? (
-                            (isCardio || actualReps === defaultTargetReps) ? (
-                              <i className="fa-solid fa-check text-lg" />
-                            ) : (
-                              `${actualReps} reps`
-                            )
-                          ) : (
-                            isCardio ? 'Fatto' : `${actualReps} reps`
+                    const prefillData = {
+                      reps: actualReps,
+                      weight: displayWeight,
+                      rir: !isCardio && displayEffort !== undefined && displayEffort !== '' ? String(displayEffort) : undefined,
+                      rpe: isCardio && displayEffort !== undefined && displayEffort !== '' ? String(displayEffort) : undefined,
+                      customFields: histSet?.customFields || {}
+                    };
+
+                    return (
+                      <div key={sub.id} className="bg-zinc-900/50 p-3.5 rounded-2xl border border-zinc-800/60 flex flex-col gap-2">
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                              {letter}
+                            </span>
+                            <span className="font-extrabold text-xs text-white">{sub.name}</span>
+                          </div>
+                          {sub.link && sub.link.trim() !== '' && (
+                            <button
+                              type="button"
+                              onClick={() => onOpenVideo(sub.link!)}
+                              className="text-emerald-400 bg-emerald-950/40 hover:bg-emerald-900/60 p-1.5 rounded-lg border border-emerald-900/40 transition-all active:scale-95"
+                            >
+                              <i className="fa-solid fa-video text-[9px]" />
+                            </button>
                           )}
-                        </button>
-                        {/* 🔴 BUG FIX: Mostra RPE o RIR */}
-                        <button
-                          type="button"
-                          disabled={!isWorkoutActive}
-                          onClick={() => onOpenEffortModal(setId, isCardio)}
-                          className={`border text-[10px] font-extrabold flex-1 py-3.5 rounded-2xl outline-none uppercase tracking-wider shadow-sm transition-all active:scale-[0.98] ${
-                            currentEffort !== undefined && currentEffort !== ''
-                              ? 'text-zinc-100 border-zinc-500 bg-zinc-700'
-                              : displayEffort !== undefined && displayEffort !== ''
-                              ? 'text-emerald-400 border-dashed border-emerald-700/60 bg-emerald-950/20'
-                              : 'text-zinc-400 border-zinc-700/60 bg-zinc-900/50 hover:bg-zinc-800/80'
-                          }`}
-                        >
-                          {displayEffort !== undefined && displayEffort !== ''
-                            ? displayEffort === '-1'
-                              ? 'CED'
-                              : `${isCardio ? 'RPE' : 'RIR'} ${displayEffort}`
-                            : isCardio ? 'RPE' : 'RIR'}
-                        </button>
-                      </div>
-
-                      {isCardio && sub.cardioFields && sub.cardioFields.length > 0 && (
-                        <div className="flex flex-wrap gap-2 pl-[4.5rem] pr-12 mt-1">
-                          {sub.cardioFields.map(cf => (
-                            <div key={cf.id} className="flex-1 min-w-[80px] bg-zinc-950/80 rounded-xl border border-zinc-800/60 p-2 flex items-center shadow-inner">
-                              <span className="text-[9px] text-zinc-500 uppercase font-bold w-1/2 truncate pr-1">{cf.label}</span>
-                              <input
-                                type="text"
-                                inputMode="decimal"
-                                disabled={!isWorkoutActive}
-                                value={state.setCustomFields?.[setId]?.[cf.id] || ''}
-                                onChange={(e) => onSaveCustomField?.(setId, cf.id, e.target.value)}
-                                placeholder={histSet?.customFields?.[cf.id] ? String(histSet.customFields[cf.id]) : cf.unit}
-                                className="bg-transparent text-white text-xs font-bold w-1/2 outline-none text-right disabled:opacity-50"
-                              />
-                            </div>
-                          ))}
                         </div>
+
+                        {sub.metricType !== 'cardio' && (
+                          <div className="flex items-center bg-zinc-950/80 rounded-xl p-1 border border-zinc-800/60">
+                            <div className="px-2 text-zinc-500 text-[10px]">
+                              <i className="fa-solid fa-weight-hanging" />
+                            </div>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              disabled={!isWorkoutActive}
+                              value={displayWeight}
+                              onChange={(e) => onSaveWeight(sub.id, e.target.value)}
+                              placeholder={histSet?.weight ? String(histSet.weight) : "Carico (kg)"}
+                              className="bg-transparent text-white w-full py-1 outline-none font-bold text-xs disabled:opacity-50"
+                            />
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-2.5">
+                          <button
+                            type="button"
+                            disabled={!isWorkoutActive}
+                            onPointerDown={() => handlePointerDown(sub.id, rIdx, sub.pause || 0, prefillData)}
+                            onPointerUp={() => handlePointerUp(sub.id, rIdx, sub.pause || 0, prefillData, actualReps)}
+                            onPointerLeave={handlePointerCancel}
+                            className={`flex-1 py-3 rounded-xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
+                              isChecked
+                                ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-emerald-500/20'
+                                : 'bg-zinc-800/80 text-zinc-200 border-zinc-700/60 hover:bg-zinc-700'
+                            }`}
+                          >
+                            {isChecked ? (
+                              (isCardio || actualReps === defaultTargetReps) ? (
+                                <i className="fa-solid fa-check text-lg" />
+                              ) : (
+                                `${actualReps} reps`
+                              )
+                            ) : (
+                              isCardio ? 'Fatto' : `${actualReps} reps`
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!isWorkoutActive}
+                            onClick={() => onOpenEffortModal(setId, isCardio)}
+                            className={`border text-[10px] font-extrabold w-20 py-3 rounded-xl outline-none uppercase tracking-wider shadow-sm transition-all active:scale-[0.98] ${
+                              currentEffort !== undefined && currentEffort !== ''
+                                ? 'text-zinc-100 border-zinc-500 bg-zinc-700'
+                                : displayEffort !== undefined && displayEffort !== ''
+                                ? 'text-emerald-400 border-dashed border-emerald-700/60 bg-emerald-950/20'
+                                : 'text-zinc-400 border-zinc-700/60 bg-zinc-900/50 hover:bg-zinc-800/80'
+                            }`}
+                          >
+                            {displayEffort !== undefined && displayEffort !== ''
+                              ? displayEffort === '-1'
+                                ? 'CED'
+                                : `${isCardio ? 'RPE' : 'RIR'} ${displayEffort}`
+                              : isCardio ? 'RPE' : 'RIR'}
+                          </button>
+                        </div>
+
+                        {isCardio && sub.cardioFields && sub.cardioFields.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {sub.cardioFields.map(cf => (
+                              <div key={cf.id} className="flex-1 min-w-[80px] bg-zinc-950/80 rounded-xl border border-zinc-800/60 p-2 flex items-center shadow-inner">
+                                <span className="text-[9px] text-zinc-500 uppercase font-bold w-1/2 truncate pr-1">{cf.label}</span>
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  disabled={!isWorkoutActive}
+                                  value={state.setCustomFields?.[setId]?.[cf.id] || ''}
+                                  onChange={(e) => onSaveCustomField?.(setId, cf.id, e.target.value)}
+                                  placeholder={histSet?.customFields?.[cf.id] ? String(histSet.customFields[cf.id]) : cf.unit}
+                                  className="bg-transparent text-white text-xs font-bold w-1/2 outline-none text-right disabled:opacity-50"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          circuit.exercises.map((sub, sIdx) => {
+            if (sub.metricType === 'rest') {
+              return (
+                <div
+                  key={sub.id}
+                  className="p-3 rounded-2xl bg-zinc-950/60 border border-zinc-800/80 text-center text-xs text-zinc-400 flex items-center justify-center gap-2 shadow-inner"
+                >
+                  <i className="fa-regular fa-clock text-zinc-500" />
+                  <span className="font-medium">Pausa tra gli esercizi: {sub.restSeconds || 30}s</span>
+                </div>
+              );
+            }
+
+            const lastSubPerf = getLastExercisePerformance(state.sessionsV2, sub.exerciseId, sub.name);
+            const currentWeight = state.weights[sub.id] || (lastSubPerf?.weight !== undefined ? String(lastSubPerf.weight) : '');
+            const letter = String.fromCharCode(65 + sIdx);
+            const coachAdvice = subCoachAdvices[sub.id];
+
+            return (
+              <div key={sub.id} className="bg-zinc-950/50 p-4 rounded-3xl border border-zinc-800/60 shadow-sm">
+                <div className="flex justify-between items-center mb-3">
+                  <div className="flex items-baseline gap-2.5">
+                    <span className="text-xs font-black text-emerald-500 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+                      {letter}
+                    </span>
+                    <span className="font-extrabold text-sm text-white">{sub.name}</span>
+                  </div>
+                  {sub.link && sub.link.trim() !== '' && !isEditMode && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenVideo(sub.link!)}
+                      className="text-emerald-400 bg-emerald-950/40 hover:bg-emerald-900/60 p-2 rounded-xl border border-emerald-900/40 transition-all active:scale-95 shadow-sm"
+                    >
+                      <i className="fa-solid fa-video text-[10px]" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Sub Exercise Coach Advice */}
+                {coachAdvice && coachAdvice.message && (
+                  <div
+                    className={`p-3 rounded-2xl mb-3 flex items-start gap-2.5 text-xs shadow-inner border ${
+                      coachAdvice.badge === 'increase'
+                        ? 'bg-emerald-950/30 border-emerald-800/40 text-emerald-300'
+                        : coachAdvice.badge === 'stall' || coachAdvice.badge === 'deload'
+                        ? 'bg-amber-950/30 border-amber-800/40 text-amber-300'
+                        : coachAdvice.badge === 'decrease'
+                        ? 'bg-rose-950/30 border-rose-800/40 text-rose-300'
+                        : 'bg-zinc-950/60 border-zinc-800 text-zinc-300'
+                    }`}
+                  >
+                    <div className="mt-0.5 shrink-0 opacity-90">
+                      {coachAdvice.badge === 'increase' ? (
+                        <i className="fa-solid fa-arrow-trend-up text-emerald-400" />
+                      ) : coachAdvice.badge === 'stall' ? (
+                        <i className="fa-solid fa-triangle-exclamation text-amber-400" />
+                      ) : (
+                        <i className="fa-solid fa-robot text-emerald-500" />
                       )}
                     </div>
-                  );
-                })}
+                    <div className="leading-relaxed">
+                      <b className="tracking-wide">{coachAdvice.title}:</b> {coachAdvice.message}
+                    </div>
+                  </div>
+                )}
+
+                {/* Weight Input */}
+                {sub.metricType !== 'cardio' && (
+                  <div className="flex items-center bg-zinc-950/80 rounded-2xl p-1.5 mb-3 border border-zinc-800/60 shadow-inner focus-within:border-emerald-500/50 transition-colors">
+                    <div className="px-3 text-zinc-500 text-xs">
+                      <i className="fa-solid fa-weight-hanging" />
+                    </div>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      disabled={!isWorkoutActive}
+                      value={currentWeight}
+                      onChange={(e) => onSaveWeight(sub.id, e.target.value)}
+                      placeholder="Carico (kg)"
+                      className="bg-transparent text-white w-full py-1.5 outline-none font-bold text-xs disabled:opacity-50"
+                    />
+                  </div>
+                )}
+
+                {/* Rounds Inputs */}
+                <div className="space-y-2.5">
+                  {roundsArray.map((rIdx) => {
+                    const setId = `${sub.id}-${rIdx}`;
+                    const isChecked = Boolean(state.checkedSets[setId]);
+                    const histSet = getHistoricalSetDataV2(state.sessionsV2, rIdx + 1, sub.exerciseId, sub.name);
+                    const defaultTargetReps = histSet?.reps !== undefined ? String(histSet.reps) : (sub.reps || '10');
+                    const actualReps = state.setReps[setId] ?? defaultTargetReps;
+
+                    let displayWeight = state.setWeights?.[setId];
+                    if (displayWeight === undefined) {
+                      for (let j = rIdx - 1; j >= 0; j--) {
+                        const prevId = `${sub.id}-${j}`;
+                        if (state.setWeights?.[prevId] !== undefined) {
+                          displayWeight = state.setWeights[prevId];
+                          break;
+                        }
+                      }
+                      if (displayWeight === undefined && histSet?.weight !== undefined && histSet.weight !== '') {
+                        displayWeight = String(histSet.weight);
+                      }
+                      if (displayWeight === undefined) {
+                        displayWeight = state.weights[sub.id] || '';
+                      }
+                    }
+
+                    const isCardio = sub.metricType === 'cardio';
+                    const currentEffort = isCardio ? state.setRpe[setId] : state.setRir[setId];
+                    const histEffort = isCardio ? histSet?.rpe : histSet?.rir;
+                    const displayEffort = currentEffort !== undefined && currentEffort !== '' ? currentEffort : histEffort;
+
+                    const prefillData = {
+                      reps: actualReps,
+                      weight: displayWeight,
+                      rir: !isCardio && displayEffort !== undefined && displayEffort !== '' ? String(displayEffort) : undefined,
+                      rpe: isCardio && displayEffort !== undefined && displayEffort !== '' ? String(displayEffort) : undefined,
+                      customFields: histSet?.customFields || {}
+                    };
+
+                    let emomClass = '';
+                    if (isEmom) {
+                      if (activeEmomRound === -1 || rIdx > activeEmomRound) {
+                        emomClass = 'emom-locked opacity-40 grayscale';
+                      } else if (rIdx === activeEmomRound) {
+                        emomClass = 'emom-active ring-2 ring-emerald-400 ring-offset-2 ring-offset-zinc-950 rounded-2xl p-1 bg-emerald-950/30 transition-all duration-300 shadow-[0_0_15px_rgba(16,185,129,0.35)]';
+                      } else {
+                        emomClass = 'opacity-60 transition-opacity duration-300';
+                      }
+                    }
+
+                    return (
+                      <div key={rIdx} className="flex flex-col gap-1.5">
+                        <div className={`flex items-center gap-2.5 transition-all duration-300 ${emomClass}`}>
+                          <span className="text-[10px] font-black text-zinc-500 w-12 uppercase bg-zinc-950/80 border border-zinc-800/80 px-2 py-3.5 rounded-2xl text-center shadow-sm shrink-0">
+                            G{rIdx + 1}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={!isWorkoutActive}
+                            onPointerDown={() => handlePointerDown(sub.id, rIdx, sub.pause || 0, prefillData)}
+                            onPointerUp={() => handlePointerUp(sub.id, rIdx, sub.pause || 0, prefillData, actualReps)}
+                            onPointerLeave={handlePointerCancel}
+                            className={`w-28 py-3.5 rounded-2xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
+                              isChecked
+                                ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-emerald-500/20'
+                                : 'bg-zinc-800/80 text-zinc-200 border-zinc-700/60 hover:bg-zinc-700'
+                            }`}
+                          >
+                            {isChecked ? (
+                              (isCardio || actualReps === defaultTargetReps) ? (
+                                <i className="fa-solid fa-check text-lg" />
+                              ) : (
+                                `${actualReps} reps`
+                              )
+                            ) : (
+                              isCardio ? 'Fatto' : `${actualReps} reps`
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!isWorkoutActive}
+                            onClick={() => onOpenEffortModal(setId, isCardio)}
+                            className={`border text-[10px] font-extrabold flex-1 py-3.5 rounded-2xl outline-none uppercase tracking-wider shadow-sm transition-all active:scale-[0.98] ${
+                              currentEffort !== undefined && currentEffort !== ''
+                                ? 'text-zinc-100 border-zinc-500 bg-zinc-700'
+                                : displayEffort !== undefined && displayEffort !== ''
+                                ? 'text-emerald-400 border-dashed border-emerald-700/60 bg-emerald-950/20'
+                                : 'text-zinc-400 border-zinc-700/60 bg-zinc-900/50 hover:bg-zinc-800/80'
+                            }`}
+                          >
+                            {displayEffort !== undefined && displayEffort !== ''
+                              ? displayEffort === '-1'
+                                ? 'CED'
+                                : `${isCardio ? 'RPE' : 'RIR'} ${displayEffort}`
+                              : isCardio ? 'RPE' : 'RIR'}
+                          </button>
+                        </div>
+
+                        {isCardio && sub.cardioFields && sub.cardioFields.length > 0 && (
+                          <div className="flex flex-wrap gap-2 pl-[4.5rem] pr-12 mt-1">
+                            {sub.cardioFields.map(cf => (
+                              <div key={cf.id} className="flex-1 min-w-[80px] bg-zinc-950/80 rounded-xl border border-zinc-800/60 p-2 flex items-center shadow-inner">
+                                <span className="text-[9px] text-zinc-500 uppercase font-bold w-1/2 truncate pr-1">{cf.label}</span>
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  disabled={!isWorkoutActive}
+                                  value={state.setCustomFields?.[setId]?.[cf.id] || ''}
+                                  onChange={(e) => onSaveCustomField?.(setId, cf.id, e.target.value)}
+                                  placeholder={histSet?.customFields?.[cf.id] ? String(histSet.customFields[cf.id]) : cf.unit}
+                                  className="bg-transparent text-white text-xs font-bold w-1/2 outline-none text-right disabled:opacity-50"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
 
       {/* Classic Circuit Round Rest Buttons */}
@@ -875,6 +1052,18 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
               </button>
             );
           })}
+        </div>
+      )}
+
+      {/* Coach Advice - Vista Azione (Solo durante il Workout) */}
+      {isWorkoutActive && circuitCoachAdvice && circuitCoachAdvice.message && (
+        <div className="mt-4 pt-3 border-t border-zinc-800/60 text-[11px] font-extrabold text-emerald-400 flex items-start gap-2 leading-snug">
+          <i className="fa-solid fa-robot mt-0.5" /> 
+          <span>
+            {circuitCoachAdvice.message.includes('AZIONE:') 
+              ? circuitCoachAdvice.message.split('AZIONE:')[1].trim() 
+              : circuitCoachAdvice.message}
+          </span>
         </div>
       )}
     </motion.div>

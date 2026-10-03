@@ -523,7 +523,7 @@ export default function App() {
           }
           const completedRounds: CircuitRoundV2[] = [];
           for (let j = 0; j < (roundsToCount || 10); j++) {
-            const isDone = ex.exercises.some((sub) => state.checkedSets[`${sub.id}-${j}`]) || state.checkedSets[`${ex.id}-round-${j}`];
+            const isDone = ex.structureType === 'amrap' || ex.exercises.some((sub) => state.checkedSets[`${sub.id}-${j}`]) || state.checkedSets[`${ex.id}-round-${j}`];
             if (isDone) {
               hasCheckedSets = true;
               totalSets++;
@@ -1027,6 +1027,17 @@ export default function App() {
       // Suona solo se c'è un cambio round E sono passati meno di 5 sec (evita spam arretrato da background iOS)
       if (currentRound > lastAnnouncedRound) {
         lastAnnouncedRound = currentRound;
+        let nextToSave: AppState | null = null;
+        setState((prev) => {
+          if (!prev) return null;
+          const next = {
+            ...prev,
+            checkedSets: { ...prev.checkedSets, [`${circuitId}-round-${currentRound - 1}`]: true }
+          };
+          nextToSave = next;
+          return next;
+        });
+        if (nextToSave) saveGymState(nextToSave).catch(() => {});
         if (elapsedSec - (currentRound * intervalSec) < 5) {
           playTrumpet();
         }
@@ -1282,7 +1293,7 @@ export default function App() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto overscroll-y-contain w-full max-w-2xl mx-auto p-4 sm:p-6 pb-[calc(3rem+env(safe-area-inset-bottom))]">
+      <main className="flex-1 overflow-y-auto overscroll-y-contain w-full max-w-2xl mx-auto p-4 sm:p-6 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         {isHomeTab ? (
           <HomeDashboard
             state={state}
