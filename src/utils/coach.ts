@@ -114,6 +114,17 @@ function getAvgRir(histEntry: WeightHistoryEntry): number | null {
 export function getFatigueTrendAlert(effHistory: WeightHistoryEntry[]): string | null {
   try {
     if (!effHistory || effHistory.length < 4) return null;
+
+    const recent = effHistory.slice(0, 2);
+    const older = effHistory.slice(2, 4);
+    if (recent.length < 2 || older.length < 2) return null;
+
+    const avgWRecent = recent.reduce((a, h) => a + (parseFloat(h.weight) || 0), 0) / recent.length;
+    const avgWOlder = older.reduce((a, h) => a + (parseFloat(h.weight) || 0), 0) / older.length;
+
+    // Se sta sovraccaricando, il drop dell'RIR è fisiologico, non è fatica sistemica
+    if (avgWRecent > avgWOlder) return null;
+
     const rirOf = (h: WeightHistoryEntry) => {
       const v = Object.values(h.rirs || {})
         .filter((r) => r !== '')
@@ -121,8 +132,8 @@ export function getFatigueTrendAlert(effHistory: WeightHistoryEntry[]): string |
         .filter((num) => !isNaN(num));
       return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
     };
-    const recentRirs = effHistory.slice(0, 2).map(rirOf).filter((v): v is number => v !== null);
-    const olderRirs = effHistory.slice(2, 4).map(rirOf).filter((v): v is number => v !== null);
+    const recentRirs = recent.map(rirOf).filter((v): v is number => v !== null);
+    const olderRirs = older.map(rirOf).filter((v): v is number => v !== null);
     if (recentRirs.length < 2 || olderRirs.length < 2) return null;
     const avgRecent = recentRirs.reduce((a, b) => a + b, 0) / recentRirs.length;
     const avgOlder = olderRirs.reduce((a, b) => a + b, 0) / olderRirs.length;
@@ -295,11 +306,11 @@ export function getExerciseCoachAdvice(
       const reps3 = getAvgReps(history[2]);
 
       if ((w1 > 0 || metricType === 'bodyweight') && w1 === w2 && w2 === w3 && reps1 <= reps3) {
-        const avgRir1 = getAvgRir(history[0]);
-        const avgRir3 = getAvgRir(history[2]);
+        const avgRirRecent = getAvgRir(history[0]);
+        const avgRirOld = getAvgRir(history[2]);
 
-        // Se reps stabili ma RIR migliorato (avgRir1 < avgRir3: fatica percepita minore, più reps in reserve)
-        if (avgRir1 !== null && avgRir3 !== null && avgRir1 < avgRir3) {
+        // Efficienza Neurale: scatta SE avgRirRecent > avgRirOld (il margine è aumentato, fai meno fatica)
+        if (avgRirRecent !== null && avgRirOld !== null && avgRirRecent > avgRirOld) {
           return {
             badge: 'info',
             title: 'Efficienza Neurale',
@@ -307,8 +318,8 @@ export function getExerciseCoachAdvice(
           };
         }
 
-        // Stallo effettivo: volume non sale e fatica non scende
-        if (avgRir1 === null || avgRir3 === null || avgRir1 >= avgRir3) {
+        // Stallo Reale: scatta SE avgRirRecent <= avgRirOld (nessun miglioramento di reps E fatica uguale o peggiore)
+        if (avgRirRecent === null || avgRirOld === null || avgRirRecent <= avgRirOld) {
           return {
             badge: 'stall',
             title: 'Segnale di Stallo Rilevato',
@@ -419,17 +430,17 @@ export function getExerciseCoachAdvice(
         );
 
         if (isIsolationOrTut) {
-          if (minRepsInTopSets >= minTarget && avgRir >= 2.0) {
+          if (minRepsInTopSets >= (minTarget - 1) && avgRir >= 1.5) {
             return {
               badge: 'increase',
               title: 'Overload Isolamento Sbloccato',
-              message: `${diagContext} AZIONE: Nessun drop-off tra le serie (minimo ${minRepsInTopSets} reps >= target ${minTarget}) e margine eccellente (RIR medio ${avgRir.toFixed(1)} >= 2.0). Puoi salire di carico a ${maxW + jump}kg.`
+              message: `${diagContext} AZIONE: Drop-off fisiologico controllato (minimo ${minRepsInTopSets} reps, tollerata max 1 rep sotto il target ${minTarget}) e margine solido (RIR medio ${avgRir.toFixed(1)} >= 1.5). Puoi salire di carico a ${maxW + jump}kg.`
             };
           } else {
             return {
               badge: 'maintain',
               title: 'Consolidamento Isolamento',
-              message: `${diagContext} AZIONE: Sugli esercizi di isolamento il drop-off tra le serie deve essere nullo prima di salire di peso (almeno ${minTarget} reps in tutte le serie e RIR medio >= 2.0). Consolida a ${maxW > 0 ? maxW + 'kg' : 'BW'}.`
+              message: `${diagContext} AZIONE: Sugli esercizi di isolamento è tollerato un drop-off massimo di 1 rep sotto il target (${minTarget - 1} reps) con RIR medio >= 1.5 prima di salire di peso. Consolida a ${maxW > 0 ? maxW + 'kg' : 'BW'}.`
             };
           }
         }
