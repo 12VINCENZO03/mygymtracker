@@ -1187,6 +1187,8 @@ export default function App() {
         isActive={isRestTimerActive}
         remainingSeconds={restTimerSeconds}
         onSkip={skipRestTimer}
+        nextExerciseName={currentTab?.exercises[0]?.name}
+        nextExerciseLoad={currentTab?.exercises[0] && 'id' in currentTab.exercises[0] ? state.weights[currentTab.exercises[0].id] : undefined}
       />
 
       {/* Header */}

@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { motion } from 'motion/react';
 import { AppState, SupersetExercise } from '../types/gym';
 import { formatTime } from '../utils/storage';
 import { getExerciseCoachAdvice, getCircuitCoachAdvice } from '../utils/coach';
@@ -509,7 +510,9 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
   };
 
   return (
-    <div
+    <motion.div
+      layout
+      transition={{ type: 'spring', stiffness: 350, damping: 30 }}
       id={`circuit-${circuit.id}`}
       className={`bg-zinc-900/60 rounded-3xl p-5 sm:p-6 mb-5 relative shadow-sm border border-zinc-800/40 backdrop-blur-md transition-all ${
         !isWorkoutActive ? 'opacity-75 grayscale-[20%]' : ''
@@ -849,6 +852,6 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
           })}
         </div>
       )}
-    </div>
+    </motion.div>
   );
 };

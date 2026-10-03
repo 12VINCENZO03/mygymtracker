@@ -1,4 +1,5 @@
 import React, { useRef } from 'react';
+import { motion } from 'motion/react';
 import { AppState, SingleExercise } from '../types/gym';
 import { getExerciseCoachAdvice } from '../utils/coach';
 import { getLastExercisePerformance, getHistoricalSetDataV2 } from '../utils/domain';
@@ -233,7 +234,9 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
   };
 
   return (
-    <div
+    <motion.div
+      layout
+      transition={{ type: 'spring', stiffness: 350, damping: 30 }}
       id={`ex-container-${ex.id}`}
       className={`bg-zinc-900/60 rounded-3xl p-5 sm:p-6 mb-5 relative shadow-sm border border-zinc-800/40 backdrop-blur-md transition-all ${
         !isWorkoutActive ? 'opacity-75 grayscale-[20%]' : ''
@@ -450,6 +453,6 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
           );
         })}
       </div>
-    </div>
+    </motion.div>
   );
 };
