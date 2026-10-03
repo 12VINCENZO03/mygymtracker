@@ -84,6 +84,8 @@ export interface WeightHistoryEntry {
   reps: Record<string, string>;
   rirs: Record<string, string>;
   rpes: Record<string, string>;
+  durations?: Record<string, string>;
+  customFields?: Record<string, Record<string, string>>;
 }
 
 export interface BodyMetrics {

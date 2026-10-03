@@ -261,8 +261,8 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
         )}
       </div>
 
-      {/* Smart Coach Advice */}
-      {coachAdvice && coachAdvice.message && (
+      {/* Coach Advice - Vista Analitica (Solo fuori dal Workout) */}
+      {!isWorkoutActive && coachAdvice && coachAdvice.message && (
         <div
           className={`p-3.5 rounded-2xl mb-3 flex items-start gap-3 text-xs shadow-inner border ${
             coachAdvice.badge === 'increase'
@@ -289,7 +289,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
         </div>
       )}
 
-      {coachAdvice?.fatigueAlert && (
+      {!isWorkoutActive && coachAdvice?.fatigueAlert && (
         <div className="bg-indigo-950/40 border border-indigo-700/60 text-indigo-200 text-xs p-3.5 rounded-2xl mb-4 flex items-start gap-3 shadow-inner">
           <i className="fa-solid fa-chart-line text-indigo-400 mt-0.5 text-sm shrink-0 opacity-90" />
           <div className="leading-relaxed">
@@ -444,6 +444,18 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
           );
         })}
       </div>
+
+      {/* Coach Advice - Vista Azione (Solo durante il Workout) */}
+      {isWorkoutActive && coachAdvice && coachAdvice.message && (
+        <div className="mt-4 pt-3 border-t border-zinc-800/60 text-[11px] font-extrabold text-emerald-400 flex items-start gap-2 leading-snug">
+          <i className="fa-solid fa-robot mt-0.5" /> 
+          <span>
+            {coachAdvice.message.includes('AZIONE:') 
+              ? coachAdvice.message.split('AZIONE:')[1].trim() 
+              : coachAdvice.message}
+          </span>
+        </div>
+      )}
     </motion.div>
   );
 };

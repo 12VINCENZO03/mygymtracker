@@ -43,7 +43,7 @@ export const RestTimerBubble: React.FC<RestTimerBubbleProps> = ({
       onClick={() => setIsExpanded(!isExpanded)}
       role="button"
       tabIndex={0}
-      className={`fixed top-3 left-1/2 -translate-x-1/2 z-50 cursor-pointer shadow-2xl backdrop-blur-2xl bg-zinc-950/95 border border-zinc-800 text-white select-none ${
+      className={`fixed top-[calc(env(safe-area-inset-top)+8px)] left-1/2 -translate-x-1/2 z-50 cursor-pointer shadow-2xl backdrop-blur-2xl bg-zinc-950/95 border border-zinc-800 text-white select-none ${
         isExpanded
           ? 'px-5 py-4 rounded-[2rem] w-[90vw] max-w-sm flex flex-col gap-3.5 ring-2 ring-emerald-500/40 shadow-[0_15px_40px_rgba(0,0,0,0.9)]'
           : 'px-3.5 py-1.5 rounded-full flex items-center gap-2.5 ring-1 ring-zinc-700/80 hover:scale-105 active:scale-95 shadow-xl'

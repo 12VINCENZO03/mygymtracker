@@ -111,6 +111,47 @@ function getAvgRir(histEntry: WeightHistoryEntry): number | null {
   return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
 }
 
+function getAvgRpe(histEntry: WeightHistoryEntry): number | null {
+  const v = Object.values(histEntry.rpes || {})
+    .filter((r) => r !== '')
+    .map(Number)
+    .filter((num) => !isNaN(num));
+  return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+}
+
+function getAvgDuration(histEntry: WeightHistoryEntry): number {
+  if (histEntry.durations) {
+    const vals = Object.values(histEntry.durations)
+      .filter((v) => v !== '' && !isNaN(Number(v)))
+      .map(Number);
+    if (vals.length > 0) return vals.reduce((a, b) => a + b, 0) / vals.length;
+  }
+  if (histEntry.reps) {
+    const vals = Object.values(histEntry.reps)
+      .filter((v) => v !== '' && !isNaN(Number(v)))
+      .map(Number);
+    if (vals.length > 0) return vals.reduce((a, b) => a + b, 0) / vals.length;
+  }
+  return 0;
+}
+
+function getAvgCustomField(entry: WeightHistoryEntry, fieldKey: string): number | null {
+  if (!entry.customFields) return null;
+  const vals: number[] = [];
+  const normalizedKey = fieldKey.trim().toLowerCase();
+  Object.values(entry.customFields).forEach((fields) => {
+    if (fields) {
+      for (const [k, v] of Object.entries(fields)) {
+        if (k.trim().toLowerCase() === normalizedKey && v !== undefined && v !== '') {
+          const parsed = parseFloat(String(v).replace(',', '.'));
+          if (!isNaN(parsed)) vals.push(parsed);
+        }
+      }
+    }
+  });
+  return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+}
+
 export function getFatigueTrendAlert(effHistory: WeightHistoryEntry[]): string | null {
   try {
     if (!effHistory || effHistory.length < 4) return null;
@@ -162,7 +203,14 @@ export function extractExerciseHistoryFromSessions(
   const targetName = exerciseName ? exerciseName.trim().toLowerCase() : '';
   const dateMap = new Map<string, {
     date: string;
-    sets: Array<{ weight: number; reps: number | string; rir?: string; rpe?: string }>;
+    sets: Array<{
+      weight: number;
+      reps: number | string;
+      rir?: string;
+      rpe?: string;
+      durationSec?: number;
+      customFields?: Record<string, string>;
+    }>;
   }>();
 
   for (const session of sessions) {
@@ -188,11 +236,23 @@ export function extractExerciseHistoryFromSessions(
               if (Array.isArray(sub.sets)) {
                 sub.sets.forEach((s) => {
                   if (!s) return;
+                  let safeFields: Record<string, string> | undefined = undefined;
+                  if (s.customFields && typeof s.customFields === 'object') {
+                    safeFields = {};
+                    Object.entries(s.customFields).forEach(([k, v]) => {
+                      if (v !== undefined && v !== null && v !== '') {
+                        safeFields![k] = String(v);
+                      }
+                    });
+                    if (Object.keys(safeFields).length === 0) safeFields = undefined;
+                  }
                   entry.sets.push({
                     weight: s.weight !== undefined ? s.weight : 0,
                     reps: s.reps !== undefined ? s.reps : '',
                     rir: s.isCed ? 'CED' : s.rir !== undefined ? String(s.rir) : undefined,
-                    rpe: s.rpe !== undefined ? String(s.rpe) : undefined
+                    rpe: s.rpe !== undefined ? String(s.rpe) : undefined,
+                    durationSec: s.durationSec !== undefined ? s.durationSec : undefined,
+                    customFields: safeFields
                   });
                 });
               }
@@ -211,11 +271,23 @@ export function extractExerciseHistoryFromSessions(
           if (Array.isArray(exBlock.sets)) {
             exBlock.sets.forEach((s: any) => {
               if (!s) return;
+              let safeFields: Record<string, string> | undefined = undefined;
+              if (s.customFields && typeof s.customFields === 'object') {
+                safeFields = {};
+                Object.entries(s.customFields).forEach(([k, v]) => {
+                  if (v !== undefined && v !== null && v !== '') {
+                    safeFields![k] = String(v);
+                  }
+                });
+                if (Object.keys(safeFields).length === 0) safeFields = undefined;
+              }
               entry.sets.push({
                 weight: s.weight !== undefined ? s.weight : 0,
                 reps: s.reps !== undefined ? s.reps : '',
                 rir: s.isCed ? 'CED' : s.rir !== undefined ? String(s.rir) : undefined,
-                rpe: s.rpe !== undefined ? String(s.rpe) : undefined
+                rpe: s.rpe !== undefined ? String(s.rpe) : undefined,
+                durationSec: s.durationSec !== undefined ? s.durationSec : undefined,
+                customFields: safeFields
               });
             });
           }
@@ -231,6 +303,8 @@ export function extractExerciseHistoryFromSessions(
     const weights: Record<string, string> = {};
     const rirs: Record<string, string> = {};
     const rpes: Record<string, string> = {};
+    const durations: Record<string, string> = {};
+    const customFields: Record<string, Record<string, string>> = {};
     let maxW = 0;
 
     data.sets.forEach((s, idx) => {
@@ -240,6 +314,8 @@ export function extractExerciseHistoryFromSessions(
       if (s.weight > maxW) maxW = s.weight;
       if (s.rir !== undefined) rirs[sId] = s.rir;
       if (s.rpe !== undefined) rpes[sId] = s.rpe;
+      if (s.durationSec !== undefined && s.durationSec !== null) durations[sId] = String(s.durationSec);
+      if (s.customFields && Object.keys(s.customFields).length > 0) customFields[sId] = s.customFields;
     });
 
     entries.push({
@@ -248,7 +324,9 @@ export function extractExerciseHistoryFromSessions(
       weights,
       reps,
       rirs,
-      rpes
+      rpes,
+      durations: Object.keys(durations).length > 0 ? durations : undefined,
+      customFields: Object.keys(customFields).length > 0 ? customFields : undefined
     });
   }
 
@@ -330,44 +408,136 @@ export function getExerciseCoachAdvice(
       }
     }
 
-    // Cardio: Rispetto rigoroso di Zone 2 (LISS) e soglie RPE
+    // Cardio: Analisi Multi-variabile avanzata e zone RPE
     if (metricType === 'cardio') {
-      if (lastSession.rpes) {
-        const validRpes = Object.values(lastSession.rpes).map(Number).filter((r) => !isNaN(r));
-        if (validRpes.length > 0) {
-          const avgRpe = validRpes.reduce((a, b) => a + b, 0) / validRpes.length;
-          if (avgRpe <= 3) {
-            return {
-              badge: 'increase',
-              title: 'Sforzo Blando',
-              message: `DIAGNOSI: RPE medio ${avgRpe.toFixed(1)} <= 3. AZIONE: Sforzo troppo blando, puoi aumentare l'inclinazione, la resistenza o il passo.`
-            };
-          } else if (avgRpe <= 6) {
-            return {
-              badge: 'maintain',
-              title: 'Base Aerobica (Zone 2)',
-              message: 'Sforzo ottimale per LISS e recupero attivo. Non aumentare intensità se il target non è anaerobico.'
-            };
-          } else if (avgRpe <= 7) {
-            return {
-              badge: 'maintain',
-              title: 'Zona Moderata',
-              message: `DIAGNOSI: RPE ${avgRpe.toFixed(1)}. AZIONE: Ottimo equilibrio aerobico, mantieni i parametri attuali.`
-            };
-          } else {
-            return {
-              badge: 'maintain',
-              title: 'Sforzo Intenso',
-              message: `DIAGNOSI: RPE ${avgRpe.toFixed(1)}. AZIONE: Sessione spinta al limite, consolida questo livello senza aumentare.`
-            };
+      const curSession = history[0];
+      const curAvgRpe = getAvgRpe(curSession);
+
+      if (history.length >= 2) {
+        const prevSession = history[1];
+        const prevAvgRpe = getAvgRpe(prevSession);
+
+        const positiveMetricKeys = ['distanza', 'distance', 'velocita', 'velocità', 'speed', 'inclinazione', 'incline', 'resistenza', 'resistance'];
+        
+        let improvedCond = false;
+        let improvedEff = false;
+        let diffDetail = '';
+
+        for (const key of positiveMetricKeys) {
+          const curVal = getAvgCustomField(curSession, key);
+          const prevVal = getAvgCustomField(prevSession, key);
+          if (curVal !== null && prevVal !== null && prevVal > 0) {
+            const diffPct = ((curVal - prevVal) / prevVal) * 100;
+            if (diffPct >= 2 && curAvgRpe !== null && prevAvgRpe !== null && curAvgRpe <= prevAvgRpe) {
+              improvedCond = true;
+              diffDetail = `${key} salita da ${prevVal.toFixed(1)} a ${curVal.toFixed(1)} (+${diffPct.toFixed(1)}%) con RPE stabile (${curAvgRpe.toFixed(1)} vs ${prevAvgRpe.toFixed(1)})`;
+              break;
+            }
+            if (diffPct >= -1 && curAvgRpe !== null && prevAvgRpe !== null && (prevAvgRpe - curAvgRpe) >= 0.5) {
+              improvedEff = true;
+              diffDetail = `${key} mantenuta a ${curVal.toFixed(1)} ma con RPE sceso da ${prevAvgRpe.toFixed(1)} a ${curAvgRpe.toFixed(1)}`;
+              break;
+            }
           }
         }
+
+        if (!improvedCond && !improvedEff) {
+          const curPasso = getAvgCustomField(curSession, 'passo');
+          const prevPasso = getAvgCustomField(prevSession, 'passo');
+          if (curPasso !== null && prevPasso !== null && prevPasso > 0) {
+            if (curPasso < prevPasso && curAvgRpe !== null && prevAvgRpe !== null && curAvgRpe <= prevAvgRpe) {
+              improvedCond = true;
+              diffDetail = `passo migliorato da ${prevPasso.toFixed(1)} a ${curPasso.toFixed(1)} con RPE ${curAvgRpe.toFixed(1)}`;
+            } else if (curPasso <= prevPasso && curAvgRpe !== null && prevAvgRpe !== null && (prevAvgRpe - curAvgRpe) >= 0.5) {
+              improvedEff = true;
+              diffDetail = `passo invariato a ${curPasso.toFixed(1)} con sforzo RPE calato da ${prevAvgRpe.toFixed(1)} a ${curAvgRpe.toFixed(1)}`;
+            }
+          }
+        }
+
+        if (improvedCond) {
+          return {
+            badge: 'increase',
+            title: 'Miglioramento Condizionamento',
+            message: `DIAGNOSI: ${diffDetail}. AZIONE: Capacità di lavoro cardiovascolare incrementata. Puoi consolidare o alzare ulteriormente il ritmo.`
+          };
+        }
+
+        if (improvedEff) {
+          return {
+            badge: 'increase',
+            title: 'Maggiore Efficienza Aerobica',
+            message: `DIAGNOSI: ${diffDetail}. AZIONE: Il sistema cardiovascolare lavora con maggiore facilità allo stesso output. Ottimo adattamento aerobico!`
+          };
+        }
       }
+
+      // Fallback: logiche attuali basate sulle zone RPE
+      if (curAvgRpe !== null) {
+        if (curAvgRpe <= 3) {
+          return {
+            badge: 'increase',
+            title: 'Sforzo Blando',
+            message: `DIAGNOSI: RPE medio ${curAvgRpe.toFixed(1)} <= 3. AZIONE: Sforzo troppo blando, puoi aumentare l'inclinazione, la velocità, la resistenza o il passo.`
+          };
+        } else if (curAvgRpe <= 6) {
+          return {
+            badge: 'maintain',
+            title: 'Base Aerobica (Zone 2)',
+            message: 'Sforzo ottimale per LISS e recupero attivo. Non aumentare intensità se il target non è anaerobico.'
+          };
+        } else if (curAvgRpe <= 7) {
+          return {
+            badge: 'maintain',
+            title: 'Zona Moderata',
+            message: `DIAGNOSI: RPE ${curAvgRpe.toFixed(1)}. AZIONE: Ottimo equilibrio aerobico, mantieni i parametri attuali.`
+          };
+        } else {
+          return {
+            badge: 'maintain',
+            title: 'Sforzo Intenso',
+            message: `DIAGNOSI: RPE ${curAvgRpe.toFixed(1)}. AZIONE: Sessione spinta al limite, consolida questo livello senza aumentare.`
+          };
+        }
+      }
+
       return null;
     }
 
     if (metricType === 'time') {
-      return { badge: 'info', title: 'Focus Isometria', message: 'DIAGNOSI: Lavoro a tempo. AZIONE: Cura la respirazione diaframmatica e mantieni la massima tensione corporea costante.' };
+      if (history.length >= 2) {
+        const curAvgDur = getAvgDuration(history[0]);
+        const prevAvgDur = getAvgDuration(history[1]);
+        const avgRir = getAvgRir(history[0]);
+
+        if (curAvgDur > prevAvgDur && curAvgDur > 0) {
+          const gain = Math.round(curAvgDur - prevAvgDur);
+          return {
+            badge: 'increase',
+            title: 'Progressione TUT',
+            message: `DIAGNOSI: Durata media aumentata da ${Math.round(prevAvgDur)}s a ${Math.round(curAvgDur)}s (+${gain}s). AZIONE: Eccellente progresso nel Time Under Tension. Consolida la tenuta isometrica prima di allungare ulteriormente.`
+          };
+        } else {
+          if (avgRir !== null && avgRir <= 1) {
+            return {
+              badge: 'maintain',
+              title: 'Insufficienza Work Capacity',
+              message: `DIAGNOSI: Durata media (${Math.round(curAvgDur)}s) non superiore alla precedente (${Math.round(prevAvgDur)}s) con RIR tirato al limite (${avgRir.toFixed(1)}). AZIONE: Non forzare la durata; mantieni il tempo attuale curando la respirazione e la stabilità posturale.`
+            };
+          } else {
+            return {
+              badge: 'maintain',
+              title: 'Consolidamento Isometria',
+              message: `DIAGNOSI: Durata media stabile (${Math.round(curAvgDur)}s vs ${Math.round(prevAvgDur)}s). AZIONE: Consolida la tenuta e mantieni la massima tensione corporea costante.`
+            };
+          }
+        }
+      }
+      return {
+        badge: 'info',
+        title: 'Focus Isometria',
+        message: 'DIAGNOSI: Lavoro a tempo. AZIONE: Cura la respirazione diaframmatica e mantieni la massima tensione corporea costante.'
+      };
     }
 
     // --- COACH 2.0: MULTI-SET & FATIGUE ANALYSIS ---
@@ -480,6 +650,16 @@ export function getExerciseCoachAdvice(
             };
           } else {
             // Target raggiunto sul Top Set. Applichiamo la lente d'ingrandimento sul drop-off
+            const repDropOff = bestTopSet.reps - minRepsInTopSets;
+
+            if (repDropOff > 2) {
+              return {
+                badge: 'maintain',
+                title: 'Stabilità Inadeguata',
+                message: `${diagContext} AZIONE: Crollo prestazionale eccessivo tra le serie (drop-off di ${repDropOff} reps). Uniforma le ripetizioni su tutte le serie prima di salire di carico a causa dell'eccessiva perdita di stabilità.`
+              };
+            }
+
             if (minRepsInTopSets < minTarget) {
               return {
                 badge: 'maintain',
@@ -563,9 +743,9 @@ export function getCircuitCoachAdvice(state: AppState, circuit: SupersetExercise
 
     const circuitName = (circuit.name || '').trim().toLowerCase();
     const exIds = new Set(circuit.exercises.map((e) => e.exerciseId || e.id));
-    const exNames = new Set(circuit.exercises.map((e) => (e.name || '').trim().toLowerCase()));
 
-    let targetCircuitBlock: CircuitSnapshotV2 | null = null;
+    // 1. Estrai tutto lo storico di questo specifico circuito
+    const history: CircuitSnapshotV2[] = [];
     for (const session of state.sessionsV2) {
       if (!session || !Array.isArray(session.blocks)) continue;
       for (const b of session.blocks) {
@@ -574,68 +754,77 @@ export function getCircuitCoachAdvice(state: AppState, circuit: SupersetExercise
         const nameMatches = circuitName && (circ.nameSnapshot || '').trim().toLowerCase() === circuitName;
         const hasMatchingExercises = Array.isArray(circ.rounds) && circ.rounds.some((r) =>
           Array.isArray(r.exercises) && r.exercises.some((sub) =>
-            (sub.exerciseId && exIds.has(sub.exerciseId)) ||
-            (sub.nameSnapshot && exNames.has(sub.nameSnapshot.trim().toLowerCase()))
+            (sub.exerciseId && exIds.has(sub.exerciseId))
           )
         );
-
         if (nameMatches || hasMatchingExercises) {
-          targetCircuitBlock = circ;
-          break;
+          history.push(circ);
+          break; // Preso il circuito, passa alla sessione successiva
         }
       }
-      if (targetCircuitBlock) break;
     }
 
-    if (!targetCircuitBlock || !Array.isArray(targetCircuitBlock.rounds) || targetCircuitBlock.rounds.length < 2) {
-      return null;
-    }
+    if (history.length === 0) return null;
 
-    const rounds = targetCircuitBlock.rounds;
-    const firstRound = rounds[0];
-    const compareRound = rounds.length >= 3 ? rounds[2] : rounds[rounds.length - 1];
+    const lastCirc = history[0];
+    const prevCirc = history.length > 1 ? history[1] : null;
+    const type = circuit.structureType || 'classic'; 
 
-    if (!firstRound || !compareRound || !Array.isArray(firstRound.exercises) || !Array.isArray(compareRound.exercises)) {
-      return null;
-    }
-
-    const dropPcts: number[] = [];
-
-    for (const subEx of circuit.exercises) {
-      const subId = subEx.exerciseId || subEx.id;
-      const subName = (subEx.name || '').trim().toLowerCase();
-
-      const subR0 = firstRound.exercises.find((e) =>
-        (subId && e.exerciseId === subId) ||
-        (subName && (e.nameSnapshot || '').trim().toLowerCase() === subName)
-      );
-
-      const subRCompare = compareRound.exercises.find((e) =>
-        (subId && e.exerciseId === subId) ||
-        (subName && (e.nameSnapshot || '').trim().toLowerCase() === subName)
-      );
-
-      if (!subR0 || !subRCompare) continue;
-
-      const reps0 = Array.isArray(subR0.sets) && subR0.sets[0] ? (Number(subR0.sets[0].reps) || 0) : 0;
-      const repsCompare = Array.isArray(subRCompare.sets) && subRCompare.sets[0] ? (Number(subRCompare.sets[0].reps) || 0) : 0;
-
-      if (reps0 > 0) {
-        const dropPct = (reps0 - repsCompare) / reps0;
-        dropPcts.push(dropPct);
+    // --- MOTORE AMRAP (Work Capacity & Pacing) ---
+    if (type === 'amrap') {
+      const curRounds = lastCirc.rounds?.length || 0;
+      if (!prevCirc) {
+        return { badge: 'info', title: 'Baseline AMRAP', message: `DIAGNOSI: Primo riferimento registrato (${curRounds} giri). AZIONE: Usa questo volume come target da battere al prossimo allenamento gestendo bene il pacing iniziale.` };
+      }
+      const prevRounds = prevCirc.rounds?.length || 0;
+      if (curRounds > prevRounds) {
+        return { badge: 'increase', title: 'Work Capacity Migliorata', message: `DIAGNOSI: Chiusi ${curRounds} giri contro i ${prevRounds} della volta scorsa. AZIONE: Ottima gestione dell'acido lattico e del pacing! Consolida o prova a forzare una rep in più a giro.` };
+      } else if (curRounds < prevRounds) {
+        return { badge: 'decrease', title: 'Calo di Pacing', message: `DIAGNOSI: Chiusi ${curRounds} giri (erano ${prevRounds}). AZIONE: Probabile partenza troppo esplosiva o fatica sistemica. Rallenta il ritmo nei primi 3 minuti per non crollare nel finale.` };
+      } else {
+        return { badge: 'maintain', title: 'Pacing Costante', message: `DIAGNOSI: Volume invariato (${curRounds} giri). AZIONE: Pacing consolidato. Per sbloccare la progressione prova a ridurre le micro-pause tra le transizioni degli esercizi.` };
       }
     }
 
-    if (dropPcts.length === 0) return null;
+    // --- MOTORE EMOM (Metabolic Failure & Densità) ---
+    if (type === 'emom') {
+      const curRounds = lastCirc.rounds?.length || 0;
+      const targetRounds = circuit.emomTotalMin && circuit.emomIntervalSec ? Math.ceil((circuit.emomTotalMin * 60) / circuit.emomIntervalSec) : curRounds;
+      
+      if (curRounds < targetRounds) {
+        return { badge: 'decrease', title: 'Cedimento Metabolico', message: `DIAGNOSI: Chiusi ${curRounds} intervalli su ${targetRounds}. Il tempo di lavoro ha eroso il recupero. AZIONE: Scala i carichi o riduci le reps del 10% per riuscire a stare dentro il minuto senza bruciarti.` };
+      } else {
+        return { badge: 'increase', title: 'Densità Dominata', message: `DIAGNOSI: Completati tutti i ${targetRounds} intervalli. AZIONE: Hai dominato la densità. Al prossimo workout aggiungi 1 minuto totale al timer o aumenta un micro-carico.` };
+      }
+    }
 
-    const avgDrop = dropPcts.reduce((a, b) => a + b, 0) / dropPcts.length;
-
-    if (avgDrop > 0.30) {
-      return {
-        badge: 'info',
-        title: 'Debito Sistemico',
-        message: 'Crollo netto di ripetizioni dopo il primo giro. Aumenta la pausa tra i round di 30-45s invece di scalare i carichi.'
+    // --- MOTORE CLASSICO (Performance Stability & Drop-off) ---
+    if (type === 'classic') {
+      if (!lastCirc.rounds || lastCirc.rounds.length < 2) return null;
+      const r0 = lastCirc.rounds[0];
+      const rLast = lastCirc.rounds[lastCirc.rounds.length - 1];
+      
+      const countReps = (round: any) => {
+        let total = 0;
+        if (Array.isArray(round.exercises)) {
+          round.exercises.forEach((ex: any) => {
+            if (Array.isArray(ex.sets)) ex.sets.forEach((s: any) => total += (Number(s.reps) || 0));
+          });
+        }
+        return total;
       };
+
+      const reps0 = countReps(r0);
+      const repsLast = countReps(rLast);
+
+      if (reps0 > 0) {
+        const drop = (reps0 - repsLast) / reps0;
+        if (drop > 0.25) {
+           return { badge: 'maintain', title: 'Drop-off Eccessivo', message: `DIAGNOSI: Crollo del volume > 25% tra il primo e l'ultimo giro (${reps0} ➔ ${repsLast} reps). AZIONE: Aumenta il recupero di 30-45s a fine round per stabilizzare la performance.` };
+        } else {
+           return { badge: 'increase', title: 'Stabilità Ottimale', message: `DIAGNOSI: Performance mantenuta solida fino all'ultimo giro (Drop: ${(drop * 100).toFixed(0)}%). AZIONE: Se l'RIR è buono, puoi aumentare il carico sul primo esercizio o aggiungere un round.` };
+        }
+      }
     }
 
     return null;
