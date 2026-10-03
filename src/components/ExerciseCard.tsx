@@ -309,8 +309,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
           const hist = getHistoricalSetData(setIdx);
           const defaultTargetReps = hist?.reps !== undefined ? hist.reps : (ex.reps || '10');
           const actualReps = state.setReps[setId] ?? defaultTargetReps;
-
-          // 🔴 NUOVO: Logica di ereditarietà del peso
+          
           let displayWeight = state.setWeights?.[setId];
           if (displayWeight === undefined) {
             for (let j = setIdx - 1; j >= 0; j--) {
@@ -328,17 +327,14 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
             }
           }
 
-          // 🔴 BUG FIX: Logica Dinamica per RPE vs RIR
           const isCardio = ex.metricType === 'cardio';
           const currentEffort = isCardio ? state.setRpe[setId] : state.setRir[setId];
           const histEffort = isCardio ? hist?.rpe : hist?.rir;
           const displayEffort = currentEffort !== undefined && currentEffort !== '' ? currentEffort : histEffort;
-
           const isTimeType = ex.metricType === 'time';
           const timerRemaining = activeInlineTimerSec[setId];
           const isTimerRunning = timerRemaining !== undefined && timerRemaining > 0;
 
-          // 🔴 Prepariamo i dati esatti visualizzati in questo momento per il salvataggio
           const prefillData = {
             reps: actualReps,
             weight: displayWeight,
@@ -349,7 +345,6 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
 
           return (
             <div key={setIdx} className="flex flex-col gap-1.5">
-              {/* RIGA 1: Set, Peso, Timer/Reps e RIR/RPE */}
               <div className="flex items-center gap-2.5">
                 <span className="text-[10px] font-black text-zinc-500 w-12 uppercase tracking-wider bg-zinc-950/80 border border-zinc-800/80 px-2 py-3.5 rounded-2xl text-center shadow-sm shrink-0">
                   S{setIdx + 1}
@@ -407,7 +402,6 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                     )}
                   </button>
                 )}
-                {/* Pulsante RIR / RPE */}
                 <button
                   type="button"
                   disabled={!isWorkoutActive}
