@@ -392,13 +392,13 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                     }`}
                   >
                     {isChecked ? (
-                      actualReps !== defaultTargetReps ? (
-                        `${actualReps} reps`
-                      ) : (
+                      (isCardio || actualReps === defaultTargetReps) ? (
                         <i className="fa-solid fa-check text-lg" />
+                      ) : (
+                        `${actualReps} reps`
                       )
                     ) : (
-                      `${actualReps} reps`
+                      isCardio ? 'Fatto' : `${actualReps} reps`
                     )}
                   </button>
                 )}
@@ -421,6 +421,25 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                     : isCardio ? 'RPE' : 'RIR'}
                 </button>
               </div>
+
+              {isCardio && ex.cardioFields && ex.cardioFields.length > 0 && (
+                <div className="flex flex-wrap gap-2 pl-14 mt-1">
+                  {ex.cardioFields.map(cf => (
+                    <div key={cf.id} className="flex-1 min-w-[90px] bg-zinc-950/80 rounded-xl border border-zinc-800/60 p-2 flex items-center shadow-inner">
+                      <span className="text-[9px] text-zinc-500 uppercase font-bold w-1/2 truncate pr-1">{cf.label}</span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        disabled={!isWorkoutActive}
+                        value={state.setCustomFields?.[setId]?.[cf.id] || ''}
+                        onChange={(e) => onSaveCustomField(setId, cf.id, e.target.value)}
+                        placeholder={hist?.customFields?.[cf.id] ? String(hist.customFields[cf.id]) : cf.unit}
+                        className="bg-transparent text-white text-xs font-bold w-1/2 outline-none text-right disabled:opacity-50"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}

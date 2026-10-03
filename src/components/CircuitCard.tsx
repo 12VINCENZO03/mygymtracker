@@ -654,6 +654,10 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
           const letter = String.fromCharCode(65 + sIdx);
           const coachAdvice = subCoachAdvices[sub.id];
 
+          const roundsArray = isAmrap
+            ? [state.amrapRounds[circuit.id] || 0]
+            : Array.from({ length: totalRounds }).map((_, i) => i);
+
           return (
             <div key={sub.id} className="bg-zinc-950/50 p-4 rounded-3xl border border-zinc-800/60 shadow-sm">
               <div className="flex justify-between items-center mb-3">
@@ -723,7 +727,7 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
 
               {/* Rounds Inputs */}
               <div className="space-y-2.5">
-                {Array.from({ length: totalRounds }).map((_, rIdx) => {
+                {roundsArray.map((rIdx) => {
                   const setId = `${sub.id}-${rIdx}`;
                   const isChecked = Boolean(state.checkedSets[setId]);
                   const histSet = getHistoricalSetDataV2(state.sessionsV2, rIdx + 1, sub.exerciseId, sub.name);
@@ -773,51 +777,72 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                   }
 
                   return (
-                    <div key={rIdx} className={`flex items-center gap-2.5 transition-all duration-300 ${emomClass}`}>
-                      <span className="text-[10px] font-black text-zinc-500 w-12 uppercase bg-zinc-950/80 border border-zinc-800/80 px-2 py-3.5 rounded-2xl text-center shadow-sm">
-                        G{rIdx + 1}
-                      </span>
-                      <button
-                        type="button"
-                        disabled={!isWorkoutActive}
-                        onPointerDown={() => handlePointerDown(sub.id, rIdx, sub.pause || 0, prefillData)}
-                        onPointerUp={() => handlePointerUp(sub.id, rIdx, sub.pause || 0, prefillData, actualReps)}
-                        onPointerLeave={handlePointerCancel}
-                        className={`w-28 py-3.5 rounded-2xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
-                          isChecked
-                            ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-emerald-500/20'
-                            : 'bg-zinc-800/80 text-zinc-200 border-zinc-700/60 hover:bg-zinc-700'
-                        }`}
-                      >
-                        {isChecked ? (
-                          actualReps !== defaultTargetReps ? (
-                            `${actualReps} reps`
+                    <div key={rIdx} className="flex flex-col gap-1.5">
+                      <div className={`flex items-center gap-2.5 transition-all duration-300 ${emomClass}`}>
+                        <span className="text-[10px] font-black text-zinc-500 w-12 uppercase bg-zinc-950/80 border border-zinc-800/80 px-2 py-3.5 rounded-2xl text-center shadow-sm shrink-0">
+                          G{rIdx + 1}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={!isWorkoutActive}
+                          onPointerDown={() => handlePointerDown(sub.id, rIdx, sub.pause || 0, prefillData)}
+                          onPointerUp={() => handlePointerUp(sub.id, rIdx, sub.pause || 0, prefillData, actualReps)}
+                          onPointerLeave={handlePointerCancel}
+                          className={`w-28 py-3.5 rounded-2xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
+                            isChecked
+                              ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-emerald-500/20'
+                              : 'bg-zinc-800/80 text-zinc-200 border-zinc-700/60 hover:bg-zinc-700'
+                          }`}
+                        >
+                          {isChecked ? (
+                            (isCardio || actualReps === defaultTargetReps) ? (
+                              <i className="fa-solid fa-check text-lg" />
+                            ) : (
+                              `${actualReps} reps`
+                            )
                           ) : (
-                            <i className="fa-solid fa-check text-lg" />
-                          )
-                        ) : (
-                          `${actualReps} reps`
-                        )}
-                      </button>
-                      {/* 🔴 BUG FIX: Mostra RPE o RIR */}
-                      <button
-                        type="button"
-                        disabled={!isWorkoutActive}
-                        onClick={() => onOpenEffortModal(setId, isCardio)}
-                        className={`border text-[10px] font-extrabold flex-1 py-3.5 rounded-2xl outline-none uppercase tracking-wider shadow-sm transition-all active:scale-[0.98] ${
-                          currentEffort !== undefined && currentEffort !== ''
-                            ? 'text-zinc-100 border-zinc-500 bg-zinc-700'
-                            : displayEffort !== undefined && displayEffort !== ''
-                            ? 'text-emerald-400 border-dashed border-emerald-700/60 bg-emerald-950/20'
-                            : 'text-zinc-400 border-zinc-700/60 bg-zinc-900/50 hover:bg-zinc-800/80'
-                        }`}
-                      >
-                        {displayEffort !== undefined && displayEffort !== ''
-                          ? displayEffort === '-1'
-                            ? 'CED'
-                            : `${isCardio ? 'RPE' : 'RIR'} ${displayEffort}`
-                          : isCardio ? 'RPE' : 'RIR'}
-                      </button>
+                            isCardio ? 'Fatto' : `${actualReps} reps`
+                          )}
+                        </button>
+                        {/* 🔴 BUG FIX: Mostra RPE o RIR */}
+                        <button
+                          type="button"
+                          disabled={!isWorkoutActive}
+                          onClick={() => onOpenEffortModal(setId, isCardio)}
+                          className={`border text-[10px] font-extrabold flex-1 py-3.5 rounded-2xl outline-none uppercase tracking-wider shadow-sm transition-all active:scale-[0.98] ${
+                            currentEffort !== undefined && currentEffort !== ''
+                              ? 'text-zinc-100 border-zinc-500 bg-zinc-700'
+                              : displayEffort !== undefined && displayEffort !== ''
+                              ? 'text-emerald-400 border-dashed border-emerald-700/60 bg-emerald-950/20'
+                              : 'text-zinc-400 border-zinc-700/60 bg-zinc-900/50 hover:bg-zinc-800/80'
+                          }`}
+                        >
+                          {displayEffort !== undefined && displayEffort !== ''
+                            ? displayEffort === '-1'
+                              ? 'CED'
+                              : `${isCardio ? 'RPE' : 'RIR'} ${displayEffort}`
+                            : isCardio ? 'RPE' : 'RIR'}
+                        </button>
+                      </div>
+
+                      {isCardio && sub.cardioFields && sub.cardioFields.length > 0 && (
+                        <div className="flex flex-wrap gap-2 pl-[4.5rem] pr-12 mt-1">
+                          {sub.cardioFields.map(cf => (
+                            <div key={cf.id} className="flex-1 min-w-[80px] bg-zinc-950/80 rounded-xl border border-zinc-800/60 p-2 flex items-center shadow-inner">
+                              <span className="text-[9px] text-zinc-500 uppercase font-bold w-1/2 truncate pr-1">{cf.label}</span>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                disabled={!isWorkoutActive}
+                                value={state.setCustomFields?.[setId]?.[cf.id] || ''}
+                                onChange={(e) => onSaveCustomField?.(setId, cf.id, e.target.value)}
+                                placeholder={histSet?.customFields?.[cf.id] ? String(histSet.customFields[cf.id]) : cf.unit}
+                                className="bg-transparent text-white text-xs font-bold w-1/2 outline-none text-right disabled:opacity-50"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
