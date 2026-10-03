@@ -349,12 +349,11 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
 
           return (
             <div key={setIdx} className="flex flex-col gap-1.5">
-              {/* RIGA 1: Timer e RPE (Uguale a prima) */}
+              {/* RIGA 1: Set, Peso, Timer/Reps e RIR/RPE */}
               <div className="flex items-center gap-2.5">
                 <span className="text-[10px] font-black text-zinc-500 w-12 uppercase tracking-wider bg-zinc-950/80 border border-zinc-800/80 px-2 py-3.5 rounded-2xl text-center shadow-sm shrink-0">
                   S{setIdx + 1}
                 </span>
-
                 {ex.metricType !== 'cardio' && (
                   <input
                     type="text"
@@ -366,7 +365,6 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                     className="bg-zinc-950/80 text-white w-16 py-3.5 rounded-2xl border border-zinc-800/80 text-center font-bold text-sm shadow-inner outline-none focus:border-emerald-500/50 disabled:opacity-50 transition-colors"
                   />
                 )}
-
                 {isTimeType ? (
                   <button
                     type="button"
@@ -398,14 +396,18 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                         : 'bg-zinc-800/80 text-zinc-200 border-zinc-700/60 hover:bg-zinc-700'
                     }`}
                   >
-                    {isCardio ? (
-                      isChecked ? <i className="fa-solid fa-flag-checkered text-lg" /> : 'Fatto'
+                    {isChecked ? (
+                      actualReps !== defaultTargetReps ? (
+                        `${actualReps} reps`
+                      ) : (
+                        <i className="fa-solid fa-check text-lg" />
+                      )
                     ) : (
-                      isChecked ? (actualReps !== defaultTargetReps ? `${actualReps} reps` : <i className="fa-solid fa-check text-lg" />) : `${actualReps} reps`
+                      `${actualReps} reps`
                     )}
                   </button>
                 )}
-
+                {/* Pulsante RIR / RPE */}
                 <button
                   type="button"
                   disabled={!isWorkoutActive}
@@ -419,36 +421,12 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                   }`}
                 >
                   {displayEffort !== undefined && displayEffort !== ''
-                    ? displayEffort === '-1' ? 'CED' : `${isCardio ? 'RPE' : 'RIR'} ${displayEffort}`
+                    ? displayEffort === '-1'
+                      ? 'CED'
+                      : `${isCardio ? 'RPE' : 'RIR'} ${displayEffort}`
                     : isCardio ? 'RPE' : 'RIR'}
                 </button>
               </div>
-
-              {/* 🔴 RIGA 2: I nuovi campi Cardio (Visibili solo se è cardio e ci sono campi) */}
-              {isCardio && ex.cardioFields && ex.cardioFields.length > 0 && (
-                <div className="flex gap-2 ml-[58px]"> {/* ml-[58px] allinea perfettamente saltando il bottone "S1" */}
-                  {ex.cardioFields.map(cf => {
-                    const val = state.setCustomFields?.[setId]?.[cf.id] || '';
-                    return (
-                      <div key={cf.id} className="flex-1 bg-zinc-950/60 border border-zinc-800/60 rounded-xl p-1.5 flex flex-col items-center shadow-inner focus-within:border-emerald-500/50 transition-colors">
-                        <span className="text-[8px] font-extrabold text-zinc-500 uppercase tracking-wider mb-0.5">{cf.label}</span>
-                        <div className="flex items-baseline gap-0.5 w-full px-1">
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            disabled={!isWorkoutActive}
-                            value={val}
-                            onChange={(e) => onSaveCustomField(setId, cf.id, e.target.value)}
-                            placeholder={hist?.customFields?.[cf.id] ? String(hist.customFields[cf.id]) : "-"}
-                            className="bg-transparent text-white font-bold text-xs w-full text-center outline-none"
-                          />
-                          <span className="text-[8px] text-zinc-500 font-medium">{cf.unit}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
             </div>
           );
         })}
