@@ -18,6 +18,7 @@ interface ExerciseCardProps {
   onSaveWeight: (val: string) => void;
   onSaveSetWeight: (setId: string, val: string) => void;
   onSaveCustomField: (setId: string, fieldId: string, val: string) => void;
+  onUpdateRegistry?: (permId: string, field: string, val: any) => void;
   onToggleSet: (setIndex: number, pauseSec: number, prefill: { reps: string; weight: string; rir?: string; rpe?: string; customFields?: Record<string, string> }) => void;
   onLongPressSet: (setIndex: number, pauseSec: number, prefill: { reps: string; weight: string; rir?: string; rpe?: string; customFields?: Record<string, string> }) => void;
   onOpenEffortModal: (setId: string, isRpe: boolean) => void;
@@ -40,6 +41,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
   onSaveWeight,
   onSaveSetWeight,
   onSaveCustomField, // 🔴 AGGIUNTO
+  onUpdateRegistry,
   onToggleSet,
   onLongPressSet,
   onOpenEffortModal,
@@ -49,6 +51,8 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
 }) => {
   const pressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isLongPressRef = useRef(false);
+
+  const regData = ex.exerciseId && state.registryV2 ? state.registryV2[ex.exerciseId] : null;
 
   // 🔴 CANONICAL V2: Ultima prestazione letta dalle sessioni storiche immutabili
   const lastPerf = getLastExercisePerformance(state.sessionsV2, ex.exerciseId, ex.name);
@@ -197,6 +201,72 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
               <option value="vogatore">Vogatore</option>
               <option value="bike">Bike / Assault</option>
             </select>
+          </div>
+        )}
+
+        {/* SETUP COACH 2.0 */}
+        {regData && (
+          <div className="mt-4 pt-3 border-t border-zinc-800/80">
+            <div className="text-[10px] font-black text-emerald-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <i className="fa-solid fa-robot" /> Setup Coach 2.0
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <select
+                value={regData.equipment || ''}
+                onChange={(e) => onUpdateRegistry?.(ex.exerciseId!, 'equipment', e.target.value)}
+                className="bg-zinc-950 text-zinc-300 text-[10px] font-bold p-2 rounded-xl border border-zinc-700/50 outline-none"
+              >
+                <option value="">Attrezzatura...</option>
+                <option value="barbell">Bilanciere</option>
+                <option value="dumbbell">Manubri</option>
+                <option value="machine">Macchina</option>
+                <option value="cable">Cavi</option>
+                <option value="smith_machine">Multipower</option>
+                <option value="bodyweight">Corpo Libero</option>
+              </select>
+              
+              <select
+                value={regData.movementPattern || ''}
+                onChange={(e) => onUpdateRegistry?.(ex.exerciseId!, 'movementPattern', e.target.value)}
+                className="bg-zinc-950 text-zinc-300 text-[10px] font-bold p-2 rounded-xl border border-zinc-700/50 outline-none"
+              >
+                <option value="">Pattern...</option>
+                <option value="horizontal_push">Spinta Orizzontale</option>
+                <option value="vertical_push">Spinta Verticale</option>
+                <option value="horizontal_pull">Tirata Orizzontale</option>
+                <option value="vertical_pull">Tirata Verticale</option>
+                <option value="squat">Squat / Press</option>
+                <option value="hinge">Hinge / Stacco</option>
+                <option value="isolation_shoulders">Isolamento Spalle</option>
+                <option value="isolation_biceps">Isolamento Bicipiti</option>
+                <option value="isolation_triceps">Isolamento Tricipiti</option>
+                <option value="isolation_legs">Isolamento Gambe</option>
+              </select>
+
+              <select
+                value={regData.progressionModel || ''}
+                onChange={(e) => onUpdateRegistry?.(ex.exerciseId!, 'progressionModel', e.target.value)}
+                className="bg-zinc-950 text-zinc-300 text-[10px] font-bold p-2 rounded-xl border border-zinc-700/50 outline-none"
+              >
+                <option value="">Progressione...</option>
+                <option value="double_progression">Doppia Progressione</option>
+                <option value="time_under_tension">Time Under Tension</option>
+                <option value="fixed_volume">Volume Fisso</option>
+              </select>
+
+              <div className="flex items-center bg-zinc-950 border border-zinc-700/50 rounded-xl p-1 px-2">
+                <span className="text-[9px] text-zinc-500 font-bold uppercase w-12">Incr.</span>
+                <input
+                  type="number"
+                  step="0.25"
+                  min="0"
+                  placeholder="kg/s"
+                  value={regData.progressionIncrement || ''}
+                  onChange={(e) => onUpdateRegistry?.(ex.exerciseId!, 'progressionIncrement', parseFloat(e.target.value) || 0)}
+                  className="bg-transparent text-white font-bold w-full text-right outline-none text-[10px]"
+                />
+              </div>
+            </div>
           </div>
         )}
       </div>

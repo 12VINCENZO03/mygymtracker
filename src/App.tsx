@@ -1107,8 +1107,14 @@ export default function App() {
 
         if (currentRound > lastAnnouncedRoundOrPacing) {
           lastAnnouncedRoundOrPacing = currentRound;
-          // Spunta automatica in sicurezza
-          setState(prev => prev ? { ...prev, checkedSets: { ...prev.checkedSets, [`${circuitId}-round-${currentRound - 1}`]: true } } : null);
+          let nextToSave: AppState | null = null;
+          setState((prev) => {
+            if (!prev) return null;
+            const next = { ...prev, checkedSets: { ...prev.checkedSets, [`${circuitId}-round-${currentRound - 1}`]: true } };
+            nextToSave = next;
+            return next;
+          });
+          if (nextToSave) saveGymState(nextToSave).catch(() => {});
           
           // Suona solo se Safari non stava dormendo da ore (evita spam di suoni arretrati)
           if (elapsedSec - (currentRound * intSec) < 5) playTrumpet();
@@ -1478,6 +1484,20 @@ export default function App() {
                     onSaveWeight={(val) => handleSaveWeight(ex.id, val)}
                     onSaveSetWeight={handleSaveSetWeight}
                     onSaveCustomField={handleSaveCustomField} // 🔴 AGGIUNGI QUESTA RIGA QUI
+                    onUpdateRegistry={(permId, field, val) => {
+                      setState((prev) => {
+                        if (!prev) return null;
+                        const currentReg = prev.registryV2[permId];
+                        if (!currentReg) return prev;
+                        return {
+                          ...prev,
+                          registryV2: {
+                            ...prev.registryV2,
+                            [permId]: { ...currentReg, [field]: val }
+                          }
+                        };
+                      });
+                    }}
                     onToggleSet={(sIdx, pauseSec, prefill) =>
                       handleToggleSet(ex.id, sIdx, pauseSec, prefill)
                     }

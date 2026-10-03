@@ -33,8 +33,20 @@ export function calculateVolumeFromSessionV2(session: WorkoutSessionV2): number 
           for (const set of sub.sets) {
             const reps = set.reps || 0;
             const w = set.weight || 0;
-            if (sub.type === 'weight' || !sub.type) vol += reps * w;
-            else if (sub.type === 'bodyweight') vol += reps * w; // Conta solo la zavorra esterna!
+            const type = (sub.type || 'weight');
+            
+            if (type === 'weight' || !type) {
+              vol += reps * w;
+            } else if (type === 'bodyweight') {
+              vol += reps * w; 
+            } else if (type === 'cardio') {
+              const durationMin = (set.durationSec || 0) / 60;
+              const rpe = set.rpe || 5; 
+              vol += Math.round(durationMin * rpe * 10);
+            } else if (type === 'time') {
+              const durationMin = (set.durationSec || 0) / 60;
+              vol += Math.round(durationMin * 100);
+            }
           }
         }
       }
@@ -44,8 +56,20 @@ export function calculateVolumeFromSessionV2(session: WorkoutSessionV2): number 
       for (const set of exBlock.sets) {
         const reps = set.reps || 0;
         const w = set.weight || 0;
-        if (exBlock.type === 'weight' || !exBlock.type) vol += reps * w;
-        else if (exBlock.type === 'bodyweight') vol += reps * w; // Conta solo la zavorra esterna!
+        const type = (exBlock.type || 'weight');
+        
+        if (type === 'weight' || !type) {
+          vol += reps * w;
+        } else if (type === 'bodyweight') {
+          vol += reps * w; 
+        } else if (type === 'cardio') {
+          const durationMin = (set.durationSec || 0) / 60;
+          const rpe = set.rpe || 5; 
+          vol += Math.round(durationMin * rpe * 10);
+        } else if (type === 'time') {
+          const durationMin = (set.durationSec || 0) / 60;
+          vol += Math.round(durationMin * 100);
+        }
       }
     }
   }
