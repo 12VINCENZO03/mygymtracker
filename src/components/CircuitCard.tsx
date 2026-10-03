@@ -715,21 +715,28 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
 
                     return (
                       <div key={sub.id} className="bg-zinc-900/50 p-3.5 rounded-2xl border border-zinc-800/60 flex flex-col gap-2">
-                        <div className="flex justify-between items-center">
+                        <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-black text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                            <div className="w-5 h-5 flex items-center justify-center bg-emerald-950/60 border border-emerald-900/50 rounded text-emerald-400 font-bold text-[10px] shrink-0">
                               {letter}
-                            </span>
+                            </div>
                             <span className="font-extrabold text-xs text-white">{sub.name}</span>
                           </div>
-                          {sub.link && sub.link.trim() !== '' && (
-                            <button
-                              type="button"
-                              onClick={() => onOpenVideo(sub.link!)}
-                              className="text-emerald-400 bg-emerald-950/40 hover:bg-emerald-900/60 p-1.5 rounded-lg border border-emerald-900/40 transition-all active:scale-95"
+                          {(sub.videoUrl || sub.link) && (
+                            <a
+                              href={sub.videoUrl || sub.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => {
+                                if (onOpenVideo) {
+                                  e.preventDefault();
+                                  onOpenVideo((sub.videoUrl || sub.link)!);
+                                }
+                              }}
+                              className="w-7 h-7 flex items-center justify-center rounded-full bg-zinc-900 text-emerald-400 hover:bg-zinc-800 transition-colors border border-zinc-700/60 shadow-sm shrink-0"
                             >
                               <i className="fa-solid fa-video text-[9px]" />
-                            </button>
+                            </a>
                           )}
                         </div>
 
@@ -839,23 +846,33 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
 
             return (
               <div key={sub.id} className="bg-zinc-950/50 p-4 rounded-3xl border border-zinc-800/60 shadow-sm">
-                <div className="flex justify-between items-center mb-3">
-                  <div className="flex items-baseline gap-2.5">
-                    <span className="text-xs font-black text-emerald-500 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
-                      {letter}
-                    </span>
-                    <span className="font-extrabold text-sm text-white">{sub.name}</span>
+              {/* Intestazione Esercizio Interno */}
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 flex items-center justify-center bg-emerald-950/60 border border-emerald-900/50 rounded-md text-emerald-400 font-bold text-xs shrink-0">
+                    {letter}
                   </div>
-                  {sub.link && sub.link.trim() !== '' && !isEditMode && (
-                    <button
-                      type="button"
-                      onClick={() => onOpenVideo(sub.link!)}
-                      className="text-emerald-400 bg-emerald-950/40 hover:bg-emerald-900/60 p-2 rounded-xl border border-emerald-900/40 transition-all active:scale-95 shadow-sm"
-                    >
-                      <i className="fa-solid fa-video text-[10px]" />
-                    </button>
-                  )}
+                  <h4 className="font-bold text-zinc-100 text-sm leading-tight">
+                    {sub.name}
+                  </h4>
                 </div>
+                {(sub.videoUrl || sub.link) && (
+                  <a
+                    href={sub.videoUrl || sub.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => {
+                      if (onOpenVideo) {
+                        e.preventDefault();
+                        onOpenVideo((sub.videoUrl || sub.link)!);
+                      }
+                    }}
+                    className="w-8 h-8 flex items-center justify-center rounded-full bg-zinc-900 text-emerald-400 hover:bg-zinc-800 transition-colors border border-zinc-700/60 shadow-sm shrink-0"
+                  >
+                    <i className="fa-solid fa-video text-[10px]" />
+                  </a>
+                )}
+              </div>
 
                 {/* Sub Exercise Coach Advice */}
                 {coachAdvice && coachAdvice.message && (

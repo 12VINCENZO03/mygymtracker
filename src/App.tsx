@@ -1089,8 +1089,14 @@ export default function App() {
         playTrumpet();
         showToast(type === 'emom' ? 'EMOM Completato con successo!' : 'AMRAP Terminato!');
         
-        // Rimuove silenziosamente il timer dallo stato persistente
-        setState(prev => prev ? { ...prev, activeMasterTimer: null } : null);
+        // 🔥 FIX: Salva esplicitamente la rimozione del timer
+        setState(prev => {
+           if (!prev) return null;
+           const nextState = { ...prev, activeMasterTimer: null };
+           // Chiamata fire-and-forget, ma garantisce che IDB riceva l'ordine di eliminare il timer persistente
+           saveGymState(nextState).catch(console.error);
+           return nextState;
+        });
         return;
       }
 

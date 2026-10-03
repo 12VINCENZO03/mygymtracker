@@ -15,6 +15,12 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
   const [selectedSession, setSelectedSession] = useState<WorkoutSessionV2 | null>(null);
   const [visibleCount, setVisibleCount] = useState(30);
 
+  // Filtra la cronologia eliminando i valori nulli che potrebbero mandare in crash React
+  const safeHistory = useMemo(() => {
+    if (!Array.isArray(historyV2)) return [];
+    return historyV2.filter((s) => s && typeof s === 'object');
+  }, [historyV2]);
+
   if (!isOpen) return null;
 
   // Helper corazzato: non salta in aria se mancano dati (es. vecchie sessioni o DB corrotto)
@@ -42,12 +48,6 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
     }
     return count;
   };
-
-  // Filtra la cronologia eliminando i valori nulli che potrebbero mandare in crash React
-  const safeHistory = useMemo(() => {
-    if (!Array.isArray(historyV2)) return [];
-    return historyV2.filter((s) => s && typeof s === 'object');
-  }, [historyV2]);
 
   const displayedHistory = safeHistory.slice(0, visibleCount);
 
