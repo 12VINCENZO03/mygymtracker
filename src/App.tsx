@@ -39,6 +39,7 @@ import { ExerciseCard } from './components/ExerciseCard';
 import { CircuitCard } from './components/CircuitCard';
 import { EffortModal } from './components/EffortModal';
 import { SummaryModal } from './components/SummaryModal';
+import { RepsModal } from './components/RepsModal';
 import { BiaModal } from './components/BiaModal';
 import { PRModal } from './components/PRModal';
 import { SyncModal } from './components/SyncModal';
@@ -78,6 +79,17 @@ export default function App() {
   const [summaryData, setSummaryData] = useState<{
     newSnapshot: WorkoutSessionV2;
     prevSnapshot: WorkoutSessionV2 | null;
+  } | null>(null);
+
+  // Reps modal
+  const [repsModalTarget, setRepsModalTarget] = useState<{
+    exId: string;
+    setIndex: number;
+    pauseSec: number;
+    prefill: { reps: string; weight: string; rir?: string; rpe?: string; customFields?: Record<string, string> };
+    circuitId?: string;
+    initialReps: number;
+    exerciseName?: string;
   } | null>(null);
 
   // Toast
@@ -192,32 +204,48 @@ export default function App() {
 
   const handleSaveWeight = useCallback((id: string, val: string | number) => {
     const cleanVal = sanitizeNumericInput(val);
-
+    let nextToSave: AppState | null = null;
     setState((prev) => {
       if (!prev) return null;
       if (prev.weights[id] === cleanVal) return prev;
-      return { ...prev, weights: { ...prev.weights, [id]: cleanVal } };
+      const nextState = { ...prev, weights: { ...prev.weights, [id]: cleanVal } };
+      nextToSave = nextState;
+      return nextState;
     });
+    if (nextToSave) {
+      saveGymState(nextToSave).catch(console.warn);
+    }
   }, []);
 
   const handleSaveSetWeight = useCallback((setId: string, val: string | number) => {
     const cleanVal = sanitizeNumericInput(val);
-
+    let nextToSave: AppState | null = null;
     setState((prev) => {
       if (!prev) return null;
       if (prev.setWeights[setId] === cleanVal) return prev;
-      return { ...prev, setWeights: { ...prev.setWeights, [setId]: cleanVal } };
+      const nextState = { ...prev, setWeights: { ...prev.setWeights, [setId]: cleanVal } };
+      nextToSave = nextState;
+      return nextState;
     });
+    if (nextToSave) {
+      saveGymState(nextToSave).catch(console.warn);
+    }
   }, []);
 
   // 🔴 NUOVO: Salvataggio campi cardio avanzati (Velocità, Inclinazione, ecc.)
   const handleSaveCustomField = useCallback((setId: string, fieldId: string, val: string) => {
+    let nextToSave: AppState | null = null;
     setState((prev) => {
       if (!prev) return null;
       const allFields = prev.setCustomFields || {};
       const currentFields = allFields[setId] || {};
-      return { ...prev, setCustomFields: { ...allFields, [setId]: { ...currentFields, [fieldId]: val } } };
+      const nextState = { ...prev, setCustomFields: { ...allFields, [setId]: { ...currentFields, [fieldId]: val } } };
+      nextToSave = nextState;
+      return nextState;
     });
+    if (nextToSave) {
+      saveGymState(nextToSave).catch(console.warn);
+    }
   }, []);
 
 
@@ -531,40 +559,44 @@ export default function App() {
           const completedRounds: CircuitRoundV2[] = [];
           const maxRounds = ex.structureType === 'amrap' ? roundsToCount : (roundsToCount || 10);
           for (let j = 0; j < maxRounds; j++) {
-            const isDone = ex.structureType === 'amrap'
-              ? true
-              : ex.exercises.some((sub) => state.checkedSets[`${sub.id}-${j}`]) || state.checkedSets[`${ex.id}-round-${j}`];
-            if (isDone) {
-              hasCheckedSets = true;
-              totalSets++;
-              const roundExs: ExerciseSnapshotV2[] = ex.exercises.map((sub) => {
-                const setId = `${sub.id}-${j}`;
-                const regId = sub.exerciseId || getOrRegisterEx(sub.name, sub.metricType);
-                const rawWeight = state.setWeights[setId] ?? state.weights[sub.id];
-                const rawReps = state.setReps[setId] || sub.reps;
-                const rawDuration = state.setDurations[setId] || state.setReps[setId] || sub.workSec || 60;
-                const rawRir = state.setRir[setId];
-                const rawRpe = state.setRpe[setId];
-                const validData = validateSetData(
-                  parseInt(String(rawReps)) || undefined,
-                  parseFloat(String(rawWeight)) || undefined,
-                  parseFloat(String(rawDuration)) || undefined,
-                  rawRir === '' || rawRir == null || rawRir === '-1' || rawRir === 'CED' ? undefined : parseFloat(String(rawRir)),
-                  parseFloat(String(rawRpe)) || undefined
-                );
-                return {
-                  exerciseId: regId,
-                  nameSnapshot: sub.name,
-                  type: sub.metricType || 'weight',
-                  sets: [{
-                    id: generateId(),
-                    index: 1,
-                    ...validData,
-                    isCed: rawRir === '-1' || rawRir === 'CED',
-                    customFields: state.setCustomFields?.[`${sub.name}-${j + 1}`] || state.setCustomFields?.[setId] || undefined
-                  }]
-                };
+            const isMasterRoundDone = Boolean(state.checkedSets[`${ex.id}-round-${j}`]) || (ex.structureType === 'amrap' && j < roundsToCount);
+            const roundExs: ExerciseSnapshotV2[] = [];
+
+            for (const sub of ex.exercises) {
+              const setId = `${sub.id}-${j}`;
+              const isSubDone = Boolean(state.checkedSets[setId]) || isMasterRoundDone;
+              if (!isSubDone) continue;
+
+              const regId = sub.exerciseId || getOrRegisterEx(sub.name, sub.metricType);
+              const rawWeight = state.setWeights[setId] ?? state.weights[sub.id];
+              const rawReps = state.setReps[setId] || sub.reps;
+              const rawDuration = state.setDurations[setId] || state.setReps[setId] || sub.workSec || 60;
+              const rawRir = state.setRir[setId];
+              const rawRpe = state.setRpe[setId];
+              const validData = validateSetData(
+                parseInt(String(rawReps)) || undefined,
+                parseFloat(String(rawWeight)) || undefined,
+                parseFloat(String(rawDuration)) || undefined,
+                rawRir === '' || rawRir == null || rawRir === '-1' || rawRir === 'CED' ? undefined : parseFloat(String(rawRir)),
+                parseFloat(String(rawRpe)) || undefined
+              );
+              roundExs.push({
+                exerciseId: regId,
+                nameSnapshot: sub.name,
+                type: sub.metricType || 'weight',
+                sets: [{
+                  id: generateId(),
+                  index: 1,
+                  ...validData,
+                  isCed: rawRir === '-1' || rawRir === 'CED',
+                  customFields: state.setCustomFields?.[`${sub.name}-${j + 1}`] || state.setCustomFields?.[setId] || undefined
+                }]
               });
+            }
+
+            if (roundExs.length > 0) {
+              hasCheckedSets = true;
+              totalSets += roundExs.length;
               completedRounds.push({ roundIndex: j + 1, exercises: roundExs });
             }
           }
@@ -869,7 +901,7 @@ export default function App() {
     await saveGymState(nextState); // Persistenza sicura su IndexedDB
   };
 
-  const handleLongPressSet = async (
+  const handleLongPressSet = (
     exId: string,
     setIndex: number,
     pauseSec: number,
@@ -879,112 +911,142 @@ export default function App() {
     if (!state) return;
     const setId = `${exId}-${setIndex}`;
     const currentVal = state.setReps[setId] ?? prefill.reps;
-    
-    const input = prompt('Quante ripetizioni hai eseguito davvero?', currentVal);
-    
-    if (input !== null && input.trim() !== '') {
-      const parsed = Math.max(0, parseInt(input));
-      
-      if (!isNaN(parsed)) {
-        const nextCheckedSets = { ...state.checkedSets };
-        const nextSetReps = { ...state.setReps };
-        const nextSetWeights = { ...state.setWeights };
-        const nextSetRir = { ...state.setRir };
-        const nextSetRpe = { ...state.setRpe };
+    const parsedInitial = parseInt(String(currentVal)) || 10;
 
-        nextSetReps[setId] = parsed.toString();
-        nextCheckedSets[setId] = true;
-        
-        if (nextSetWeights[setId] === undefined) nextSetWeights[setId] = prefill.weight;
-        if (prefill.rir !== undefined && nextSetRir[setId] === undefined) nextSetRir[setId] = prefill.rir;
-        if (prefill.rpe !== undefined && nextSetRpe[setId] === undefined) nextSetRpe[setId] = prefill.rpe;
-
-        let nextSetCustomFields = state.setCustomFields || {};
-        if (prefill.customFields && Object.keys(prefill.customFields).length > 0) {
-          const currentFields = nextSetCustomFields[setId] || {};
-          nextSetCustomFields = { ...nextSetCustomFields, [setId]: { ...prefill.customFields, ...currentFields } };
+    let exerciseName: string | undefined;
+    for (const tab of state.plan) {
+      for (const ex of tab.exercises) {
+        if (ex.id === exId) {
+          exerciseName = ex.name;
+          break;
         }
-
-        const nextState = {
-          ...state,
-          checkedSets: nextCheckedSets,
-          setReps: nextSetReps,
-          setWeights: nextSetWeights,
-          setRir: nextSetRir,
-          setRpe: nextSetRpe,
-          setCustomFields: nextSetCustomFields
-        };
-
-        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-          try { navigator.vibrate(20); } catch { /* ignore */ }
-        }
-        playShortBeep();
-
-        let handledCircuitRest = false;
-        if (circuitId) {
-          const currentTab = nextState.plan.find((t) => t.id === nextState.activeTab);
-          const circuit = currentTab?.exercises.find((e) => e.id === circuitId);
-          
-          if (circuit && circuit.type === 'superset' && circuit.structureType === 'classic') {
-            const lastRealEx = [...circuit.exercises].reverse().find((e) => e.metricType !== 'rest');
-            
-            if (lastRealEx && lastRealEx.id === exId) {
-              handledCircuitRest = true;
-              const circuitPause = circuit.pause !== undefined ? circuit.pause : 90;
-              
-              if (circuitPause > 0) {
-                startRestTimer(circuitPause, async () => {
-                  let nextToSave: AppState | null = null;
-                  setState((prev) => {
-                    if (!prev) return null;
-                    const next = {
-                      ...prev,
-                      checkedSets: { ...prev.checkedSets, [`${circuitId}-round-${setIndex}`]: true }
-                    };
-                    nextToSave = next;
-                    return next;
-                  });
-                  if (nextToSave) {
-                    await saveGymState(nextToSave);
-                  }
-                  const circuitEl = document.getElementById(`circuit-${circuitId}`);
-                  circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                });
-              } else {
-                nextCheckedSets[`${circuitId}-round-${setIndex}`] = true;
-                const circuitEl = document.getElementById(`circuit-${circuitId}`);
-                circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              }
-            }
+        if (ex.type === 'superset' && ex.exercises) {
+          const sub = ex.exercises.find((s) => s.id === exId);
+          if (sub) {
+            exerciseName = sub.name;
+            break;
           }
         }
+      }
+      if (exerciseName) break;
+    }
 
-        if (!handledCircuitRest) {
-          if (pauseSec > 0) {
-            startRestTimer(pauseSec, () => {
-              if (circuitId) {
-                const circuitEl = document.getElementById(`circuit-${circuitId}`);
-                circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              } else {
-                const exEl = document.getElementById(`ex-container-${exId}`) || document.getElementById(`exercise-${exId}`);
-                exEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setRepsModalTarget({
+      exId,
+      setIndex,
+      pauseSec,
+      prefill,
+      circuitId,
+      initialReps: parsedInitial,
+      exerciseName
+    });
+  };
+
+  const handleConfirmRepsModal = async (reps: number) => {
+    if (!state || !repsModalTarget) return;
+    const { exId, setIndex, pauseSec, prefill, circuitId } = repsModalTarget;
+    setRepsModalTarget(null);
+
+    const setId = `${exId}-${setIndex}`;
+    const parsed = Math.max(0, reps);
+
+    const nextCheckedSets = { ...state.checkedSets };
+    const nextSetReps = { ...state.setReps };
+    const nextSetWeights = { ...state.setWeights };
+    const nextSetRir = { ...state.setRir };
+    const nextSetRpe = { ...state.setRpe };
+
+    nextSetReps[setId] = parsed.toString();
+    nextCheckedSets[setId] = true;
+    
+    if (nextSetWeights[setId] === undefined) nextSetWeights[setId] = prefill.weight;
+    if (prefill.rir !== undefined && nextSetRir[setId] === undefined) nextSetRir[setId] = prefill.rir;
+    if (prefill.rpe !== undefined && nextSetRpe[setId] === undefined) nextSetRpe[setId] = prefill.rpe;
+
+    let nextSetCustomFields = state.setCustomFields || {};
+    if (prefill.customFields && Object.keys(prefill.customFields).length > 0) {
+      const currentFields = nextSetCustomFields[setId] || {};
+      nextSetCustomFields = { ...nextSetCustomFields, [setId]: { ...prefill.customFields, ...currentFields } };
+    }
+
+    const nextState = {
+      ...state,
+      checkedSets: nextCheckedSets,
+      setReps: nextSetReps,
+      setWeights: nextSetWeights,
+      setRir: nextSetRir,
+      setRpe: nextSetRpe,
+      setCustomFields: nextSetCustomFields
+    };
+
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try { navigator.vibrate(20); } catch { /* ignore */ }
+    }
+    playShortBeep();
+
+    let handledCircuitRest = false;
+    if (circuitId) {
+      const currentTab = nextState.plan.find((t) => t.id === nextState.activeTab);
+      const circuit = currentTab?.exercises.find((e) => e.id === circuitId);
+      
+      if (circuit && circuit.type === 'superset' && circuit.structureType === 'classic') {
+        const lastRealEx = [...circuit.exercises].reverse().find((e) => e.metricType !== 'rest');
+        
+        if (lastRealEx && lastRealEx.id === exId) {
+          handledCircuitRest = true;
+          const circuitPause = circuit.pause !== undefined ? circuit.pause : 90;
+          
+          if (circuitPause > 0) {
+            startRestTimer(circuitPause, async () => {
+              let nextToSave: AppState | null = null;
+              setState((prev) => {
+                if (!prev) return null;
+                const next = {
+                  ...prev,
+                  checkedSets: { ...prev.checkedSets, [`${circuitId}-round-${setIndex}`]: true }
+                };
+                nextToSave = next;
+                return next;
+              });
+              if (nextToSave) {
+                await saveGymState(nextToSave);
               }
-            });
-          } else {
-            if (circuitId) {
               const circuitEl = document.getElementById(`circuit-${circuitId}`);
               circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            } else {
-              const exEl = document.getElementById(`ex-container-${exId}`) || document.getElementById(`exercise-${exId}`);
-              exEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
+            });
+          } else {
+            nextCheckedSets[`${circuitId}-round-${setIndex}`] = true;
+            const circuitEl = document.getElementById(`circuit-${circuitId}`);
+            circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }
         }
-
-        setState(nextState); // Immediato / ottimistico
-        await saveGymState(nextState); // Persistenza sicura su IndexedDB
       }
     }
+
+    if (!handledCircuitRest) {
+      if (pauseSec > 0) {
+        startRestTimer(pauseSec, () => {
+          if (circuitId) {
+            const circuitEl = document.getElementById(`circuit-${circuitId}`);
+            circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          } else {
+            const exEl = document.getElementById(`ex-container-${exId}`) || document.getElementById(`exercise-${exId}`);
+            exEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        });
+      } else {
+        if (circuitId) {
+          const circuitEl = document.getElementById(`circuit-${circuitId}`);
+          circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+          const exEl = document.getElementById(`ex-container-${exId}`) || document.getElementById(`exercise-${exId}`);
+          exEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+    }
+
+    setState(nextState);
+    await saveGymState(nextState);
   };
 
   const handleRunInlineTimer = (
@@ -2114,10 +2176,13 @@ export default function App() {
               createdAt: now
             };
 
-            // Invece di sovrascrivere l'indice se la data è la stessa, usa unshift per aggiungere sempre un nuovo record
-            hist.unshift(entry);
+            const existingIndex = hist.findIndex(h => h.date === entry.date);
+            if (existingIndex >= 0) {
+              hist[existingIndex] = { ...hist[existingIndex], ...entry, createdAt: entry.createdAt };
+            } else {
+              hist.unshift(entry);
+            }
 
-            // Riordinamento decrescente (sort) anche su misurazioni dello stesso giorno via createdAt
             hist.sort((a, b) => {
               const timeA = a.createdAt || new Date(a.date).getTime() || 0;
               const timeB = b.createdAt || new Date(b.date).getTime() || 0;
@@ -2174,6 +2239,16 @@ export default function App() {
         onClose={() => setSummaryData(null)}
       />
 
+      {/* Reps Modal */}
+      <RepsModal
+        isOpen={Boolean(repsModalTarget)}
+        exerciseName={repsModalTarget?.exerciseName}
+        setIndex={repsModalTarget?.setIndex ?? 0}
+        initialReps={repsModalTarget?.initialReps ?? 10}
+        onConfirm={handleConfirmRepsModal}
+        onClose={() => setRepsModalTarget(null)}
+      />
+
       {/* BIA Review Modal */}
       <BiaModal
         isOpen={Boolean(biaModalData)}
@@ -2201,8 +2276,13 @@ export default function App() {
               createdAt: now
             };
 
-            // Invece di sovrascrivere se la data è la stessa, usa unshift per aggiungere sempre un nuovo record
-            hist.unshift(entry);
+            const existingIndex = hist.findIndex(h => h.date === entry.date);
+            if (existingIndex >= 0) {
+              hist[existingIndex] = { ...hist[existingIndex], ...entry, createdAt: entry.createdAt };
+            } else {
+              hist.unshift(entry);
+            }
+
             hist.sort((a, b) => {
               const timeA = a.createdAt || new Date(a.date).getTime() || 0;
               const timeB = b.createdAt || new Date(b.date).getTime() || 0;

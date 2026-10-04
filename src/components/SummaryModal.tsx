@@ -399,9 +399,9 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({
                     isPr
                       ? 'bg-amber-950/20 border-amber-500/40 text-amber-200'
                       : isNeural
-                      ? 'bg-indigo-950/25 border-indigo-500/40 text-indigo-200'
+                      ? 'bg-amber-950/25 border-amber-500/40 text-amber-200'
                       : isEmom
-                      ? 'bg-sky-950/25 border-sky-500/40 text-sky-200'
+                      ? 'bg-amber-950/25 border-amber-500/40 text-amber-200'
                       : isReps || isTut || isBetter
                       ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-300'
                       : isWorse
@@ -413,9 +413,9 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({
                     {isPr ? (
                       <i className="fa-solid fa-trophy text-amber-400" />
                     ) : isNeural ? (
-                      <i className="fa-solid fa-brain text-indigo-400" />
+                      <i className="fa-solid fa-brain text-amber-400" />
                     ) : isEmom ? (
-                      <i className="fa-solid fa-stopwatch text-sky-400" />
+                      <i className="fa-solid fa-stopwatch text-amber-400" />
                     ) : isReps ? (
                       <i className="fa-solid fa-repeat text-emerald-400" />
                     ) : isTut ? (
@@ -472,8 +472,8 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({
                 )}
 
                 {diag.fatigueAlert && (
-                  <div className="text-[10px] text-indigo-300 bg-indigo-950/30 p-2 rounded-xl border border-indigo-900/40">
-                    <b className="text-indigo-400">Allerta Fatica:</b> {diag.fatigueAlert}
+                  <div className="text-[10px] text-amber-300 bg-amber-950/30 p-2 rounded-xl border border-amber-900/40">
+                    <b className="text-amber-400">Allerta Fatica:</b> {diag.fatigueAlert}
                   </div>
                 )}
               </div>

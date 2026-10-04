@@ -244,22 +244,22 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
           onClick={() => setMetricTab('cardio')}
           className={`p-4 rounded-2xl border transition-all cursor-pointer shadow-sm ${
             metricTab === 'cardio'
-              ? 'bg-sky-950/40 border-sky-500/60 ring-1 ring-sky-500/30'
+              ? 'bg-amber-950/40 border-amber-500/60 ring-1 ring-amber-500/30'
               : 'bg-zinc-900/60 border-zinc-800/60 hover:bg-zinc-900'
           }`}
         >
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] uppercase font-bold text-sky-400 tracking-wider">🏃 Cardio Settimana</span>
-            <i className="fa-solid fa-person-running text-sky-400 text-xs" />
+            <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">🏃 Cardio Settimana</span>
+            <i className="fa-solid fa-person-running text-amber-400 text-xs" />
           </div>
           <div className="text-xl font-black text-white">
             {stats.week.cardioKm > 0 ? (
               <>
-                {stats.week.cardioKm.toFixed(1)} <span className="text-xs text-sky-400 font-normal">km</span>
+                {stats.week.cardioKm.toFixed(1)} <span className="text-xs text-amber-400 font-normal">km</span>
               </>
             ) : (
               <>
-                {Math.round(stats.week.cardioMinutes)} <span className="text-xs text-sky-400 font-normal">min</span>
+                {Math.round(stats.week.cardioMinutes)} <span className="text-xs text-amber-400 font-normal">min</span>
               </>
             )}
           </div>
@@ -280,7 +280,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
               </>
             ) : (
               <>
-                <i className="fa-solid fa-person-running text-sky-400" /> Cardio & Endurance
+                <i className="fa-solid fa-person-running text-amber-400" /> Cardio & Endurance
               </>
             )}
           </span>
@@ -298,7 +298,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
               type="button"
               onClick={() => setMetricTab('cardio')}
               className={`px-2.5 py-1 rounded-lg transition-all ${
-                metricTab === 'cardio' ? 'bg-sky-500 text-zinc-950 font-black' : 'text-zinc-400'
+                metricTab === 'cardio' ? 'bg-amber-500 text-zinc-950 font-black' : 'text-zinc-400'
               }`}
             >
               Cardio
@@ -346,11 +346,11 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
               <div className="text-lg font-black text-white">
                 {stats.today.cardioKm > 0 ? (
                   <>
-                    {stats.today.cardioKm.toFixed(1)} <span className="text-xs text-sky-400 font-normal">km</span>
+                    {stats.today.cardioKm.toFixed(1)} <span className="text-xs text-amber-400 font-normal">km</span>
                   </>
                 ) : stats.today.cardioMinutes > 0 ? (
                   <>
-                    {Math.round(stats.today.cardioMinutes)} <span className="text-xs text-sky-400 font-normal">min</span>
+                    {Math.round(stats.today.cardioMinutes)} <span className="text-xs text-amber-400 font-normal">min</span>
                   </>
                 ) : (
                   <>
@@ -365,11 +365,11 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
               <div className="text-lg font-black text-white flex items-baseline">
                 {stats.week.cardioKm > 0 ? (
                   <>
-                    {stats.week.cardioKm.toFixed(1)} <span className="text-xs text-sky-400 font-normal ml-1 mr-1">km</span>
+                    {stats.week.cardioKm.toFixed(1)} <span className="text-xs text-amber-400 font-normal ml-1 mr-1">km</span>
                   </>
                 ) : (
                   <>
-                    {Math.round(stats.week.cardioMinutes)} <span className="text-xs text-sky-400 font-normal ml-1 mr-1">min</span>
+                    {Math.round(stats.week.cardioMinutes)} <span className="text-xs text-amber-400 font-normal ml-1 mr-1">min</span>
                   </>
                 )}
                 {renderDiffBadge(stats.week.cardioScore, stats.lastWeek.cardioScore, stats.hasLastWeek)}
@@ -381,11 +381,11 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
               <div className="text-lg font-black text-white flex items-baseline">
                 {stats.month.cardioKm > 0 ? (
                   <>
-                    {stats.month.cardioKm.toFixed(1)} <span className="text-xs text-sky-400 font-normal ml-1 mr-1">km</span>
+                    {stats.month.cardioKm.toFixed(1)} <span className="text-xs text-amber-400 font-normal ml-1 mr-1">km</span>
                   </>
                 ) : (
                   <>
-                    {Math.round(stats.month.cardioMinutes)} <span className="text-xs text-sky-400 font-normal ml-1 mr-1">min</span>
+                    {Math.round(stats.month.cardioMinutes)} <span className="text-xs text-amber-400 font-normal ml-1 mr-1">min</span>
                   </>
                 )}
                 {renderDiffBadge(stats.month.cardioScore, stats.lastMonth.cardioScore, stats.hasLastMonth)}
@@ -397,11 +397,11 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
               <div className="text-lg font-black text-white flex items-baseline">
                 {stats.year.cardioKm > 0 ? (
                   <>
-                    {stats.year.cardioKm.toFixed(1)} <span className="text-xs text-sky-400 font-normal ml-1 mr-1">km</span>
+                    {stats.year.cardioKm.toFixed(1)} <span className="text-xs text-amber-400 font-normal ml-1 mr-1">km</span>
                   </>
                 ) : (
                   <>
-                    {Math.round(stats.year.cardioMinutes)} <span className="text-xs text-sky-400 font-normal ml-1 mr-1">min</span>
+                    {Math.round(stats.year.cardioMinutes)} <span className="text-xs text-amber-400 font-normal ml-1 mr-1">min</span>
                   </>
                 )}
                 {renderDiffBadge(stats.year.cardioScore, stats.lastYear.cardioScore, stats.hasLastYear)}

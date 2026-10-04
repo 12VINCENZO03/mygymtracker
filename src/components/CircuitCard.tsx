@@ -767,16 +767,8 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
 
                 <div className="space-y-3">
                   {circuit.exercises.map((sub, sIdx) => {
-                    if (sub.metricType === 'rest') {
-                      return (
-                        <div
-                          key={sub.id}
-                          className="p-2.5 rounded-2xl bg-zinc-900/60 border border-zinc-800/60 text-center text-xs text-zinc-400 flex items-center justify-center gap-2 shadow-inner"
-                        >
-                          <i className="fa-regular fa-clock text-zinc-500" />
-                          <span className="font-medium">Pausa: {sub.restSeconds || 30}s</span>
-                        </div>
-                      );
+                    if (!isEditMode && sub.metricType === 'rest') {
+                      return null;
                     }
 
                     const lastSubPerf = getLastExercisePerformance(state.sessionsV2, sub.exerciseId, sub.name);
@@ -932,16 +924,8 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
           })
         ) : (
           circuit.exercises.map((sub, sIdx) => {
-            if (sub.metricType === 'rest') {
-              return (
-                <div
-                  key={sub.id}
-                  className="p-3 rounded-2xl bg-zinc-950/60 border border-zinc-800/80 text-center text-xs text-zinc-400 flex items-center justify-center gap-2 shadow-inner"
-                >
-                  <i className="fa-regular fa-clock text-zinc-500" />
-                  <span className="font-medium">Pausa tra gli esercizi: {sub.restSeconds || 30}s</span>
-                </div>
-              );
+            if (!isEditMode && sub.metricType === 'rest') {
+              return null;
             }
 
             const lastSubPerf = getLastExercisePerformance(state.sessionsV2, sub.exerciseId, sub.name);

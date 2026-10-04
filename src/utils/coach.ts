@@ -350,7 +350,7 @@ export function extractExerciseHistoryFromSessions(
             if (!sub) continue;
             const matchId = exerciseId && sub.exerciseId === exerciseId;
             const matchName = targetName && String(sub.nameSnapshot || '').trim().toLowerCase() === targetName;
-            if (matchId || (!exerciseId && matchName)) {
+            if (matchId || matchName) {
               if (!dateMap.has(session.date)) {
                 dateMap.set(session.date, { date: session.date, sets: [] });
               }
@@ -385,7 +385,7 @@ export function extractExerciseHistoryFromSessions(
         const exBlock = block as any;
         const matchId = exerciseId && exBlock.exerciseId === exerciseId;
         const matchName = targetName && String(exBlock.nameSnapshot || '').trim().toLowerCase() === targetName;
-        if (matchId || (!exerciseId && matchName)) {
+        if (matchId || matchName) {
           if (!dateMap.has(session.date)) {
             dateMap.set(session.date, { date: session.date, sets: [] });
           }
