@@ -670,7 +670,7 @@ export function getExerciseCoachAdvice(
               return {
                 badge: 'increase',
                 title: 'Pronto per Zavorra',
-                message: `${diagContext} AZIONE: Pieno controllo tecnico. È il momento di inserire una zavorra di partenza (+${jump}kg).`
+                message: `${diagContext} AZIONE: Pieno controllo tecnico. È il momento di inserire una zavorra modulare minima (registra il primo carico sostenibile).`
               };
             }
           }
@@ -732,17 +732,10 @@ export function getGoalCrossInsight(state: AppState, stats: VolumeStats): string
     const goal = state.bodyGoal;
     if (!goal || goal === 'recomp') return null;
     const hist = state.bodyMetricsHistory || [];
-    if (hist.length < 2) return null;
-    const now = new Date();
-    const past = hist.find((h) => {
-      const d = Math.floor((now.getTime() - new Date(h.date).getTime()) / 86400000);
-      return d >= 21 && d <= 42 && h.fm !== '' && h.fm != null;
-    }) || hist.find((h) => {
-      const d = Math.floor((now.getTime() - new Date(h.date).getTime()) / 86400000);
-      return d >= 21 && h.fm !== '' && h.fm != null;
-    });
-    if (!past) return null;
-    const cur = hist.find(h => h.fm !== '' && h.fm != null && h.ffm !== '' && h.ffm != null) || hist[0];
+    const validBiaEntries = hist.filter((h) => h.fm !== '' && h.fm != null && h.ffm !== '' && h.ffm != null);
+    if (validBiaEntries.length < 2) return null;
+    const cur = validBiaEntries[0];
+    const past = validBiaEntries[1];
     const curFm = parseFloat(String(cur.fm)) || null;
     const pastFm = parseFloat(String(past.fm)) || null;
     const fmDown = curFm !== null && pastFm !== null && pastFm - curFm >= 0.5;

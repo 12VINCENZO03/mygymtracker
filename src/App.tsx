@@ -599,7 +599,7 @@ export default function App() {
 
         // GESTIONE IMMUTABILE DEI PR
         v2Blocks.forEach((block) => {
-          if (!('rounds' in block) && (block.type === 'weight' || !block.type)) {
+          if (!('rounds' in block) && (block.type === 'weight' || block.type === 'bodyweight' || !block.type)) {
             const maxW = Math.max(...block.sets.map((s) => s.weight || 0));
             if (maxW > 0) {
               const permId = block.exerciseId;

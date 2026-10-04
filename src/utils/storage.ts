@@ -590,7 +590,7 @@ export function normalizeState(parsed: any): AppState {
     profileName: typeof parsed.profileName === 'string' ? parsed.profileName : '',
     plan,
     activeTab: typeof parsed.activeTab === 'string' ? parsed.activeTab : 'home',
-    isEditMode: false,
+    isEditMode: !!parsed.isEditMode,
     weights: parsed.weights || {},
     setWeights: parsed.setWeights || {},
     checkedSets: parsed.checkedSets || {},
@@ -605,12 +605,13 @@ export function normalizeState(parsed: any): AppState {
     bodyMetricsHistory: Array.isArray(parsed.bodyMetricsHistory) ? parsed.bodyMetricsHistory : [],
     favoriteTabs: parsed.favoriteTabs || {},
     amrapRounds: parsed.amrapRounds || {},
-    bodyGoal: parsed.bodyGoal || 'recomp',
+    bodyGoal: parsed.bodyGoal !== undefined ? parsed.bodyGoal : 'recomp',
     deloadActive: !!parsed.deloadActive,
     deloadDates: Array.isArray(parsed.deloadDates) ? parsed.deloadDates : [],
     currentEffortSelection: parsed.currentEffortSelection || null,
     activeMasterTimer: parsed.activeMasterTimer || null,
     lastBackupDate: parsed.lastBackupDate || null,
+    lastSavedAt: parsed.lastSavedAt,
 
     // CANONICAL V2
     registryV2: registry,
@@ -662,6 +663,17 @@ export function importBackupString(input: string, currentState?: AppState): AppS
 
   // Estraiamo lo stato interno se il backup è nel nuovo formato container
   const rawState = parsed.format === 'MYGYM_CANONICAL_V2' && parsed.state ? parsed.state : parsed;
+
+  if (!rawState || typeof rawState !== 'object') {
+    throw new Error('Dati di backup non validi o vuoti');
+  }
+
+  // Blocco di sicurezza contro importazioni kamikaze di oggetti vuoti ({})
+  const hasValidPlan = Array.isArray(rawState.plan) && rawState.plan.length > 0;
+  const hasValidSessions = Array.isArray(rawState.sessionsV2) || Array.isArray(rawState.sessions) || Array.isArray(rawState.workoutSessionsHistory);
+  if (!hasValidPlan && !hasValidSessions) {
+    throw new Error('Dati di backup non validi: archivio privo di schede (plan) o sessioni storiche (sessionsV2).');
+  }
 
   // Normalizzazione e migrazione
   const normalized = normalizeState(rawState);
