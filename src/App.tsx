@@ -568,6 +568,7 @@ export default function App() {
             const roundExs: ExerciseSnapshotV2[] = [];
 
             for (const sub of ex.exercises) {
+              if (sub.metricType === 'rest') continue;
               const setId = `${sub.id}-${j}`;
               const isSubDone = Boolean(state.checkedSets[setId]) || isMasterRoundDone;
               if (!isSubDone) continue;
@@ -707,6 +708,8 @@ export default function App() {
         setState(newState);
         showToast('Allenamento terminato (nessuna serie registrata).');
       }
+    } catch (e: any) {
+      showToast('Errore di salvataggio: ' + (e?.message || 'Riprova'), true);
     } finally {
       setIsSaving(false);
     }
@@ -1142,7 +1145,7 @@ export default function App() {
       }
     };
     setState(newState);
-    await saveGymState(newState, true); // Sincrono
+    await saveGymState(newState, false); // Sincrono
   };
 
   const handleStartAmrap = async (circuitId: string, totalMin: number, pacingSec?: number) => {
@@ -1164,7 +1167,7 @@ export default function App() {
       }
     };
     setState(newState);
-    await saveGymState(newState, true); // Sincrono
+    await saveGymState(newState, false); // Sincrono
   };
 
   // 4. 🔥 AGGIUNGI QUESTO USE_EFFECT SUBITO SOTTO AGLI ALTRI (Il cuore dell'Anti-Crash)
@@ -2324,11 +2327,7 @@ export default function App() {
               hist.unshift(entry);
             }
 
-            hist.sort((a, b) => {
-              const timeA = a.createdAt || new Date(a.date).getTime() || 0;
-              const timeB = b.createdAt || new Date(b.date).getTime() || 0;
-              return timeB - timeA;
-            });
+            hist.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
             return { ...prev, bodyMetrics: updated, bodyMetricsHistory: hist };
           });
@@ -2419,11 +2418,7 @@ export default function App() {
               hist.unshift(entry);
             }
 
-            hist.sort((a, b) => {
-              const timeA = a.createdAt || new Date(a.date).getTime() || 0;
-              const timeB = b.createdAt || new Date(b.date).getTime() || 0;
-              return timeB - timeA;
-            });
+            hist.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
             const next = { ...prev, bodyMetrics: nextMetrics, bodyMetricsHistory: hist };
             nextToSave = next;

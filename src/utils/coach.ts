@@ -1114,7 +1114,9 @@ export function getCircuitCoachAdvice(state: AppState, circuit: SupersetExercise
         let total = 0;
         if (Array.isArray(round.exercises)) {
           round.exercises.forEach((ex: any) => {
-            if (Array.isArray(ex.sets)) ex.sets.forEach((s: any) => total += (Number(s.reps) || 0));
+            if (ex.type !== 'time' && ex.type !== 'cardio' && Array.isArray(ex.sets)) {
+              ex.sets.forEach((s: any) => total += (Number(s.reps) || 0));
+            }
           });
         }
         return total;
