@@ -30,18 +30,34 @@ const workerCode = `
       try {
         const database = await initDB();
         const payload = e.data.payload;
+        const newSession = e.data.newSession;
+        const deletedSessionIds = e.data.deletedSessionIds;
         const hasSessions = Boolean(payload && Array.isArray(payload.sessionsV2));
+        const hasDeletes = Boolean(Array.isArray(deletedSessionIds) && deletedSessionIds.length > 0);
         
-        const storeNames = hasSessions ? ['store', 'sessions'] : ['store'];
+        const storeNames = (hasSessions || newSession || hasDeletes) ? ['store', 'sessions'] : ['store'];
         const tx = database.transaction(storeNames, 'readwrite');
         
         const hotState = { ...payload };
         delete hotState.sessionsV2;
         tx.objectStore('store').put(hotState, 'state');
+
+        const sessionStore = (hasSessions || newSession || hasDeletes) ? tx.objectStore('sessions') : null;
         
-        if (hasSessions) {
+        if (sessionStore && hasDeletes) {
+          for (let i = 0; i < deletedSessionIds.length; i++) {
+            const delId = deletedSessionIds[i];
+            if (delId) {
+              sessionStore.delete(delId);
+            }
+          }
+        }
+        
+        if (sessionStore && newSession && newSession.id) {
+          // Salvataggio Delta O(1): inserisce solo la singola nuova sessione
+          sessionStore.put(newSession, newSession.id);
+        } else if (sessionStore && hasSessions) {
           const sessions = payload.sessionsV2 || [];
-          const sessionStore = tx.objectStore('sessions');
           // Rimuoviamo l'eventuale chiave monolitica legacy 'history'
           try { sessionStore.delete('history'); } catch (err) {}
           
@@ -56,6 +72,21 @@ const workerCode = `
         
         tx.oncomplete = () => self.postMessage({ success: true, id: e.data.id, revision: payload.revision });
         tx.onerror = (err) => self.postMessage({ success: false, error: 'Transaction error: ' + err, id: e.data.id });
+      } catch (err) {
+        self.postMessage({ success: false, error: err.message, id: e.data.id });
+      }
+    } else if (e.data.action === 'putSession') {
+      try {
+        const database = await initDB();
+        const session = e.data.session;
+        if (session && session.id) {
+          const tx = database.transaction(['sessions'], 'readwrite');
+          tx.objectStore('sessions').put(session, session.id);
+          tx.oncomplete = () => self.postMessage({ success: true, id: e.data.id });
+          tx.onerror = (err) => self.postMessage({ success: false, error: 'Transaction error: ' + err, id: e.data.id });
+        } else {
+          self.postMessage({ success: true, id: e.data.id });
+        }
       } catch (err) {
         self.postMessage({ success: false, error: err.message, id: e.data.id });
       }

@@ -103,6 +103,7 @@ export interface BodyMetricHistoryEntry {
   height: string | number;
   fm: string | number;
   ffm: string | number;
+  createdAt?: number;
 }
 
 export interface PRRecord {

@@ -38,7 +38,7 @@ export function calculateVolumeFromSessionV2(session: WorkoutSessionV2): number 
             if (type === 'weight' || !type) {
               vol += reps * w;
             } else if (type === 'bodyweight') {
-              vol += reps * w; 
+              vol += reps * (bw + w); 
             } else if (type === 'cardio') {
               const durationMin = (set.durationSec || 0) / 60;
               const rpe = set.rpe || 5; 
@@ -61,7 +61,7 @@ export function calculateVolumeFromSessionV2(session: WorkoutSessionV2): number 
         if (type === 'weight' || !type) {
           vol += reps * w;
         } else if (type === 'bodyweight') {
-          vol += reps * w; 
+          vol += reps * (bw + w); 
         } else if (type === 'cardio') {
           const durationMin = (set.durationSec || 0) / 60;
           const rpe = set.rpe || 5; 
@@ -183,6 +183,15 @@ export function getFatigueTrendAlert(effHistory: WeightHistoryEntry[]): string |
     const recent = effHistory.slice(0, 2);
     const older = effHistory.slice(2, 4);
     if (recent.length < 2 || older.length < 2) return null;
+
+    // Controllo data: le 4 sessioni devono ricadere in un arco temporale congruo (max 28 giorni),
+    // altrimenti la variazione non è attribuibile a fatica acuta/sistemica cumulativa
+    const newestDate = new Date(recent[0].date).getTime();
+    const oldestDate = new Date(older[older.length - 1].date).getTime();
+    if (!isNaN(newestDate) && !isNaN(oldestDate)) {
+      const daysSpan = Math.abs(newestDate - oldestDate) / (1000 * 60 * 60 * 24);
+      if (daysSpan > 28) return null;
+    }
 
     const avgWRecent = recent.reduce((a, h) => a + (parseFloat(h.weight) || 0), 0) / recent.length;
     const avgWOlder = older.reduce((a, h) => a + (parseFloat(h.weight) || 0), 0) / older.length;
@@ -353,6 +362,9 @@ export function extractExerciseHistoryFromSessions(
       customFields: Object.keys(customFields).length > 0 ? customFields : undefined
     });
   }
+
+  // Garantiamo ordinamento cronologico decrescente (la più recente all'indice 0)
+  entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   return entries;
 }

@@ -343,7 +343,12 @@ let saveRequestCounter = 0;
 /**
  * Carica l'intero stato canonico V2 combinando lo stato leggero con lo storico immutabile.
  */
-export async function saveGymState(state: AppState, sessionsChanged: boolean = false): Promise<void> {
+export async function saveGymState(
+  state: AppState,
+  sessionsChanged: boolean = false,
+  newSession?: WorkoutSessionV2,
+  deletedSessionIds?: string[]
+): Promise<void> {
   if (typeof window === 'undefined') return;
   setPersistenceStatus('SAVING');
 
@@ -380,19 +385,35 @@ export async function saveGymState(state: AppState, sessionsChanged: boolean = f
         worker.addEventListener('message', handler);
         worker.postMessage({
           action: 'save',
-          payload: sessionsChanged ? stateToSave : hotState,
+          payload: (sessionsChanged && !newSession) ? stateToSave : hotState,
+          newSession: newSession || undefined,
+          deletedSessionIds: (deletedSessionIds && deletedSessionIds.length > 0) ? deletedSessionIds : undefined,
           id: reqId
         });
       });
     } else {
       const db = await initDB();
       await new Promise<void>((resolve, reject) => {
-        const tx = db.transaction(sessionsChanged ? ['store', 'sessions'] : ['store'], 'readwrite');
+        const hasDeletes = Boolean(deletedSessionIds && deletedSessionIds.length > 0);
+        const needsSessions = Boolean(sessionsChanged || newSession || hasDeletes);
+        const tx = db.transaction(needsSessions ? ['store', 'sessions'] : ['store'], 'readwrite');
         tx.objectStore('store').put(hotState, 'state');
+
+        const sessionStore = needsSessions ? tx.objectStore('sessions') : null;
+
+        if (sessionStore && hasDeletes && deletedSessionIds) {
+          for (let i = 0; i < deletedSessionIds.length; i++) {
+            const delId = deletedSessionIds[i];
+            if (delId) {
+              sessionStore.delete(delId);
+            }
+          }
+        }
         
-        if (sessionsChanged) {
+        if (sessionStore && newSession && newSession.id) {
+          tx.objectStore('sessions').put(newSession, newSession.id);
+        } else if (sessionStore && sessionsChanged) {
           const sessions = stateToSave.sessionsV2 || [];
-          const sessionStore = tx.objectStore('sessions');
           // Rimuoviamo l'eventuale chiave monolitica legacy 'history'
           try { sessionStore.delete('history'); } catch (err) {}
           

@@ -4,7 +4,8 @@ import {
   BodyGoal,
   SingleExercise,
   SupersetExercise,
-  PersistentMasterTimer
+  PersistentMasterTimer,
+  BodyMetricHistoryEntry
 } from './types/gym';
 import {
   WorkoutSessionV2,
@@ -656,7 +657,7 @@ export default function App() {
           setCustomFields: {}
         };
 
-        await saveGymState(newState, true);
+        await saveGymState(newState, true, v2Session);
         setState(newState);
         setSummaryData({ newSnapshot: v2Session, prevSnapshot });
       } else {
@@ -708,6 +709,16 @@ export default function App() {
         }
       });
 
+      const todayStr = getTodayStr();
+      const sessionToDelete = (state.sessionsV2 || []).find((s) => s.planId === tabId && s.date === todayStr);
+      let nextSessionsV2 = state.sessionsV2 || [];
+      const deletedSessionIds: string[] = [];
+
+      if (sessionToDelete) {
+        deletedSessionIds.push(sessionToDelete.id);
+        nextSessionsV2 = nextSessionsV2.filter((s) => s.id !== sessionToDelete.id);
+      }
+
       const newState = {
         ...state,
         checkedSets: nextCheckedSets,
@@ -715,11 +726,12 @@ export default function App() {
         setRir: nextSetRir,
         setRpe: nextSetRpe,
         amrapRounds: nextAmrapRounds,
-        activeMasterTimer: null
+        activeMasterTimer: null,
+        sessionsV2: nextSessionsV2
       };
       
       setState(newState);
-      await saveGymState(newState, true);
+      await saveGymState(newState, false, undefined, deletedSessionIds);
       showToast('Sessione riavviata.');
     }
   };
@@ -813,6 +825,10 @@ export default function App() {
                 const circuitEl = document.getElementById(`circuit-${circuitId}`);
                 circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
               });
+            } else {
+              nextCheckedSets[`${circuitId}-round-${setIndex}`] = true;
+              const circuitEl = document.getElementById(`circuit-${circuitId}`);
+              circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
           }
         }
@@ -828,8 +844,19 @@ export default function App() {
             if (circuitId) {
               const circuitEl = document.getElementById(`circuit-${circuitId}`);
               circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else {
+              const exEl = document.getElementById(`ex-container-${exId}`) || document.getElementById(`exercise-${exId}`);
+              exEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
           });
+        } else {
+          if (circuitId) {
+            const circuitEl = document.getElementById(`circuit-${circuitId}`);
+            circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          } else {
+            const exEl = document.getElementById(`ex-container-${exId}`) || document.getElementById(`exercise-${exId}`);
+            exEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
         }
       }
     }
@@ -912,18 +939,35 @@ export default function App() {
                   const circuitEl = document.getElementById(`circuit-${circuitId}`);
                   circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 });
+              } else {
+                nextCheckedSets[`${circuitId}-round-${setIndex}`] = true;
+                const circuitEl = document.getElementById(`circuit-${circuitId}`);
+                circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
               }
             }
           }
         }
 
-        if (!handledCircuitRest && pauseSec > 0) {
-          startRestTimer(pauseSec, () => {
+        if (!handledCircuitRest) {
+          if (pauseSec > 0) {
+            startRestTimer(pauseSec, () => {
+              if (circuitId) {
+                const circuitEl = document.getElementById(`circuit-${circuitId}`);
+                circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              } else {
+                const exEl = document.getElementById(`ex-container-${exId}`) || document.getElementById(`exercise-${exId}`);
+                exEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }
+            });
+          } else {
             if (circuitId) {
               const circuitEl = document.getElementById(`circuit-${circuitId}`);
               circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else {
+              const exEl = document.getElementById(`ex-container-${exId}`) || document.getElementById(`exercise-${exId}`);
+              exEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
-          });
+          }
         }
 
         setState(nextState); // Immediato / ottimistico
@@ -1990,32 +2034,41 @@ export default function App() {
         onUpdateProfileName={(name) => setState((prev) => (prev ? { ...prev, profileName: name } : null))}
         onSetBodyGoal={(goal) => setState((prev) => (prev ? { ...prev, bodyGoal: goal } : null))}
         onToggleDeload={() => setState((prev) => (prev ? { ...prev, deloadActive: !prev.deloadActive } : null))}
-        onUpdateBodyMetrics={(m) => {
+        onUpdateBodyMetrics={async (m) => {
+          let nextToSave: AppState | null = null;
           setState((prev) => {
             if (!prev) return null;
             const updated = { ...prev.bodyMetrics, ...m };
             const hist = [...prev.bodyMetricsHistory];
             const todayStr = getTodayStr();
-            const existingIdx = hist.findIndex((h) => h.date === todayStr);
+            const now = Date.now();
 
-            // 🔴 BUG FIX BIA: Se mi peso e basta, NON copio la FM del mese scorso.
-            const oldEntry = existingIdx >= 0 ? hist[existingIdx] : null;
-            const entry = {
+            const entry: BodyMetricHistoryEntry = {
               date: todayStr,
-              weight: m.weight !== undefined ? m.weight : (oldEntry?.weight || ''),
-              height: m.height !== undefined ? m.height : (oldEntry?.height || prev.bodyMetrics.height),
-              fm: m.fm !== undefined ? m.fm : (oldEntry?.fm || ''), // Niente falsi positivi!
-              ffm: m.ffm !== undefined ? m.ffm : (oldEntry?.ffm || '')
+              weight: m.weight !== undefined ? m.weight : '',
+              height: m.height !== undefined ? m.height : prev.bodyMetrics.height,
+              fm: m.fm !== undefined ? m.fm : '',
+              ffm: m.ffm !== undefined ? m.ffm : '',
+              createdAt: now
             };
-            
-            if (existingIdx >= 0) hist[existingIdx] = entry;
-            else hist.unshift(entry);
-            
-            // 🔴 BUG FIX: Ordiniamo lo storico in modo decrescente (dal più recente)
-            hist.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-            
-            return { ...prev, bodyMetrics: updated, bodyMetricsHistory: hist };
+
+            // Invece di sovrascrivere l'indice se la data è la stessa, usa unshift per aggiungere sempre un nuovo record
+            hist.unshift(entry);
+
+            // Riordinamento decrescente (sort) anche su misurazioni dello stesso giorno via createdAt
+            hist.sort((a, b) => {
+              const timeA = a.createdAt || new Date(a.date).getTime() || 0;
+              const timeB = b.createdAt || new Date(b.date).getTime() || 0;
+              return timeB - timeA;
+            });
+
+            const next = { ...prev, bodyMetrics: updated, bodyMetricsHistory: hist };
+            nextToSave = next;
+            return next;
           });
+          if (nextToSave) {
+            await saveGymState(nextToSave);
+          }
         }}
         onUploadPdf={handlePdfUpload}
         onOpenHistoryModal={() => setIsHistoryModalOpen(true)}
@@ -2062,7 +2115,8 @@ export default function App() {
       <BiaModal
         isOpen={Boolean(biaModalData)}
         data={biaModalData}
-        onConfirm={(confirmed) => {
+        onConfirm={async (confirmed) => {
+          let nextToSave: AppState | null = null;
           setState((prev) => {
             if (!prev) return null;
             const nextMetrics = {
@@ -2073,23 +2127,34 @@ export default function App() {
             };
             const hist = [...prev.bodyMetricsHistory];
             const dateStr = confirmed.date || getTodayStr();
-            const existingIdx = hist.findIndex((h) => h.date === dateStr);
-            const entry = {
+            const now = Date.now();
+
+            const entry: BodyMetricHistoryEntry = {
               date: dateStr,
               weight: confirmed.weight,
               height: confirmed.height,
               fm: confirmed.fm,
-              ffm: confirmed.ffm
+              ffm: confirmed.ffm,
+              createdAt: now
             };
-            if (existingIdx >= 0) hist[existingIdx] = entry;
-            else {
-              hist.unshift(entry);
-              hist.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-            }
-            return { ...prev, bodyMetrics: nextMetrics, bodyMetricsHistory: hist };
+
+            // Invece di sovrascrivere se la data è la stessa, usa unshift per aggiungere sempre un nuovo record
+            hist.unshift(entry);
+            hist.sort((a, b) => {
+              const timeA = a.createdAt || new Date(a.date).getTime() || 0;
+              const timeB = b.createdAt || new Date(b.date).getTime() || 0;
+              return timeB - timeA;
+            });
+
+            const next = { ...prev, bodyMetrics: nextMetrics, bodyMetricsHistory: hist };
+            nextToSave = next;
+            return next;
           });
           setBiaModalData(null);
           showToast('Referto BIA salvato nello storico!');
+          if (nextToSave) {
+            await saveGymState(nextToSave);
+          }
         }}
         onClose={() => setBiaModalData(null)}
       />
