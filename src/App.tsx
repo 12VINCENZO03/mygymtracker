@@ -472,6 +472,7 @@ export default function App() {
 
   // 🔴 FASE 2: Debounce/Lock con Try-Finally
   const handleStopWorkout = async (tabId: string) => {
+    if (!window.confirm('Vuoi davvero terminare questo allenamento?')) return;
     if (!state || isSaving) return;
     
     setIsSaving(true);
@@ -1366,6 +1367,7 @@ export default function App() {
         onSelectTab={handleSelectTab}
         onToggleSideMenu={() => setIsSideMenuOpen(true)}
         onMoveTab={(id, dir) => {
+          let nextToSave: AppState | null = null;
           setState((prev) => {
             if (!prev) return null;
             const idx = prev.plan.findIndex((t) => t.id === id);
@@ -1376,8 +1378,13 @@ export default function App() {
             const temp = newPlan[idx];
             newPlan[idx] = newPlan[targetIdx];
             newPlan[targetIdx] = temp;
-            return { ...prev, plan: newPlan };
+            const next = { ...prev, plan: newPlan };
+            nextToSave = next;
+            return next;
           });
+          if (nextToSave) {
+            saveGymState(nextToSave).catch(console.warn);
+          }
         }}
         onDeleteTab={async (id) => {
           if (state.plan.length <= 2) {
@@ -1424,24 +1431,36 @@ export default function App() {
           }
         }}
         onRenameTab={(id, name) => {
+          let nextToSave: AppState | null = null;
           setState((prev) => {
             if (!prev) return null;
-            return {
+            const next = {
               ...prev,
               plan: prev.plan.map((t) => (t.id === id ? { ...t, name } : t))
             };
+            nextToSave = next;
+            return next;
           });
+          if (nextToSave) {
+            saveGymState(nextToSave).catch(console.warn);
+          }
         }}
         onAddTab={() => {
           const newId = `scheda-${generateId()}`;
+          let nextToSave: AppState | null = null;
           setState((prev) => {
             if (!prev) return null;
-            return {
+            const next = {
               ...prev,
               plan: [...prev.plan, { id: newId, name: 'Nuova Scheda', subtitle: '', exercises: [] }],
               activeTab: newId
             };
+            nextToSave = next;
+            return next;
           });
+          if (nextToSave) {
+            saveGymState(nextToSave).catch(console.warn);
+          }
         }}
         isRestTimerActive={isRestTimerActive}
         restTimerSeconds={restTimerSeconds}
@@ -1456,15 +1475,21 @@ export default function App() {
             onSelectTab={handleSelectTab}
             onAddFirstTab={() => {
               const newId = `scheda-${generateId()}`;
+              let nextToSave: AppState | null = null;
               setState((prev) => {
                 if (!prev) return null;
-                return {
+                const next = {
                   ...prev,
                   plan: [...prev.plan, { id: newId, name: 'Scheda 1', subtitle: 'La mia scheda', exercises: [] }],
                   activeTab: newId,
                   isEditMode: true
                 };
+                nextToSave = next;
+                return next;
               });
+              if (nextToSave) {
+                saveGymState(nextToSave).catch(console.warn);
+              }
             }}
           />
         ) : (
@@ -1478,17 +1503,25 @@ export default function App() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setState((prev) => {
-                    if (!prev) return null;
-                    return {
-                      ...prev,
-                      isEditMode: false,
-                      // 🔴 FASE E: Incrementiamo la versione della scheda appena modificata
-                      plan: prev.plan.map(t =>
-                        t.id === currentTab.id ? { ...t, version: (t.version || 1) + 1 } : t
-                      )
-                    };
-                  })}
+                  onClick={() => {
+                    let nextToSave: AppState | null = null;
+                    setState((prev) => {
+                      if (!prev) return null;
+                      const next = {
+                        ...prev,
+                        isEditMode: false,
+                        // 🔴 FASE E: Incrementiamo la versione della scheda appena modificata
+                        plan: prev.plan.map(t =>
+                          t.id === currentTab.id ? { ...t, version: (t.version || 1) + 1 } : t
+                        )
+                      };
+                      nextToSave = next;
+                      return next;
+                    });
+                    if (nextToSave) {
+                      saveGymState(nextToSave).catch(console.warn);
+                    }
+                  }}
                   className="bg-emerald-500 text-zinc-950 px-4 py-2 rounded-xl text-xs font-bold outline-none active:scale-95 transition-transform"
                 >
                   Fatto ✓
@@ -1606,18 +1639,24 @@ export default function App() {
                     onSaveSetWeight={handleSaveSetWeight}
                     onSaveCustomField={handleSaveCustomField} // 🔴 AGGIUNGI QUESTA RIGA QUI
                     onUpdateRegistry={(permId, field, val) => {
+                      let nextToSave: AppState | null = null;
                       setState((prev) => {
                         if (!prev) return null;
                         const currentReg = prev.registryV2[permId];
                         if (!currentReg) return prev;
-                        return {
+                        const next = {
                           ...prev,
                           registryV2: {
                             ...prev.registryV2,
                             [permId]: { ...currentReg, [field]: val }
                           }
                         };
+                        nextToSave = next;
+                        return next;
                       });
+                      if (nextToSave) {
+                        saveGymState(nextToSave).catch(console.warn);
+                      }
                     }}
                     onToggleSet={(sIdx, pauseSec, prefill) =>
                       handleToggleSet(ex.id, sIdx, pauseSec, prefill)
@@ -1626,6 +1665,7 @@ export default function App() {
                       handleLongPressSet(ex.id, sIdx, pauseSec, prefill)
                     }
                     onUpdateEx={(field, val) => {
+                      let nextToSave: AppState | null = null;
                       setState((prev) => {
                         if (!prev) return null;
                         
@@ -1644,7 +1684,7 @@ export default function App() {
                           }
                         }
 
-                        return {
+                        const next = {
                           ...prev,
                           registryV2: nextRegistry,
                           plan: prev.plan.map((t) =>
@@ -1658,9 +1698,15 @@ export default function App() {
                               : t
                           )
                         };
+                        nextToSave = next;
+                        return next;
                       });
+                      if (nextToSave) {
+                        saveGymState(nextToSave).catch(console.warn);
+                      }
                     }}
                     onDeleteEx={() => {
+                      let nextToSave: AppState | null = null;
                       setState((prev) => {
                         if (!prev) return null;
                         const next = { ...prev };
@@ -1670,10 +1716,15 @@ export default function App() {
                             ? { ...t, exercises: t.exercises.filter((e) => e.id !== ex.id) }
                             : t
                         );
+                        nextToSave = next;
                         return next;
                       });
+                      if (nextToSave) {
+                        saveGymState(nextToSave).catch(console.warn);
+                      }
                     }}
                     onMoveEx={(dir) => {
+                      let nextToSave: AppState | null = null;
                       setState((prev) => {
                         if (!prev) return null;
                         const tIdx = prev.plan.findIndex((t) => t.id === currentTab.id);
@@ -1686,8 +1737,13 @@ export default function App() {
                         newExercises[targetExIdx] = temp;
                         const newPlan = [...prev.plan];
                         newPlan[tIdx] = { ...currentTab, exercises: newExercises };
-                        return { ...prev, plan: newPlan };
+                        const next = { ...prev, plan: newPlan };
+                        nextToSave = next;
+                        return next;
                       });
+                      if (nextToSave) {
+                        saveGymState(nextToSave).catch(console.warn);
+                      }
                     }}
                   />
                 );
@@ -1827,9 +1883,10 @@ export default function App() {
                       handleLongPressSet(subId, roundIdx, pauseSec, prefill, ex.id);
                     }}
                     onUpdateCircuit={(field, val) => {
+                      let nextToSave: AppState | null = null;
                       setState((prev) => {
                         if (!prev) return null;
-                        return {
+                        const next = {
                           ...prev,
                           plan: prev.plan.map((t) =>
                             t.id === currentTab.id
@@ -1842,9 +1899,15 @@ export default function App() {
                               : t
                           )
                         };
+                        nextToSave = next;
+                        return next;
                       });
+                      if (nextToSave) {
+                        saveGymState(nextToSave).catch(console.warn);
+                      }
                     }}
                     onDeleteCircuit={() => {
+                      let nextToSave: AppState | null = null;
                       setState((prev) => {
                         if (!prev) return null;
                         const next = { ...prev };
@@ -1854,10 +1917,15 @@ export default function App() {
                             ? { ...t, exercises: t.exercises.filter((e) => e.id !== ex.id) }
                             : t
                         );
+                        nextToSave = next;
                         return next;
                       });
+                      if (nextToSave) {
+                        saveGymState(nextToSave).catch(console.warn);
+                      }
                     }}
                     onMoveCircuit={(dir) => {
+                      let nextToSave: AppState | null = null;
                       setState((prev) => {
                         if (!prev) return null;
                         const tIdx = prev.plan.findIndex((t) => t.id === currentTab.id);
@@ -1870,18 +1938,24 @@ export default function App() {
                         newExercises[targetExIdx] = temp;
                         const newPlan = [...prev.plan];
                         newPlan[tIdx] = { ...currentTab, exercises: newExercises };
-                        return { ...prev, plan: newPlan };
+                        const next = { ...prev, plan: newPlan };
+                        nextToSave = next;
+                        return next;
                       });
+                      if (nextToSave) {
+                        saveGymState(nextToSave).catch(console.warn);
+                      }
                     }}
                     onAddSubEx={() => {
+                      let nextToSave: AppState | null = null;
                       setState((prev) => {
                         if (!prev) return null;
                         const newPermId = generateId(); // ID Permanente per il sub-esercizio
-                        return {
+                        const next = {
                           ...prev,
                           registryV2: {
                             ...prev.registryV2,
-                            [newPermId]: { id: newPermId, name: 'Nuovo Esercizio', type: 'weight' }
+                            [newPermId]: { id: newPermId, name: 'Nuovo Esercizio', type: 'weight' as const }
                           },
                           plan: prev.plan.map((t) =>
                             t.id === currentTab.id
@@ -1899,7 +1973,7 @@ export default function App() {
                                             name: 'Nuovo Esercizio',
                                             reps: '10',
                                             pause: 0,
-                                            metricType: 'weight'
+                                            metricType: 'weight' as const
                                           }
                                         ]
                                       };
@@ -1910,12 +1984,18 @@ export default function App() {
                               : t
                           )
                         };
+                        nextToSave = next;
+                        return next;
                       });
+                      if (nextToSave) {
+                        saveGymState(nextToSave).catch(console.warn);
+                      }
                     }}
                     onAddRestBlock={() => {
+                      let nextToSave: AppState | null = null;
                       setState((prev) => {
                         if (!prev) return null;
-                        return {
+                        const next = {
                           ...prev,
                           plan: prev.plan.map((t) =>
                             t.id === currentTab.id
@@ -1930,7 +2010,7 @@ export default function App() {
                                           {
                                             id: generateId(),
                                             name: 'Pausa',
-                                            metricType: 'rest',
+                                            metricType: 'rest' as const,
                                             restSeconds: 30
                                           }
                                         ]
@@ -1942,9 +2022,15 @@ export default function App() {
                               : t
                           )
                         };
+                        nextToSave = next;
+                        return next;
                       });
+                      if (nextToSave) {
+                        saveGymState(nextToSave).catch(console.warn);
+                      }
                     }}
                     onUpdateSubEx={(subId, field, val) => {
+                      let nextToSave: AppState | null = null;
                       setState((prev) => {
                         if (!prev) return null;
 
@@ -1966,7 +2052,7 @@ export default function App() {
                           }
                         }
 
-                        return {
+                        const next = {
                           ...prev,
                           registryV2: nextRegistry,
                           plan: prev.plan.map((t) =>
@@ -1988,9 +2074,15 @@ export default function App() {
                               : t
                           )
                         };
+                        nextToSave = next;
+                        return next;
                       });
+                      if (nextToSave) {
+                        saveGymState(nextToSave).catch(console.warn);
+                      }
                     }}
                     onDeleteSubEx={(subId) => {
+                      let nextToSave: AppState | null = null;
                       setState((prev) => {
                         if (!prev) return null;
                         const next = { ...prev };
@@ -2011,13 +2103,18 @@ export default function App() {
                               }
                             : t
                         );
+                        nextToSave = next;
                         return next;
                       });
+                      if (nextToSave) {
+                        saveGymState(nextToSave).catch(console.warn);
+                      }
                     }}
                     onMoveSubEx={(subId, dir) => {
+                      let nextToSave: AppState | null = null;
                       setState((prev) => {
                         if (!prev) return null;
-                        return {
+                        const next = {
                           ...prev,
                           plan: prev.plan.map((t) => {
                             if (t.id !== currentTab.id) return t;
@@ -2038,7 +2135,12 @@ export default function App() {
                             };
                           })
                         };
+                        nextToSave = next;
+                        return next;
                       });
+                      if (nextToSave) {
+                        saveGymState(nextToSave).catch(console.warn);
+                      }
                     }}
                   />
                 );
@@ -2060,21 +2162,27 @@ export default function App() {
                       sets: 3,
                       reps: '10',
                       pause: 90,
-                      metricType: 'weight'
+                      metricType: 'weight' as const
                     };
+                    let nextToSave: AppState | null = null;
                     setState((prev) => {
                       if (!prev) return null;
-                      return {
+                      const next: AppState = {
                         ...prev,
                         registryV2: {
                           ...prev.registryV2,
-                          [newPermId]: { id: newPermId, name: 'Nuovo Esercizio', type: 'weight' }
+                          [newPermId]: { id: newPermId, name: 'Nuovo Esercizio', type: 'weight' as const }
                         },
                         plan: prev.plan.map((t) =>
                           t.id === currentTab.id ? { ...t, exercises: [...t.exercises, newEx] } : t
                         )
                       };
+                      nextToSave = next;
+                      return next;
                     });
+                    if (nextToSave) {
+                      saveGymState(nextToSave).catch(console.warn);
+                    }
                   }}
                   className="flex-1 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-100 py-4 rounded-3xl font-bold border border-zinc-800/80 flex items-center justify-center gap-2 text-xs transition-all shadow-sm active:scale-95"
                 >
@@ -2092,15 +2200,21 @@ export default function App() {
                       pause: 90,
                       exercises: []
                     };
+                    let nextToSave: AppState | null = null;
                     setState((prev) => {
                       if (!prev) return null;
-                      return {
+                      const next = {
                         ...prev,
                         plan: prev.plan.map((t) =>
                           t.id === currentTab.id ? { ...t, exercises: [...t.exercises, newCirc] } : t
                         )
                       };
+                      nextToSave = next;
+                      return next;
                     });
+                    if (nextToSave) {
+                      saveGymState(nextToSave).catch(console.warn);
+                    }
                   }}
                   className="flex-1 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-100 py-4 rounded-3xl font-bold border border-zinc-800/80 flex items-center justify-center gap-2 text-xs transition-all shadow-sm active:scale-95"
                 >
@@ -2160,10 +2274,31 @@ export default function App() {
         onClose={() => setIsSideMenuOpen(false)}
         onToggleEditMode={() => setState((prev) => (prev ? { ...prev, isEditMode: !prev.isEditMode } : null))}
         onUpdateProfileName={(name) => setState((prev) => (prev ? { ...prev, profileName: name } : null))}
-        onSetBodyGoal={(goal) => setState((prev) => (prev ? { ...prev, bodyGoal: goal } : null))}
-        onToggleDeload={() => setState((prev) => (prev ? { ...prev, deloadActive: !prev.deloadActive } : null))}
-        onUpdateBodyMetrics={async (m) => {
+        onSetBodyGoal={(goal) => {
           let nextToSave: AppState | null = null;
+          setState((prev) => {
+            if (!prev) return null;
+            const next = { ...prev, bodyGoal: goal };
+            nextToSave = next;
+            return next;
+          });
+          if (nextToSave) {
+            saveGymState(nextToSave).catch(console.warn);
+          }
+        }}
+        onToggleDeload={() => {
+          let nextToSave: AppState | null = null;
+          setState((prev) => {
+            if (!prev) return null;
+            const next = { ...prev, deloadActive: !prev.deloadActive };
+            nextToSave = next;
+            return next;
+          });
+          if (nextToSave) {
+            saveGymState(nextToSave).catch(console.warn);
+          }
+        }}
+        onUpdateBodyMetrics={(m) => {
           setState((prev) => {
             if (!prev) return null;
             const updated = { ...prev.bodyMetrics, ...m };
@@ -2171,16 +2306,18 @@ export default function App() {
             const todayStr = getTodayStr();
             const now = Date.now();
 
+            const existingIndex = hist.findIndex(h => h.date === todayStr);
+            const ex = existingIndex >= 0 ? hist[existingIndex] : null;
+
             const entry: BodyMetricHistoryEntry = {
               date: todayStr,
-              weight: m.weight !== undefined ? m.weight : '',
-              height: m.height !== undefined ? m.height : prev.bodyMetrics.height,
-              fm: m.fm !== undefined ? m.fm : '',
-              ffm: m.ffm !== undefined ? m.ffm : '',
+              weight: m.weight !== undefined ? m.weight : (ex?.weight ?? ''),
+              height: m.height !== undefined ? m.height : (ex?.height ?? prev.bodyMetrics.height),
+              fm: m.fm !== undefined ? m.fm : (ex?.fm ?? ''),
+              ffm: m.ffm !== undefined ? m.ffm : (ex?.ffm ?? ''),
               createdAt: now
             };
 
-            const existingIndex = hist.findIndex(h => h.date === entry.date);
             if (existingIndex >= 0) {
               hist[existingIndex] = { ...hist[existingIndex], ...entry, createdAt: entry.createdAt };
             } else {
@@ -2193,13 +2330,8 @@ export default function App() {
               return timeB - timeA;
             });
 
-            const next = { ...prev, bodyMetrics: updated, bodyMetricsHistory: hist };
-            nextToSave = next;
-            return next;
+            return { ...prev, bodyMetrics: updated, bodyMetricsHistory: hist };
           });
-          if (nextToSave) {
-            await saveGymState(nextToSave);
-          }
         }}
         onUploadPdf={handlePdfUpload}
         onOpenHistoryModal={() => setIsHistoryModalOpen(true)}
@@ -2263,7 +2395,7 @@ export default function App() {
             if (!prev) return null;
             const nextMetrics = {
               weight: confirmed.weight,
-              height: confirmed.height,
+              height: confirmed.height || prev.bodyMetrics.height,
               fm: confirmed.fm,
               ffm: confirmed.ffm
             };
@@ -2274,7 +2406,7 @@ export default function App() {
             const entry: BodyMetricHistoryEntry = {
               date: dateStr,
               weight: confirmed.weight,
-              height: confirmed.height,
+              height: confirmed.height || prev.bodyMetrics.height,
               fm: confirmed.fm,
               ffm: confirmed.ffm,
               createdAt: now
@@ -2310,24 +2442,59 @@ export default function App() {
       <PRModal
         isOpen={isPRModalOpen}
         prs={state.prs}
-        onAddPR={(newPR) => setState((prev) => (prev ? { ...prev, prs: [...prev.prs, newPR] } : null))}
-        onUpdatePR={(id, newW) => {
+        onAddPR={(newPR) => {
+          let nextToSave: AppState | null = null;
           setState((prev) => {
             if (!prev) return null;
-            return {
+            const next = { ...prev, prs: [...prev.prs, newPR] };
+            nextToSave = next;
+            return next;
+          });
+          if (nextToSave) {
+            saveGymState(nextToSave).catch(console.warn);
+          }
+        }}
+        onUpdatePR={(id, newW) => {
+          let nextToSave: AppState | null = null;
+          setState((prev) => {
+            if (!prev) return null;
+            const todayStr = getTodayStr();
+            const next = {
               ...prev,
               prs: prev.prs.map((p) => {
                 if (p.id !== id) return p;
+                const newHistory = [...(p.history || [])];
+                if (newHistory.length > 0 && newHistory[0]?.date === todayStr) {
+                  newHistory[0] = { ...newHistory[0], weight: newW };
+                } else {
+                  newHistory.unshift({ date: todayStr, weight: newW });
+                }
                 return {
                   ...p,
                   weight: newW,
-                  history: [{ date: getTodayStr(), weight: newW }, ...(p.history || [])]
+                  history: newHistory
                 };
               })
             };
+            nextToSave = next;
+            return next;
           });
+          if (nextToSave) {
+            saveGymState(nextToSave).catch(console.warn);
+          }
         }}
-        onDeletePR={(id) => setState((prev) => (prev ? { ...prev, prs: prev.prs.filter((p) => p.id !== id) } : null))}
+        onDeletePR={(id) => {
+          let nextToSave: AppState | null = null;
+          setState((prev) => {
+            if (!prev) return null;
+            const next = { ...prev, prs: prev.prs.filter((p) => p.id !== id) };
+            nextToSave = next;
+            return next;
+          });
+          if (nextToSave) {
+            saveGymState(nextToSave).catch(console.warn);
+          }
+        }}
         onClose={() => setIsPRModalOpen(false)}
       />
 

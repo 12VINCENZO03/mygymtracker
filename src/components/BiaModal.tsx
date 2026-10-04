@@ -69,20 +69,20 @@ export const BiaModal: React.FC<BiaModalProps> = ({ isOpen, data, onConfirm, onC
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">Peso (kg)</label>
-              <input type="number" step="0.1" placeholder="es. 75.5" value={weight} onChange={(e) => { setWeight(e.target.value); setTimeout(() => handleCalc('weight'), 50); }} className="w-full bg-zinc-950 text-white font-bold p-3 rounded-xl border border-zinc-800 outline-none text-center text-sm focus:border-emerald-500" />
+              <input type="number" inputMode="decimal" step="0.1" placeholder="es. 75.5" value={weight} onChange={(e) => { setWeight(e.target.value); setTimeout(() => handleCalc('weight'), 50); }} className="w-full bg-zinc-950 text-white font-bold p-3 rounded-xl border border-zinc-800 outline-none text-center text-sm focus:border-emerald-500" />
             </div>
             <div>
               <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">Altezza (cm)</label>
-              <input type="number" placeholder="es. 178" value={height} onChange={(e) => setHeight(e.target.value)} className="w-full bg-zinc-950 text-white font-bold p-3 rounded-xl border border-zinc-800 outline-none text-center text-sm focus:border-emerald-500" />
+              <input type="number" inputMode="decimal" placeholder="es. 178" value={height} onChange={(e) => setHeight(e.target.value)} className="w-full bg-zinc-950 text-white font-bold p-3 rounded-xl border border-zinc-800 outline-none text-center text-sm focus:border-emerald-500" />
             </div>
             <div>
               <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">Massa Grassa (FM %)</label>
-              <input type="number" step="0.1" placeholder="es. 14.2" value={fm} onChange={(e) => { setFm(e.target.value); setTimeout(() => handleCalc('fm'), 50); }} className="w-full bg-zinc-950 text-white font-bold p-3 rounded-xl border border-zinc-800 outline-none text-center text-sm focus:border-emerald-500" />
+              <input type="number" inputMode="decimal" step="0.1" placeholder="es. 14.2" value={fm} onChange={(e) => { setFm(e.target.value); setTimeout(() => handleCalc('fm'), 50); }} className="w-full bg-zinc-950 text-white font-bold p-3 rounded-xl border border-zinc-800 outline-none text-center text-sm focus:border-emerald-500" />
             </div>
             <div>
               <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1">Massa Magra (FFM kg)</label>
               {/* 🔴 BUG FIX: Sostituito setFm con setFfm */}
-              <input type="number" step="0.1" placeholder="es. 64.8" value={ffm} onChange={(e) => { setFfm(e.target.value); setTimeout(() => handleCalc('ffm'), 50); }} className="w-full bg-zinc-950 text-white font-bold p-3 rounded-xl border border-zinc-800 outline-none text-center text-sm focus:border-emerald-500" />
+              <input type="number" inputMode="decimal" step="0.1" placeholder="es. 64.8" value={ffm} onChange={(e) => { setFfm(e.target.value); setTimeout(() => handleCalc('ffm'), 50); }} className="w-full bg-zinc-950 text-white font-bold p-3 rounded-xl border border-zinc-800 outline-none text-center text-sm focus:border-emerald-500" />
             </div>
           </div>
         </div>

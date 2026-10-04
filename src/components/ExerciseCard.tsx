@@ -129,6 +129,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
             <span className="text-[9px] text-zinc-500 font-extrabold uppercase ml-2 w-8 tracking-wider">Serie</span>
             <input
               type="number"
+              inputMode="decimal"
               min={1}
               max={20}
               value={ex.sets}
@@ -142,6 +143,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
             </span>
             <input
               type="text"
+              inputMode="decimal"
               value={ex.metricType === 'time' ? (ex.workSec || 60) : ex.reps}
               onChange={(e) => onUpdateEx(ex.metricType === 'time' ? 'workSec' : 'reps', e.target.value)}
               className="bg-transparent text-white font-bold w-full text-center outline-none text-sm"
@@ -151,6 +153,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
             <span className="text-[9px] text-zinc-500 font-extrabold uppercase ml-2 w-10 tracking-wider">Pausa</span>
             <input
               type="number"
+              inputMode="decimal"
               step={5}
               min={0}
               value={ex.pause || 0}
@@ -538,7 +541,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
             ) : coachAdvice.badge === 'stall' ? (
               <i className="fa-solid fa-triangle-exclamation text-amber-400 text-xs shrink-0" />
             ) : coachAdvice.badge === 'deload' ? (
-              <i className="fa-solid fa-battery-half text-sky-400 text-xs shrink-0" />
+              <i className="fa-solid fa-battery-half text-amber-400 text-xs shrink-0" />
             ) : coachAdvice.badge === 'decrease' ? (
               <i className="fa-solid fa-arrow-trend-down text-rose-400 text-xs shrink-0" />
             ) : (
@@ -553,7 +556,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                   : coachAdvice.badge === 'decrease'
                   ? 'text-rose-400 font-black'
                   : coachAdvice.badge === 'deload'
-                  ? 'text-sky-400 font-black'
+                  ? 'text-amber-400 font-black'
                   : 'text-zinc-300 font-black'
               }`}
             >

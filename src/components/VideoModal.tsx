@@ -21,8 +21,8 @@ export const VideoModal: React.FC<VideoModalProps> = ({ url, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/90 z-[100] flex flex-col items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-      <div className="w-full max-w-2xl bg-zinc-900 rounded-3xl overflow-hidden shadow-2xl relative border border-zinc-800">
+    <div onClick={onClose} className="fixed inset-0 bg-black/90 z-[100] flex flex-col items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-2xl bg-zinc-900 rounded-3xl overflow-hidden shadow-2xl relative border border-zinc-800">
         <div className="flex justify-between items-center p-4 bg-zinc-950/60 border-b border-zinc-800/50">
           <h3 className="text-white font-extrabold text-xs flex items-center gap-2">
             <i className="fa-solid fa-video text-emerald-500" /> Esecuzione Tecnica

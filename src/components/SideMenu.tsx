@@ -449,7 +449,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                       onClick={() => setTrendTab('cardio')}
                       className={`flex-1 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
                         trendTab === 'cardio'
-                          ? 'bg-sky-500 text-zinc-950 shadow-sm'
+                          ? 'bg-amber-500 text-zinc-950 shadow-sm'
                           : 'text-zinc-400 hover:text-white'
                       }`}
                     >
@@ -515,8 +515,8 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                     const firstVal = isWeights ? firstSession.tonnage : (firstSession.cardioKm > 0 ? firstSession.cardioKm : firstSession.cardioMinutes);
                     const diff = lastVal - firstVal;
 
-                    const strokeColor = isWeights ? '#10b981' : '#38bdf8';
-                    const circleActive = isWeights ? '#34d399' : '#7dd3fc';
+                    const strokeColor = isWeights ? '#10b981' : '#fbbf24';
+                    const circleActive = isWeights ? '#34d399' : '#fcd34d';
 
                     return (
                       <>
@@ -577,7 +577,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
 
                         <div className="flex justify-between items-center text-[10px] text-zinc-500 pt-1 border-t border-zinc-900 font-bold">
                           <span>Inizio: {firstSession.date}</span>
-                          <span className={diff >= 0 ? (isWeights ? 'text-emerald-400' : 'text-sky-400') : 'text-rose-400'}>
+                          <span className={diff >= 0 ? (isWeights ? 'text-emerald-400' : 'text-amber-400') : 'text-rose-400'}>
                             {diff >= 0 ? `+${isWeights ? (diff / 1000).toFixed(1) + 'k kg' : diff.toFixed(1) + (lastSession.cardioKm > 0 ? ' km' : ' min')}` : `${isWeights ? (diff / 1000).toFixed(1) + 'k kg' : diff.toFixed(1) + (lastSession.cardioKm > 0 ? ' km' : ' min')}`}
                           </span>
                           <span>Ultimo: {lastSession.date}</span>
@@ -630,7 +630,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
 
                     {/* Colonna Cardio */}
                     <div className="bg-zinc-900/60 p-2.5 rounded-xl border border-zinc-800/40">
-                      <div className="text-[10px] font-bold text-sky-400 mb-2 flex items-center justify-between">
+                      <div className="text-[10px] font-bold text-amber-400 mb-2 flex items-center justify-between">
                         <span>🏃 Cardio</span>
                         <span className="text-[9px] text-zinc-400">
                           {stats.month.cardioKm > 0 ? `${stats.month.cardioKm.toFixed(1)} km` : `${Math.round(stats.month.cardioMinutes)} min`}
@@ -650,14 +650,14 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                         </div>
                         <div className="flex-1 flex flex-col items-center justify-end gap-1 h-full">
                           <div
-                            className="w-full bg-sky-500 rounded-t-md relative flex flex-col justify-end"
+                            className="w-full bg-amber-500 rounded-t-md relative flex flex-col justify-end"
                             style={{ height: `${hCardioCur}%` }}
                           >
-                            <span className="text-[8px] text-sky-300 font-bold text-center w-full absolute -top-3.5">
+                            <span className="text-[8px] text-amber-300 font-bold text-center w-full absolute -top-3.5">
                               {stats.month.cardioKm > 0 ? `${stats.month.cardioKm.toFixed(1)}k` : `${Math.round(stats.month.cardioMinutes)}m`}
                             </span>
                           </div>
-                          <span className="text-[9px] text-sky-400 font-bold">Attuale</span>
+                          <span className="text-[9px] text-amber-400 font-bold">Attuale</span>
                         </div>
                       </div>
                     </div>

@@ -16,8 +16,8 @@ export const SyncModal: React.FC<SyncModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/90 z-[100] flex flex-col items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-      <div className="w-full max-w-sm bg-zinc-900 rounded-3xl overflow-hidden shadow-2xl relative border border-zinc-800">
+    <div onClick={onClose} className="fixed inset-0 bg-black/90 z-[100] flex flex-col items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm bg-zinc-900 rounded-3xl overflow-hidden shadow-2xl relative border border-zinc-800">
         <div className="flex justify-between items-center p-5 bg-zinc-950/60 border-b border-zinc-800/50">
           <h3 className="text-white font-extrabold text-base flex items-center gap-2">
             <i className="fa-solid fa-cloud-arrow-up text-emerald-500" />

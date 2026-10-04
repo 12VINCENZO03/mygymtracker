@@ -42,8 +42,8 @@ export const PRModal: React.FC<PRModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/90 z-[100] flex flex-col items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-      <div className="w-full max-w-md bg-zinc-900 rounded-3xl overflow-hidden shadow-2xl relative flex flex-col max-h-[85vh] border border-zinc-800">
+    <div onClick={onClose} className="fixed inset-0 bg-black/90 z-[100] flex flex-col items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md bg-zinc-900 rounded-3xl overflow-hidden shadow-2xl relative flex flex-col max-h-[85vh] border border-zinc-800">
         <div className="flex justify-between items-center p-5 bg-zinc-950/60 border-b border-zinc-800/50">
           <h3 className="text-white font-black text-base flex items-center gap-2">
             <i className="fa-solid fa-trophy text-amber-400" />
@@ -129,6 +129,7 @@ export const PRModal: React.FC<PRModalProps> = ({
               />
               <input
                 type="number"
+                inputMode="decimal"
                 step="0.5"
                 required
                 placeholder="Carico massimale (kg)"
