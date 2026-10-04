@@ -37,15 +37,20 @@ export const SideMenu: React.FC<SideMenuProps> = ({
   const [progressOpen, setProgressOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [biaHistoryOpen, setBiaHistoryOpen] = useState(false);
+  const [trendTab, setTrendTab] = useState<'weights' | 'cardio'>('weights');
 
   if (!isOpen) return null;
 
   // 🔴 CANONICAL V2: Statistiche derivate direttamente dallo storico immutabile
   const stats = calculateAllVolumeStatsV2(state.sessionsV2 || []);
   const workoutDatesSet = getWorkoutDatesSet(state.sessionsV2);
-  const maxVol = Math.max(stats.month, stats.lastMonth, 1);
-  const hCur = Math.min(100, Math.round((stats.month / maxVol) * 100));
-  const hPrev = Math.min(100, Math.round((stats.lastMonth / maxVol) * 100));
+  const maxVol = Math.max(stats.month.tonnage, stats.lastMonth.tonnage, 1);
+  const hCur = Math.min(100, Math.round((stats.month.tonnage / maxVol) * 100));
+  const hPrev = Math.min(100, Math.round((stats.lastMonth.tonnage / maxVol) * 100));
+
+  const maxCardio = Math.max(stats.month.cardioScore, stats.lastMonth.cardioScore, 1);
+  const hCardioCur = Math.min(100, Math.round((stats.month.cardioScore / maxCardio) * 100));
+  const hCardioPrev = Math.min(100, Math.round((stats.lastMonth.cardioScore / maxCardio) * 100));
 
   // Calendar for current month
   const d = new Date();
@@ -417,18 +422,43 @@ export const SideMenu: React.FC<SideMenuProps> = ({
 
             {progressOpen && (
               <div className="p-4 pt-0 space-y-4">
-                {/* Trend del Tonnellaggio - Stile Apple Fitness SVG Nativo */}
-                <div className="bg-zinc-950 p-3.5 rounded-2xl border border-zinc-800/60 space-y-2.5">
+                {/* Trend Separati: Pesi & Tonnellaggio vs Cardio & Distanza */}
+                <div className="bg-zinc-950 p-3.5 rounded-2xl border border-zinc-800/60 space-y-3">
                   <div className="flex justify-between items-center text-[10px] font-extrabold uppercase tracking-wider text-zinc-400">
                     <span className="flex items-center gap-1.5 text-emerald-400">
-                      <i className="fa-solid fa-arrow-trend-up" /> Trend Tonnellaggio
+                      <i className="fa-solid fa-arrow-trend-up" /> Trend Prestazioni
                     </span>
                     <span className="text-zinc-500">Ultime {Math.min(10, state.sessionsV2?.length || 0)} sessioni</span>
                   </div>
 
+                  {/* Toggle Selettore Grafica: Pesi vs Cardio */}
+                  <div className="flex bg-zinc-900 p-1 rounded-xl border border-zinc-800 text-[10px] font-black">
+                    <button
+                      type="button"
+                      onClick={() => setTrendTab('weights')}
+                      className={`flex-1 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                        trendTab === 'weights'
+                          ? 'bg-emerald-500 text-zinc-950 shadow-sm'
+                          : 'text-zinc-400 hover:text-white'
+                      }`}
+                    >
+                      <i className="fa-solid fa-dumbbell" /> Pesi (kg)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTrendTab('cardio')}
+                      className={`flex-1 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                        trendTab === 'cardio'
+                          ? 'bg-sky-500 text-zinc-950 shadow-sm'
+                          : 'text-zinc-400 hover:text-white'
+                      }`}
+                    >
+                      <i className="fa-solid fa-person-running" /> Cardio (km/min)
+                    </button>
+                  </div>
+
                   {(() => {
                     const rawSessions = state.sessionsV2 || [];
-                    // Prendi max 10 sessioni più recenti e invertile in ordine cronologico crescente
                     const recentSessions = [...rawSessions.slice(0, 10)].reverse();
                     
                     if (recentSessions.length < 2) {
@@ -439,27 +469,54 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                       );
                     }
 
-                    const sessionData = recentSessions.map((s) => ({
-                      date: s.date,
-                      tonnage: Math.round(calculateVolumeFromSessionV2(s))
-                    }));
+                    const sessionData = recentSessions.map((s) => {
+                      const out = calculateVolumeFromSessionV2(s);
+                      return {
+                        date: s.date,
+                        tonnage: out.tonnage,
+                        cardioKm: out.cardioKm,
+                        cardioMinutes: out.cardioMinutes,
+                        cardioScore: out.cardioScore,
+                        totalReps: out.totalReps,
+                        tutSeconds: out.tutSeconds
+                      };
+                    });
 
-                    const values = sessionData.map((d) => d.tonnage);
+                    const isWeights = trendTab === 'weights';
+                    const values = isWeights 
+                      ? sessionData.map((d) => d.tonnage)
+                      : sessionData.map((d) => d.cardioKm > 0 ? d.cardioKm : d.cardioMinutes);
+
+                    const hasData = values.some(v => v > 0);
+                    if (!hasData) {
+                      return (
+                        <div className="text-zinc-500 text-center py-5 text-[11px] italic bg-zinc-900/40 rounded-xl border border-zinc-800/40">
+                          {isWeights ? 'Nessun carico pesi registrato' : 'Nessuna sessione cardio registrata'}
+                        </div>
+                      );
+                    }
+
                     const minVal = Math.max(0, Math.min(...values) * 0.9);
-                    const maxVal = Math.max(...values) * 1.1 || 1000;
+                    const maxVal = Math.max(...values) * 1.1 || (isWeights ? 1000 : 5);
                     const rangeVal = maxVal - minVal || 1;
 
                     const points = sessionData
                       .map((d, i) => {
+                        const val = isWeights ? d.tonnage : (d.cardioKm > 0 ? d.cardioKm : d.cardioMinutes);
                         const x = (i / (sessionData.length - 1)) * 260 + 20;
-                        const y = 90 - ((d.tonnage - minVal) / rangeVal) * 75;
+                        const y = 90 - ((val - minVal) / rangeVal) * 75;
                         return `${x},${y}`;
                       })
                       .join(' ');
 
                     const lastSession = sessionData[sessionData.length - 1];
                     const firstSession = sessionData[0];
-                    const diff = lastSession.tonnage - firstSession.tonnage;
+                    const lastVal = isWeights ? lastSession.tonnage : (lastSession.cardioKm > 0 ? lastSession.cardioKm : lastSession.cardioMinutes);
+                    const firstVal = isWeights ? firstSession.tonnage : (firstSession.cardioKm > 0 ? firstSession.cardioKm : firstSession.cardioMinutes);
+                    const diff = lastVal - firstVal;
+
+                    const strokeColor = isWeights ? '#10b981' : '#38bdf8';
+                    const circleActive = isWeights ? '#34d399' : '#7dd3fc';
 
                     return (
                       <>
@@ -470,10 +527,10 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                             <line x1="10" y1="52" x2="290" y2="52" stroke="#27272a" strokeWidth="1" strokeDasharray="3" />
                             <line x1="10" y1="90" x2="290" y2="90" stroke="#27272a" strokeWidth="1" />
 
-                            {/* Linea del trend del tonnellaggio */}
+                            {/* Linea del trend */}
                             <polyline
                               fill="none"
-                              stroke="#10b981"
+                              stroke={strokeColor}
                               strokeWidth="2.5"
                               strokeLinecap="round"
                               strokeLinejoin="round"
@@ -482,10 +539,15 @@ export const SideMenu: React.FC<SideMenuProps> = ({
 
                             {/* Punti e label sui nodi */}
                             {sessionData.map((d, i) => {
+                              const val = isWeights ? d.tonnage : (d.cardioKm > 0 ? d.cardioKm : d.cardioMinutes);
                               const x = (i / (sessionData.length - 1)) * 260 + 20;
-                              const y = 90 - ((d.tonnage - minVal) / rangeVal) * 75;
+                              const y = 90 - ((val - minVal) / rangeVal) * 75;
                               const isLast = i === sessionData.length - 1;
                               const isFirst = i === 0;
+
+                              const label = isWeights
+                                ? `${(val / 1000).toFixed(1)}k`
+                                : d.cardioKm > 0 ? `${val.toFixed(1)}km` : `${Math.round(val)}m`;
 
                               return (
                                 <g key={i}>
@@ -493,18 +555,18 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                                     cx={x}
                                     cy={y}
                                     r={isLast ? 4 : 3}
-                                    fill={isLast ? '#34d399' : '#10b981'}
+                                    fill={isLast ? circleActive : strokeColor}
                                   />
                                   {(isLast || isFirst) && (
                                     <text
                                       x={x}
                                       y={y - 8}
-                                      fill={isLast ? '#34d399' : '#a1a1aa'}
+                                      fill={isLast ? circleActive : '#a1a1aa'}
                                       fontSize="9"
                                       fontWeight="bold"
                                       textAnchor={isFirst ? 'start' : 'end'}
                                     >
-                                      {(d.tonnage / 1000).toFixed(1)}k
+                                      {label}
                                     </text>
                                   )}
                                 </g>
@@ -515,8 +577,8 @@ export const SideMenu: React.FC<SideMenuProps> = ({
 
                         <div className="flex justify-between items-center text-[10px] text-zinc-500 pt-1 border-t border-zinc-900 font-bold">
                           <span>Inizio: {firstSession.date}</span>
-                          <span className={diff >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
-                            {diff >= 0 ? `+${(diff / 1000).toFixed(1)}k kg` : `${(diff / 1000).toFixed(1)}k kg`}
+                          <span className={diff >= 0 ? (isWeights ? 'text-emerald-400' : 'text-sky-400') : 'text-rose-400'}>
+                            {diff >= 0 ? `+${isWeights ? (diff / 1000).toFixed(1) + 'k kg' : diff.toFixed(1) + (lastSession.cardioKm > 0 ? ' km' : ' min')}` : `${isWeights ? (diff / 1000).toFixed(1) + 'k kg' : diff.toFixed(1) + (lastSession.cardioKm > 0 ? ' km' : ' min')}`}
                           </span>
                           <span>Ultimo: {lastSession.date}</span>
                         </div>
@@ -525,30 +587,90 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                   })()}
                 </div>
 
-                {/* Volume Bar Comparison */}
-                <div className="flex items-end gap-3 h-24 border-b border-zinc-800/60 pb-2">
-                  <div className="flex-1 flex flex-col items-center justify-end gap-1 h-full">
-                    <div
-                      className="w-full bg-zinc-800 rounded-t-md relative flex flex-col justify-end"
-                      style={{ height: `${hPrev}%` }}
-                    >
-                      <span className="text-[9px] text-zinc-400 font-bold text-center w-full absolute -top-4">
-                        {(stats.lastMonth / 1000).toFixed(1)}k
-                      </span>
+                {/* Confronto Mensile Differenziato (Pesi vs Cardio) */}
+                <div className="bg-zinc-950 p-3 rounded-2xl border border-zinc-800/60 space-y-2">
+                  <div className="flex justify-between items-center text-[10px] font-extrabold uppercase tracking-wider text-zinc-400">
+                    <span className="flex items-center gap-1 text-emerald-400">
+                      <i className="fa-solid fa-chart-column" /> Confronto Mensile (Pesi vs Cardio)
+                    </span>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    {/* Colonna Pesi */}
+                    <div className="bg-zinc-900/60 p-2.5 rounded-xl border border-zinc-800/40">
+                      <div className="text-[10px] font-bold text-emerald-400 mb-2 flex items-center justify-between">
+                        <span>🏋️ Pesi</span>
+                        <span className="text-[9px] text-zinc-400">{(stats.month.tonnage / 1000).toFixed(1)}k kg</span>
+                      </div>
+                      <div className="flex items-end gap-2 h-20">
+                        <div className="flex-1 flex flex-col items-center justify-end gap-1 h-full">
+                          <div
+                            className="w-full bg-zinc-800 rounded-t-md relative flex flex-col justify-end"
+                            style={{ height: `${hPrev}%` }}
+                          >
+                            <span className="text-[8px] text-zinc-400 font-bold text-center w-full absolute -top-3.5">
+                              {(stats.lastMonth.tonnage / 1000).toFixed(1)}k
+                            </span>
+                          </div>
+                          <span className="text-[9px] text-zinc-500 font-medium">Scorso</span>
+                        </div>
+                        <div className="flex-1 flex flex-col items-center justify-end gap-1 h-full">
+                          <div
+                            className="w-full bg-emerald-500 rounded-t-md relative flex flex-col justify-end"
+                            style={{ height: `${hCur}%` }}
+                          >
+                            <span className="text-[8px] text-emerald-300 font-bold text-center w-full absolute -top-3.5">
+                              {(stats.month.tonnage / 1000).toFixed(1)}k
+                            </span>
+                          </div>
+                          <span className="text-[9px] text-emerald-400 font-bold">Attuale</span>
+                        </div>
+                      </div>
                     </div>
-                    <span className="text-[10px] text-zinc-500 font-bold">Mese Scorso</span>
+
+                    {/* Colonna Cardio */}
+                    <div className="bg-zinc-900/60 p-2.5 rounded-xl border border-zinc-800/40">
+                      <div className="text-[10px] font-bold text-sky-400 mb-2 flex items-center justify-between">
+                        <span>🏃 Cardio</span>
+                        <span className="text-[9px] text-zinc-400">
+                          {stats.month.cardioKm > 0 ? `${stats.month.cardioKm.toFixed(1)} km` : `${Math.round(stats.month.cardioMinutes)} min`}
+                        </span>
+                      </div>
+                      <div className="flex items-end gap-2 h-20">
+                        <div className="flex-1 flex flex-col items-center justify-end gap-1 h-full">
+                          <div
+                            className="w-full bg-zinc-800 rounded-t-md relative flex flex-col justify-end"
+                            style={{ height: `${hCardioPrev}%` }}
+                          >
+                            <span className="text-[8px] text-zinc-400 font-bold text-center w-full absolute -top-3.5">
+                              {stats.lastMonth.cardioKm > 0 ? `${stats.lastMonth.cardioKm.toFixed(1)}k` : `${Math.round(stats.lastMonth.cardioMinutes)}m`}
+                            </span>
+                          </div>
+                          <span className="text-[9px] text-zinc-500 font-medium">Scorso</span>
+                        </div>
+                        <div className="flex-1 flex flex-col items-center justify-end gap-1 h-full">
+                          <div
+                            className="w-full bg-sky-500 rounded-t-md relative flex flex-col justify-end"
+                            style={{ height: `${hCardioCur}%` }}
+                          >
+                            <span className="text-[8px] text-sky-300 font-bold text-center w-full absolute -top-3.5">
+                              {stats.month.cardioKm > 0 ? `${stats.month.cardioKm.toFixed(1)}k` : `${Math.round(stats.month.cardioMinutes)}m`}
+                            </span>
+                          </div>
+                          <span className="text-[9px] text-sky-400 font-bold">Attuale</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="flex-1 flex flex-col items-center justify-end gap-1 h-full">
-                    <div
-                      className="w-full bg-emerald-500 rounded-t-md relative flex flex-col justify-end"
-                      style={{ height: `${hCur}%` }}
-                    >
-                      <span className="text-[9px] text-emerald-300 font-bold text-center w-full absolute -top-4">
-                        {(stats.month / 1000).toFixed(1)}k
-                      </span>
+                  {/* Statistiche Reps & TUT */}
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-900 text-[10px]">
+                    <div className="text-zinc-400">
+                      Reps Mese: <span className="text-white font-bold">{stats.month.totalReps.toLocaleString()}</span>
                     </div>
-                    <span className="text-[10px] text-zinc-200 font-bold">Questo Mese</span>
+                    <div className="text-zinc-400 text-right">
+                      TUT Mese: <span className="text-amber-400 font-bold">{Math.round(stats.month.tutSeconds / 60)} min</span>
+                    </div>
                   </div>
                 </div>
 

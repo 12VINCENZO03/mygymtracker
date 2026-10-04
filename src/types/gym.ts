@@ -128,6 +128,11 @@ export interface ActiveWorkoutState {
   startTime: number | null;
 }
 
+export interface AmrapCircuitState {
+  currentRound: number;
+  completedRounds: number;
+}
+
 export interface AppState {
   profileName: string;
   plan: WorkoutTab[];
@@ -152,7 +157,7 @@ export interface AppState {
   bodyMetrics: BodyMetrics;
   bodyMetricsHistory: BodyMetricHistoryEntry[];
   favoriteTabs: Record<string, boolean>;
-  amrapRounds: Record<string, number>;
+  amrapState: Record<string, AmrapCircuitState>;
   bodyGoal: BodyGoal;
   deloadActive: boolean;
   deloadDates: string[];

@@ -19,6 +19,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   const todayStr = React.useMemo(() => getTodayStr(), []);
   const stats = React.useMemo(() => calculateAllVolumeStatsV2(state.sessionsV2 || []), [state.sessionsV2, todayStr]);
   const loadOggi = React.useMemo(() => calculateTodayLoad(state.sessionsV2 || [], todayStr), [state.sessionsV2, todayStr]);
+  const [metricTab, setMetricTab] = React.useState<'weights' | 'cardio'>('weights');
   const nonHomeTabs = state.plan.filter((t) => !t.isHome);
 
   if (nonHomeTabs.length === 0) {
@@ -215,38 +216,199 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
         </div>
       </div>
 
-      {/* Volume Metrics Grid */}
+      {/* Sintesi Rapida Grafica: Pesi vs Cardio Separati */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/60 shadow-sm">
-          <div className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider mb-1">Volume Oggi</div>
+        <div 
+          onClick={() => setMetricTab('weights')}
+          className={`p-4 rounded-2xl border transition-all cursor-pointer shadow-sm ${
+            metricTab === 'weights'
+              ? 'bg-emerald-950/40 border-emerald-500/60 ring-1 ring-emerald-500/30'
+              : 'bg-zinc-900/60 border-zinc-800/60 hover:bg-zinc-900'
+          }`}
+        >
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">🏋️ Pesi Settimana</span>
+            <i className="fa-solid fa-dumbbell text-emerald-400 text-xs" />
+          </div>
           <div className="text-xl font-black text-white">
-            {stats.today.toLocaleString()} <span className="text-xs text-zinc-500 font-normal">kg</span>
+            {stats.week.tonnage.toLocaleString()} <span className="text-xs text-zinc-400 font-normal">kg</span>
+          </div>
+          <div className="text-[10px] text-zinc-500 mt-1 flex items-center gap-1">
+            <span>{stats.week.totalReps} reps</span>
+            <span>•</span>
+            <span>{Math.round(stats.week.tutSeconds / 60)}m TUT</span>
           </div>
         </div>
 
-        <div className="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/60 shadow-sm">
-          <div className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider mb-1">Questa Settimana</div>
-          <div className="text-xl font-black text-white flex items-baseline">
-            {stats.week.toLocaleString()} <span className="text-xs text-zinc-500 font-normal ml-1 mr-1">kg</span>
-            {renderDiffBadge(stats.week, stats.lastWeek, stats.hasLastWeek)}
+        <div 
+          onClick={() => setMetricTab('cardio')}
+          className={`p-4 rounded-2xl border transition-all cursor-pointer shadow-sm ${
+            metricTab === 'cardio'
+              ? 'bg-sky-950/40 border-sky-500/60 ring-1 ring-sky-500/30'
+              : 'bg-zinc-900/60 border-zinc-800/60 hover:bg-zinc-900'
+          }`}
+        >
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[10px] uppercase font-bold text-sky-400 tracking-wider">🏃 Cardio Settimana</span>
+            <i className="fa-solid fa-person-running text-sky-400 text-xs" />
+          </div>
+          <div className="text-xl font-black text-white">
+            {stats.week.cardioKm > 0 ? (
+              <>
+                {stats.week.cardioKm.toFixed(1)} <span className="text-xs text-sky-400 font-normal">km</span>
+              </>
+            ) : (
+              <>
+                {Math.round(stats.week.cardioMinutes)} <span className="text-xs text-sky-400 font-normal">min</span>
+              </>
+            )}
+          </div>
+          <div className="text-[10px] text-zinc-500 mt-1 flex items-center gap-1">
+            <span>{Math.round(stats.week.cardioMinutes)}m durata</span>
+            {stats.week.cardioKm > 0 && <span>• {stats.week.cardioKm} km</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* Griglia Dettaglio Volume Selezionato */}
+      <div className="bg-zinc-900/40 p-3 rounded-2xl border border-zinc-800/50 space-y-3">
+        <div className="flex justify-between items-center px-1">
+          <span className="text-[11px] font-black uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
+            {metricTab === 'weights' ? (
+              <>
+                <i className="fa-solid fa-weight-hanging text-emerald-400" /> Tonnellaggio & Pesi
+              </>
+            ) : (
+              <>
+                <i className="fa-solid fa-person-running text-sky-400" /> Cardio & Endurance
+              </>
+            )}
+          </span>
+          <div className="flex bg-zinc-950 p-0.5 rounded-xl border border-zinc-800 text-[10px] font-bold">
+            <button
+              type="button"
+              onClick={() => setMetricTab('weights')}
+              className={`px-2.5 py-1 rounded-lg transition-all ${
+                metricTab === 'weights' ? 'bg-emerald-500 text-zinc-950 font-black' : 'text-zinc-400'
+              }`}
+            >
+              Pesi
+            </button>
+            <button
+              type="button"
+              onClick={() => setMetricTab('cardio')}
+              className={`px-2.5 py-1 rounded-lg transition-all ${
+                metricTab === 'cardio' ? 'bg-sky-500 text-zinc-950 font-black' : 'text-zinc-400'
+              }`}
+            >
+              Cardio
+            </button>
           </div>
         </div>
 
-        <div className="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/60 shadow-sm">
-          <div className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider mb-1">Questo Mese</div>
-          <div className="text-xl font-black text-white flex items-baseline">
-            {stats.month.toLocaleString()} <span className="text-xs text-zinc-500 font-normal ml-1 mr-1">kg</span>
-            {renderDiffBadge(stats.month, stats.lastMonth, stats.hasLastMonth)}
-          </div>
-        </div>
+        {metricTab === 'weights' ? (
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="bg-zinc-950/80 p-3.5 rounded-xl border border-zinc-800/60 shadow-sm">
+              <div className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider mb-1">Volume Oggi</div>
+              <div className="text-lg font-black text-white">
+                {stats.today.tonnage.toLocaleString()} <span className="text-xs text-zinc-500 font-normal">kg</span>
+              </div>
+            </div>
 
-        <div className="bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800/60 shadow-sm">
-          <div className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider mb-1">Quest&apos;Anno</div>
-          <div className="text-xl font-black text-white flex items-baseline">
-            {stats.year.toLocaleString()} <span className="text-xs text-zinc-500 font-normal ml-1 mr-1">kg</span>
-            {renderDiffBadge(stats.year, stats.lastYear, stats.hasLastYear)}
+            <div className="bg-zinc-950/80 p-3.5 rounded-xl border border-zinc-800/60 shadow-sm">
+              <div className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider mb-1">Questa Settimana</div>
+              <div className="text-lg font-black text-white flex items-baseline">
+                {stats.week.tonnage.toLocaleString()} <span className="text-xs text-zinc-500 font-normal ml-1 mr-1">kg</span>
+                {renderDiffBadge(stats.week.tonnage, stats.lastWeek.tonnage, stats.hasLastWeek)}
+              </div>
+            </div>
+
+            <div className="bg-zinc-950/80 p-3.5 rounded-xl border border-zinc-800/60 shadow-sm">
+              <div className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider mb-1">Questo Mese</div>
+              <div className="text-lg font-black text-white flex items-baseline">
+                {stats.month.tonnage.toLocaleString()} <span className="text-xs text-zinc-500 font-normal ml-1 mr-1">kg</span>
+                {renderDiffBadge(stats.month.tonnage, stats.lastMonth.tonnage, stats.hasLastMonth)}
+              </div>
+            </div>
+
+            <div className="bg-zinc-950/80 p-3.5 rounded-xl border border-zinc-800/60 shadow-sm">
+              <div className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider mb-1">Quest&apos;Anno</div>
+              <div className="text-lg font-black text-white flex items-baseline">
+                {stats.year.tonnage.toLocaleString()} <span className="text-xs text-zinc-500 font-normal ml-1 mr-1">kg</span>
+                {renderDiffBadge(stats.year.tonnage, stats.lastYear.tonnage, stats.hasLastYear)}
+              </div>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="bg-zinc-950/80 p-3.5 rounded-xl border border-zinc-800/60 shadow-sm">
+              <div className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider mb-1">Cardio Oggi</div>
+              <div className="text-lg font-black text-white">
+                {stats.today.cardioKm > 0 ? (
+                  <>
+                    {stats.today.cardioKm.toFixed(1)} <span className="text-xs text-sky-400 font-normal">km</span>
+                  </>
+                ) : stats.today.cardioMinutes > 0 ? (
+                  <>
+                    {Math.round(stats.today.cardioMinutes)} <span className="text-xs text-sky-400 font-normal">min</span>
+                  </>
+                ) : (
+                  <>
+                    0 <span className="text-xs text-zinc-500 font-normal">km</span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-zinc-950/80 p-3.5 rounded-xl border border-zinc-800/60 shadow-sm">
+              <div className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider mb-1">Questa Settimana</div>
+              <div className="text-lg font-black text-white flex items-baseline">
+                {stats.week.cardioKm > 0 ? (
+                  <>
+                    {stats.week.cardioKm.toFixed(1)} <span className="text-xs text-sky-400 font-normal ml-1 mr-1">km</span>
+                  </>
+                ) : (
+                  <>
+                    {Math.round(stats.week.cardioMinutes)} <span className="text-xs text-sky-400 font-normal ml-1 mr-1">min</span>
+                  </>
+                )}
+                {renderDiffBadge(stats.week.cardioScore, stats.lastWeek.cardioScore, stats.hasLastWeek)}
+              </div>
+            </div>
+
+            <div className="bg-zinc-950/80 p-3.5 rounded-xl border border-zinc-800/60 shadow-sm">
+              <div className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider mb-1">Questo Mese</div>
+              <div className="text-lg font-black text-white flex items-baseline">
+                {stats.month.cardioKm > 0 ? (
+                  <>
+                    {stats.month.cardioKm.toFixed(1)} <span className="text-xs text-sky-400 font-normal ml-1 mr-1">km</span>
+                  </>
+                ) : (
+                  <>
+                    {Math.round(stats.month.cardioMinutes)} <span className="text-xs text-sky-400 font-normal ml-1 mr-1">min</span>
+                  </>
+                )}
+                {renderDiffBadge(stats.month.cardioScore, stats.lastMonth.cardioScore, stats.hasLastMonth)}
+              </div>
+            </div>
+
+            <div className="bg-zinc-950/80 p-3.5 rounded-xl border border-zinc-800/60 shadow-sm">
+              <div className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider mb-1">Quest&apos;Anno</div>
+              <div className="text-lg font-black text-white flex items-baseline">
+                {stats.year.cardioKm > 0 ? (
+                  <>
+                    {stats.year.cardioKm.toFixed(1)} <span className="text-xs text-sky-400 font-normal ml-1 mr-1">km</span>
+                  </>
+                ) : (
+                  <>
+                    {Math.round(stats.year.cardioMinutes)} <span className="text-xs text-sky-400 font-normal ml-1 mr-1">min</span>
+                  </>
+                )}
+                {renderDiffBadge(stats.year.cardioScore, stats.lastYear.cardioScore, stats.hasLastYear)}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Effort Load */}

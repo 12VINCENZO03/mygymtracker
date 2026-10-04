@@ -27,7 +27,7 @@ interface CircuitCardProps {
   onLongPressSubSet: (subId: string, roundIndex: number, pauseSec: number, prefill: { reps: string; weight: string; rir?: string; rpe?: string; customFields?: Record<string, string> }) => void;
   onOpenEffortModal: (setId: string, isRpe: boolean) => void;
   onOpenVideo: (url: string) => void;
-  onAddAmrapRound: () => void;
+  onAddAmrapRound: (roundSets?: Array<{ subId: string; reps: string; weight: string; rir?: string; rpe?: string }>) => void;
   onStartAmrapTimer: (totalMin: number, pacingSec?: number) => void;
   onStartEmomTimer: (totalMin: number, intervalSec: number) => void;
   onStartRoundRest: (seconds: number, roundIndex: number) => void;
@@ -85,9 +85,10 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
     totalRounds = 1;
   }
 
-  const amrapRoundsCount = state.amrapRounds[circuit.id] || 0;
+  const amrapInfo = state.amrapState?.[circuit.id] || { currentRound: 0, completedRounds: 0 };
+  const amrapRoundsCount = amrapInfo.completedRounds;
   const roundsArray = isAmrap
-    ? [state.amrapRounds[circuit.id] || 0]
+    ? Array.from({ length: Math.max(1, amrapInfo.currentRound + 1) }).map((_, i) => i)
     : Array.from({ length: totalRounds }).map((_, i) => i);
 
   const subCoachAdvices = React.useMemo(() => {
@@ -462,6 +463,60 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
     );
   }
 
+  const checkIsClosingEmomRound = (subId: string, roundIdx: number) => {
+    if (!isEmom) return false;
+    const setId = `${subId}-${roundIdx}`;
+    const isCurrentlyChecked = Boolean(state.checkedSets[setId]);
+    if (isCurrentlyChecked) return false;
+
+    const activeSubs = circuit.exercises.filter((s) => s.metricType !== 'rest');
+    return activeSubs.every((s) => s.id === subId || Boolean(state.checkedSets[`${s.id}-${roundIdx}`]));
+  };
+
+  const handleAddAmrapRound = () => {
+    const curRound = amrapInfo.currentRound;
+    const roundSetsData = circuit.exercises
+      .filter((sub) => sub.metricType !== 'rest')
+      .map((sub) => {
+        const setId = `${sub.id}-${curRound}`;
+        const histSet = getHistoricalSetDataV2(state.sessionsV2, curRound + 1, sub.exerciseId, sub.name);
+        const defaultTargetReps = histSet?.reps !== undefined ? String(histSet.reps) : (sub.reps || '10');
+        const actualReps = state.setReps[setId] ?? defaultTargetReps;
+
+        let displayWeight = state.setWeights?.[setId];
+        if (displayWeight === undefined) {
+          for (let j = curRound - 1; j >= 0; j--) {
+            const prevId = `${sub.id}-${j}`;
+            if (state.setWeights?.[prevId] !== undefined) {
+              displayWeight = state.setWeights[prevId];
+              break;
+            }
+          }
+          if (displayWeight === undefined && histSet?.weight !== undefined && histSet.weight !== '') {
+            displayWeight = String(histSet.weight);
+          }
+          if (displayWeight === undefined) {
+            displayWeight = state.weights[sub.id] || '';
+          }
+        }
+
+        const isCardio = sub.metricType === 'cardio';
+        const currentEffort = isCardio ? state.setRpe[setId] : state.setRir[setId];
+        const histEffort = isCardio ? histSet?.rpe : histSet?.rir;
+        const displayEffort = currentEffort !== undefined && currentEffort !== '' ? currentEffort : histEffort;
+
+        return {
+          subId: sub.id,
+          reps: actualReps,
+          weight: displayWeight || '0',
+          rir: !isCardio && displayEffort ? String(displayEffort) : undefined,
+          rpe: isCardio && displayEffort ? String(displayEffort) : undefined
+        };
+      });
+
+    onAddAmrapRound(roundSetsData);
+  };
+
   // Pointer down/up handler for press / long press
   const handlePointerDown = (subId: string, roundIdx: number, pauseSec: number, prefillData: any) => {
     isLongPressRef.current = false;
@@ -477,7 +532,30 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
         }
       }
 
-      onLongPressSubSet(subId, roundIdx, pauseSec, prefillData);
+      const isClosingRound = checkIsClosingEmomRound(subId, roundIdx);
+      let effectivePrefill = prefillData;
+      if (isClosingRound) {
+        const remSecVal = String(masterTimerRemainingSec);
+        effectivePrefill = {
+          ...prefillData,
+          customFields: {
+            ...(prefillData.customFields || {}),
+            masterTimerRemainingSec: remSecVal,
+            emomRemainingSec: remSecVal
+          }
+        };
+        onSaveCustomField?.(setId, 'masterTimerRemainingSec', remSecVal);
+        onSaveCustomField?.(setId, 'emomRemainingSec', remSecVal);
+        circuit.exercises.forEach((s) => {
+          if (s.metricType !== 'rest') {
+            const sId = `${s.id}-${roundIdx}`;
+            onSaveCustomField?.(sId, 'masterTimerRemainingSec', remSecVal);
+            onSaveCustomField?.(sId, 'emomRemainingSec', remSecVal);
+          }
+        });
+      }
+
+      onLongPressSubSet(subId, roundIdx, pauseSec, effectivePrefill);
     }, 450);
   };
 
@@ -496,10 +574,33 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
         }
       }
 
+      const isClosingRound = checkIsClosingEmomRound(subId, roundIdx);
+      let effectivePrefill = prefillData;
+      if (isClosingRound) {
+        const remSecVal = String(masterTimerRemainingSec);
+        effectivePrefill = {
+          ...prefillData,
+          customFields: {
+            ...(prefillData.customFields || {}),
+            masterTimerRemainingSec: remSecVal,
+            emomRemainingSec: remSecVal
+          }
+        };
+        onSaveCustomField?.(setId, 'masterTimerRemainingSec', remSecVal);
+        onSaveCustomField?.(setId, 'emomRemainingSec', remSecVal);
+        circuit.exercises.forEach((s) => {
+          if (s.metricType !== 'rest') {
+            const sId = `${s.id}-${roundIdx}`;
+            onSaveCustomField?.(sId, 'masterTimerRemainingSec', remSecVal);
+            onSaveCustomField?.(sId, 'emomRemainingSec', remSecVal);
+          }
+        });
+      }
+
       if (isNaN(Number(actualReps))) {
-        onLongPressSubSet(subId, roundIdx, pauseSec, prefillData);
+        onLongPressSubSet(subId, roundIdx, pauseSec, effectivePrefill);
       } else {
-        onToggleSubSet(subId, roundIdx, pauseSec, prefillData);
+        onToggleSubSet(subId, roundIdx, pauseSec, effectivePrefill);
       }
     }
   };
@@ -600,7 +701,7 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                 if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
                   try { navigator.vibrate(40); } catch { /* ignore */ }
                 }
-                onAddAmrapRound();
+                handleAddAmrapRound();
               }}
               className="bg-zinc-800 hover:bg-zinc-700 active:bg-emerald-500 active:text-zinc-950 text-emerald-400 px-4 py-3 rounded-2xl font-black text-xs border border-zinc-700 active:scale-90 transition-all duration-150 shadow-sm flex items-center gap-1.5"
             >
@@ -652,11 +753,15 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
             }
 
             return (
-              <div key={rIdx} className={`bg-zinc-950/60 p-4 rounded-3xl border border-zinc-800/80 shadow-sm space-y-3.5 ${emomRoundClass}`}>
+              <div
+                key={rIdx}
+                id={`circuit-${circuit.id}-round-${rIdx}`}
+                className={`bg-zinc-950/60 p-4 rounded-3xl border border-zinc-800/80 shadow-sm space-y-3.5 ${emomRoundClass}`}
+              >
                 <div className="flex items-center justify-between border-b border-zinc-800/60 pb-2.5">
                   <span className="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
                     <i className="fa-solid fa-arrows-spin" />
-                    Giro {rIdx + 1} {isAmrap ? '(Giro Corrente)' : `/ ${totalRounds}`}
+                    Giro {rIdx + 1} {isAmrap ? (rIdx < amrapInfo.completedRounds ? '(Completato)' : '(In corso)') : `/ ${totalRounds}`}
                   </span>
                 </div>
 
@@ -875,31 +980,50 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
               </div>
 
                 {/* Sub Exercise Coach Advice */}
-                {coachAdvice && coachAdvice.message && (
-                  <div
-                    className={`p-3 rounded-2xl mb-3 flex items-start gap-2.5 text-xs shadow-inner border ${
-                      coachAdvice.badge === 'increase'
-                        ? 'bg-emerald-950/30 border-emerald-800/40 text-emerald-300'
-                        : coachAdvice.badge === 'stall' || coachAdvice.badge === 'deload'
-                        ? 'bg-amber-950/30 border-amber-800/40 text-amber-300'
-                        : coachAdvice.badge === 'decrease'
-                        ? 'bg-rose-950/30 border-rose-800/40 text-rose-300'
-                        : 'bg-zinc-950/60 border-zinc-800 text-zinc-300'
-                    }`}
-                  >
-                    <div className="mt-0.5 shrink-0 opacity-90">
-                      {coachAdvice.badge === 'increase' ? (
-                        <i className="fa-solid fa-arrow-trend-up text-emerald-400" />
-                      ) : coachAdvice.badge === 'stall' ? (
-                        <i className="fa-solid fa-triangle-exclamation text-amber-400" />
-                      ) : (
-                        <i className="fa-solid fa-robot text-emerald-500" />
-                      )}
+                {coachAdvice && (coachAdvice.compactText || coachAdvice.message) && (
+                  isWorkoutActive ? (
+                    <div className="mb-3 flex items-center justify-between">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-zinc-950/80 border border-zinc-800 text-[10px] font-bold shadow-sm max-w-full truncate">
+                        {coachAdvice.badge === 'increase' ? (
+                          <i className="fa-solid fa-arrow-trend-up text-emerald-400 text-[11px] shrink-0" />
+                        ) : coachAdvice.badge === 'stall' ? (
+                          <i className="fa-solid fa-triangle-exclamation text-amber-400 text-[11px] shrink-0" />
+                        ) : coachAdvice.badge === 'decrease' ? (
+                          <i className="fa-solid fa-arrow-trend-down text-rose-400 text-[11px] shrink-0" />
+                        ) : (
+                          <i className="fa-solid fa-bullseye text-emerald-400 text-[11px] shrink-0" />
+                        )}
+                        <span className={coachAdvice.badge === 'increase' ? 'text-emerald-400 font-black truncate' : 'text-zinc-300 font-black truncate'}>
+                          {coachAdvice.compactText || coachAdvice.title}
+                        </span>
+                      </div>
                     </div>
-                    <div className="leading-relaxed">
-                      <b className="tracking-wide">{coachAdvice.title}:</b> {coachAdvice.message}
+                  ) : (
+                    <div
+                      className={`p-3 rounded-2xl mb-3 flex items-start gap-2.5 text-xs shadow-inner border ${
+                        coachAdvice.badge === 'increase'
+                          ? 'bg-emerald-950/30 border-emerald-800/40 text-emerald-300'
+                          : coachAdvice.badge === 'stall' || coachAdvice.badge === 'deload'
+                          ? 'bg-amber-950/30 border-amber-800/40 text-amber-300'
+                          : coachAdvice.badge === 'decrease'
+                          ? 'bg-rose-950/30 border-rose-800/40 text-rose-300'
+                          : 'bg-zinc-950/60 border-zinc-800 text-zinc-300'
+                      }`}
+                    >
+                      <div className="mt-0.5 shrink-0 opacity-90">
+                        {coachAdvice.badge === 'increase' ? (
+                          <i className="fa-solid fa-arrow-trend-up text-emerald-400" />
+                        ) : coachAdvice.badge === 'stall' ? (
+                          <i className="fa-solid fa-triangle-exclamation text-amber-400" />
+                        ) : (
+                          <i className="fa-solid fa-robot text-emerald-500" />
+                        )}
+                      </div>
+                      <div className="leading-relaxed">
+                        <b className="tracking-wide">{coachAdvice.title}:</b> {coachAdvice.message}
+                      </div>
                     </div>
-                  </div>
+                  )
                 )}
 
                 {/* Weight Input */}
@@ -1072,15 +1196,21 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
         </div>
       )}
 
-      {/* Coach Advice - Vista Azione (Solo durante il Workout) */}
-      {isWorkoutActive && circuitCoachAdvice && circuitCoachAdvice.message && (
-        <div className="mt-4 pt-3 border-t border-zinc-800/60 text-[11px] font-extrabold text-emerald-400 flex items-start gap-2 leading-snug">
-          <i className="fa-solid fa-robot mt-0.5" /> 
-          <span>
-            {circuitCoachAdvice.message.includes('AZIONE:') 
-              ? circuitCoachAdvice.message.split('AZIONE:')[1].trim() 
-              : circuitCoachAdvice.message}
-          </span>
+      {/* Coach Advice - Vista Ultra-Minimalista (Solo durante il Workout) */}
+      {isWorkoutActive && circuitCoachAdvice && (circuitCoachAdvice.compactText || circuitCoachAdvice.message) && (
+        <div className="mt-3 pt-2.5 border-t border-zinc-800/40 flex items-center justify-between">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-zinc-950/80 border border-zinc-800 text-[11px] font-bold shadow-sm max-w-full truncate">
+            {circuitCoachAdvice.badge === 'increase' ? (
+              <i className="fa-solid fa-arrow-trend-up text-emerald-400 text-xs shrink-0" />
+            ) : circuitCoachAdvice.badge === 'decrease' ? (
+              <i className="fa-solid fa-arrow-trend-down text-rose-400 text-xs shrink-0" />
+            ) : (
+              <i className="fa-solid fa-bolt text-indigo-400 text-xs shrink-0" />
+            )}
+            <span className={circuitCoachAdvice.badge === 'increase' ? 'text-emerald-400 font-black truncate' : 'text-zinc-300 font-black truncate'}>
+              {circuitCoachAdvice.compactText || circuitCoachAdvice.title}
+            </span>
+          </div>
         </div>
       )}
     </motion.div>

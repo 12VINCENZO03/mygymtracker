@@ -360,7 +360,7 @@ export default function App() {
   };
 
   const cleanupCircuitOrphanData = (nextState: AppState, circuit: SupersetExercise) => {
-    delete nextState.amrapRounds[circuit.id];
+    delete nextState.amrapState[circuit.id];
     Object.keys(nextState.checkedSets).forEach((key) => {
       if (key.startsWith(`${circuit.id}-round-`)) {
         delete nextState.checkedSets[key];
@@ -396,7 +396,7 @@ export default function App() {
             delete newState.setRpe[`${ex.id}-${i}`];
           }
         } else if (ex.type === 'superset') {
-          delete newState.amrapRounds[ex.id];
+          delete newState.amrapState[ex.id];
           for (let j = 0; j < 50; j++) {
             delete newState.checkedSets[`${ex.id}-round-${j}`];
             ex.exercises.forEach((sub) => {
@@ -526,11 +526,14 @@ export default function App() {
             roundsToCount = Math.ceil(((ex.emomTotalMin || 1) * 60) / (ex.emomIntervalSec || 60));
           }
           if (ex.structureType === 'amrap') {
-            roundsToCount = (state.amrapRounds[ex.id] || 0) + 1;
+            roundsToCount = state.amrapState?.[ex.id]?.completedRounds ?? 0;
           }
           const completedRounds: CircuitRoundV2[] = [];
-          for (let j = 0; j < (roundsToCount || 10); j++) {
-            const isDone = ex.structureType === 'amrap' || ex.exercises.some((sub) => state.checkedSets[`${sub.id}-${j}`]) || state.checkedSets[`${ex.id}-round-${j}`];
+          const maxRounds = ex.structureType === 'amrap' ? roundsToCount : (roundsToCount || 10);
+          for (let j = 0; j < maxRounds; j++) {
+            const isDone = ex.structureType === 'amrap'
+              ? true
+              : ex.exercises.some((sub) => state.checkedSets[`${sub.id}-${j}`]) || state.checkedSets[`${ex.id}-round-${j}`];
             if (isDone) {
               hasCheckedSets = true;
               totalSets++;
@@ -654,14 +657,15 @@ export default function App() {
           setRir: {},
           setRpe: {},
           setDurations: {},
-          setCustomFields: {}
+          setCustomFields: {},
+          amrapState: {}
         };
 
         await saveGymState(newState, true, v2Session);
         setState(newState);
         setSummaryData({ newSnapshot: v2Session, prevSnapshot });
       } else {
-        const newState = { ...state, activeWorkouts: nextActiveWorkouts, activeMasterTimer: null };
+        const newState = { ...state, activeWorkouts: nextActiveWorkouts, activeMasterTimer: null, amrapState: {} };
         await saveGymState(newState);
         setState(newState);
         showToast('Allenamento terminato (nessuna serie registrata).');
@@ -684,7 +688,7 @@ export default function App() {
       const nextSetReps = { ...state.setReps };
       const nextSetRir = { ...state.setRir };
       const nextSetRpe = { ...state.setRpe };
-      const nextAmrapRounds = { ...state.amrapRounds };
+      const nextAmrapState = { ...state.amrapState };
 
       const tab = state.plan.find((t) => t.id === tabId);
       tab?.exercises.forEach((ex) => {
@@ -696,7 +700,7 @@ export default function App() {
             delete nextSetRpe[`${ex.id}-${i}`];
           }
         } else if (ex.type === 'superset') {
-          delete nextAmrapRounds[ex.id];
+          delete nextAmrapState[ex.id];
           for (let j = 0; j < 50; j++) {
             delete nextCheckedSets[`${ex.id}-round-${j}`];
             ex.exercises.forEach((sub) => {
@@ -725,7 +729,7 @@ export default function App() {
         setReps: nextSetReps,
         setRir: nextSetRir,
         setRpe: nextSetRpe,
-        amrapRounds: nextAmrapRounds,
+        amrapState: nextAmrapState,
         activeMasterTimer: null,
         sessionsV2: nextSessionsV2
       };
@@ -895,13 +899,20 @@ export default function App() {
         if (prefill.rir !== undefined && nextSetRir[setId] === undefined) nextSetRir[setId] = prefill.rir;
         if (prefill.rpe !== undefined && nextSetRpe[setId] === undefined) nextSetRpe[setId] = prefill.rpe;
 
+        let nextSetCustomFields = state.setCustomFields || {};
+        if (prefill.customFields && Object.keys(prefill.customFields).length > 0) {
+          const currentFields = nextSetCustomFields[setId] || {};
+          nextSetCustomFields = { ...nextSetCustomFields, [setId]: { ...prefill.customFields, ...currentFields } };
+        }
+
         const nextState = {
           ...state,
           checkedSets: nextCheckedSets,
           setReps: nextSetReps,
           setWeights: nextSetWeights,
           setRir: nextSetRir,
-          setRpe: nextSetRpe
+          setRpe: nextSetRpe,
+          setCustomFields: nextSetCustomFields
         };
 
         if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
@@ -1323,7 +1334,7 @@ export default function App() {
                 setDurations: { ...prev.setDurations },
                 setRpe: { ...prev.setRpe },
                 setCustomFields: { ...prev.setCustomFields },
-                amrapRounds: { ...prev.amrapRounds },
+                amrapState: { ...prev.amrapState },
                 activeWorkouts: { ...prev.activeWorkouts }
               };
               
@@ -1640,14 +1651,58 @@ export default function App() {
                     onOpenEffortModal={(setId, isRpe) => setEffortTarget({ setId, isRpe })}
                     onStartAmrapTimer={(min, pacingSec) => handleStartAmrap(ex.id, min, pacingSec)}
                     onStartEmomTimer={(min, sec) => handleStartEmom(ex.id, min, sec)}
-                    onAddAmrapRound={async () => {
+                    onAddAmrapRound={async (roundSets) => {
                       let nextToSave: AppState | null = null;
                       setState((prev) => {
                         if (!prev) return null;
-                        const cur = prev.amrapRounds[ex.id] || 0;
-                        const next = {
+                        const currentAmrap = prev.amrapState?.[ex.id] || { currentRound: 0, completedRounds: 0 };
+                        const curRoundIdx = currentAmrap.currentRound;
+                        const nextCompleted = currentAmrap.completedRounds + 1;
+                        const nextCurrent = currentAmrap.currentRound + 1;
+
+                        const nextCheckedSets = { ...prev.checkedSets };
+                        const nextSetReps = { ...prev.setReps };
+                        const nextSetWeights = { ...prev.setWeights };
+                        const nextSetRir = { ...prev.setRir };
+                        const nextSetRpe = { ...prev.setRpe };
+
+                        // Marca come completato il giro
+                        nextCheckedSets[`${ex.id}-round-${curRoundIdx}`] = true;
+
+                        if (roundSets && roundSets.length > 0) {
+                          roundSets.forEach((item) => {
+                            const setId = `${item.subId}-${curRoundIdx}`;
+                            nextCheckedSets[setId] = true;
+                            if (nextSetReps[setId] === undefined) nextSetReps[setId] = item.reps;
+                            if (nextSetWeights[setId] === undefined) nextSetWeights[setId] = item.weight;
+                            if (item.rir !== undefined && nextSetRir[setId] === undefined) nextSetRir[setId] = item.rir;
+                            if (item.rpe !== undefined && nextSetRpe[setId] === undefined) nextSetRpe[setId] = item.rpe;
+                          });
+                        } else {
+                          ex.exercises.forEach((sub) => {
+                            if (sub.metricType !== 'rest') {
+                              const setId = `${sub.id}-${curRoundIdx}`;
+                              nextCheckedSets[setId] = true;
+                              if (nextSetReps[setId] === undefined) nextSetReps[setId] = sub.reps || '10';
+                              if (nextSetWeights[setId] === undefined) nextSetWeights[setId] = prev.weights[sub.id] || '0';
+                            }
+                          });
+                        }
+
+                        const next: AppState = {
                           ...prev,
-                          amrapRounds: { ...prev.amrapRounds, [ex.id]: cur + 1 }
+                          checkedSets: nextCheckedSets,
+                          setReps: nextSetReps,
+                          setWeights: nextSetWeights,
+                          setRir: nextSetRir,
+                          setRpe: nextSetRpe,
+                          amrapState: {
+                            ...prev.amrapState,
+                            [ex.id]: {
+                              currentRound: nextCurrent,
+                              completedRounds: nextCompleted
+                            }
+                          }
                         };
                         nextToSave = next;
                         return next;
@@ -1655,6 +1710,13 @@ export default function App() {
                       if (nextToSave) {
                         await saveGymState(nextToSave);
                       }
+                      setTimeout(() => {
+                        const targetRoundIdx = (state.amrapState?.[ex.id]?.currentRound ?? 0) + 1;
+                        const nextRoundEl = document.getElementById(`circuit-${ex.id}-round-${targetRoundIdx}`);
+                        if (nextRoundEl) {
+                          nextRoundEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        }
+                      }, 100);
                     }}
                     onStartRoundRest={async (sec, roundIdx) => {
                       const roundKey = `${ex.id}-round-${roundIdx}`;
@@ -2108,6 +2170,7 @@ export default function App() {
         isOpen={Boolean(summaryData)}
         newSnapshot={summaryData?.newSnapshot || null}
         previousSnapshot={summaryData?.prevSnapshot || null}
+        state={state}
         onClose={() => setSummaryData(null)}
       />
 

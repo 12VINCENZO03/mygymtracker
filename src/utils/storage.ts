@@ -209,7 +209,7 @@ export const initialDefaultState: AppState = {
   bodyMetrics: { weight: '', height: '', fm: '', ffm: '' },
   bodyMetricsHistory: [],
   favoriteTabs: {},
-  amrapRounds: {},
+  amrapState: {},
   bodyGoal: 'recomp',
   deloadActive: false,
   deloadDates: [],
@@ -604,7 +604,9 @@ export function normalizeState(parsed: any): AppState {
     bodyMetrics: { ...initialDefaultState.bodyMetrics, ...(parsed.bodyMetrics || {}) },
     bodyMetricsHistory: Array.isArray(parsed.bodyMetricsHistory) ? parsed.bodyMetricsHistory : [],
     favoriteTabs: parsed.favoriteTabs || {},
-    amrapRounds: parsed.amrapRounds || {},
+    amrapState: parsed.amrapState || (parsed.amrapRounds ? Object.fromEntries(
+      Object.entries(parsed.amrapRounds).map(([k, v]) => [k, { currentRound: Number(v) || 0, completedRounds: Number(v) || 0 }])
+    ) : {}),
     bodyGoal: parsed.bodyGoal !== undefined ? parsed.bodyGoal : 'recomp',
     deloadActive: !!parsed.deloadActive,
     deloadDates: Array.isArray(parsed.deloadDates) ? parsed.deloadDates : [],

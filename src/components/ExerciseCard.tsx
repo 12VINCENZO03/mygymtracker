@@ -520,15 +520,37 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
         })}
       </div>
 
-      {/* Coach Advice - Vista Azione (Solo durante il Workout) */}
-      {isWorkoutActive && coachAdvice && coachAdvice.message && (
-        <div className="mt-4 pt-3 border-t border-zinc-800/60 text-[11px] font-extrabold text-emerald-400 flex items-start gap-2 leading-snug">
-          <i className="fa-solid fa-robot mt-0.5" /> 
-          <span>
-            {coachAdvice.message.includes('AZIONE:') 
-              ? coachAdvice.message.split('AZIONE:')[1].trim() 
-              : coachAdvice.message}
-          </span>
+      {/* Coach Advice - Vista Ultra-Minimalista (Solo durante il Workout) */}
+      {isWorkoutActive && coachAdvice && (coachAdvice.compactText || coachAdvice.message) && (
+        <div className="mt-3 pt-2.5 border-t border-zinc-800/40 flex items-center justify-between">
+          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-xl bg-zinc-950/80 border border-zinc-800/80 text-[11px] font-bold shadow-sm max-w-full truncate">
+            {coachAdvice.badge === 'increase' ? (
+              <i className="fa-solid fa-arrow-trend-up text-emerald-400 text-xs shrink-0" />
+            ) : coachAdvice.badge === 'stall' ? (
+              <i className="fa-solid fa-triangle-exclamation text-amber-400 text-xs shrink-0" />
+            ) : coachAdvice.badge === 'deload' ? (
+              <i className="fa-solid fa-battery-half text-sky-400 text-xs shrink-0" />
+            ) : coachAdvice.badge === 'decrease' ? (
+              <i className="fa-solid fa-arrow-trend-down text-rose-400 text-xs shrink-0" />
+            ) : (
+              <i className="fa-solid fa-bullseye text-emerald-400 text-xs shrink-0" />
+            )}
+            <span
+              className={`truncate ${
+                coachAdvice.badge === 'increase'
+                  ? 'text-emerald-400 font-black'
+                  : coachAdvice.badge === 'stall'
+                  ? 'text-amber-400 font-black'
+                  : coachAdvice.badge === 'decrease'
+                  ? 'text-rose-400 font-black'
+                  : coachAdvice.badge === 'deload'
+                  ? 'text-sky-400 font-black'
+                  : 'text-zinc-300 font-black'
+              }`}
+            >
+              {coachAdvice.compactText || coachAdvice.title}
+            </span>
+          </div>
         </div>
       )}
     </motion.div>
