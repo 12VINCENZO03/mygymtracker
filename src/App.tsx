@@ -444,10 +444,14 @@ export default function App() {
       newState.activeMasterTimer = null;
     };
 
+    const workoutAlreadyActive = Boolean(newState.activeWorkouts[tabId]?.active);
     const hasSessionToday = (newState.sessionsV2 || []).some(s => s.planId === tabId && s.date === todayStr);
-    if (hasSessionToday) {
-      const conf = confirm(
-        'Hai già una sessione registrata oggi per questa scheda. Vuoi azzerare i set per iniziarne una nuova?'
+
+    if (workoutAlreadyActive || hasSessionToday) {
+      const conf = window.confirm(
+        workoutAlreadyActive
+          ? 'Hai già un allenamento in corso su questa scheda. Vuoi azzerare i set per ricominciare da capo?'
+          : 'Hai già una sessione registrata oggi per questa scheda. Vuoi azzerare i set per iniziarne una nuova?'
       );
       if (conf) {
         clearSessionData();
@@ -455,7 +459,7 @@ export default function App() {
         return;
       }
     } else {
-      // 🔴 È un giorno diverso: azzeriamo tutto automaticamente
+      // È un giorno diverso e non ci sono allenamenti attivi: azzeriamo tutto
       clearSessionData();
     }
 
