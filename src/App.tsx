@@ -2201,7 +2201,9 @@ export default function App() {
 
             hist.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-            return { ...prev, bodyMetrics: updated, bodyMetricsHistory: hist };
+            const next = { ...prev, bodyMetrics: updated, bodyMetricsHistory: hist };
+            saveGymState(next).catch(console.warn);
+            return next;
           });
         }}
         onUploadPdf={handlePdfUpload}
