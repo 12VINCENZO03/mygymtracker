@@ -39,10 +39,11 @@ export const SideMenu: React.FC<SideMenuProps> = ({
   const [biaHistoryOpen, setBiaHistoryOpen] = useState(false);
   const [trendTab, setTrendTab] = useState<'weights' | 'cardio'>('weights');
 
+  // 🔴 CANONICAL V2: Statistiche derivate direttamente dallo storico immutabile con memoizzazione anti-lag
+  const stats = React.useMemo(() => calculateAllVolumeStatsV2(state.sessionsV2 || []), [state.sessionsV2]);
+
   if (!isOpen) return null;
 
-  // 🔴 CANONICAL V2: Statistiche derivate direttamente dallo storico immutabile
-  const stats = calculateAllVolumeStatsV2(state.sessionsV2 || []);
   const workoutDatesSet = getWorkoutDatesSet(state.sessionsV2);
   const maxVol = Math.max(stats.month.tonnage, stats.lastMonth.tonnage, 1);
   const hCur = Math.min(100, Math.round((stats.month.tonnage / maxVol) * 100));

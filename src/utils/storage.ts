@@ -584,6 +584,54 @@ export function normalizeState(parsed: any): AppState {
     });
   });
 
+  // --- GARBAGE COLLECTOR: Pulizia Registro Esercizi Orfani ---
+  const usedExIds = new Set<string>();
+
+  // 1. Preserviamo gli esercizi di default
+  Object.keys(initialRegistry).forEach(id => usedExIds.add(id));
+
+  // 2. Raccogliamo ID dalle schede attive
+  plan.forEach((tab: any) => {
+    tab.exercises?.forEach((ex: any) => {
+      if (ex.type === 'single' && ex.exerciseId) usedExIds.add(ex.exerciseId);
+      else if (ex.type === 'superset') {
+        ex.exercises?.forEach((sub: any) => {
+          if (sub.exerciseId) usedExIds.add(sub.exerciseId);
+        });
+      }
+    });
+  });
+
+  // 3. Raccogliamo ID dallo storico sessioni
+  sessions.forEach((session: any) => {
+    session.blocks?.forEach((block: any) => {
+      if (block.rounds) {
+        block.rounds.forEach((r: any) => {
+          r.exercises?.forEach((sub: any) => {
+            if (sub.exerciseId) usedExIds.add(sub.exerciseId);
+          });
+        });
+      } else {
+        if (block.exerciseId) usedExIds.add(block.exerciseId);
+      }
+    });
+  });
+
+  // 4. Raccogliamo ID dai Record (PR)
+  const prs = Array.isArray(parsed.prs) ? parsed.prs : [];
+  prs.forEach((pr: any) => {
+    if (pr.exerciseId) usedExIds.add(pr.exerciseId);
+  });
+
+  // 5. Filtriamo il registro mantenendo solo gli ID utilizzati
+  const cleanedRegistry: Record<string, ExerciseDefV2> = {};
+  Object.keys(registry).forEach(key => {
+    if (usedExIds.has(key)) {
+      cleanedRegistry[key] = registry[key];
+    }
+  });
+  // -----------------------------------------------------------
+
   const normalized: AppState = {
     schemaVersion: 2,
     revision: typeof parsed.revision === 'number' ? parsed.revision : 1,
@@ -616,7 +664,7 @@ export function normalizeState(parsed: any): AppState {
     lastSavedAt: parsed.lastSavedAt,
 
     // CANONICAL V2
-    registryV2: registry,
+    registryV2: cleanedRegistry,
     sessionsV2: sessions
   };
 
