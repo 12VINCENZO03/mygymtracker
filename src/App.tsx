@@ -551,7 +551,7 @@ export default function App() {
             roundsToCount = state.amrapState?.[ex.id]?.completedRounds ?? 0;
           }
           const completedRounds: CircuitRoundV2[] = [];
-          const maxRounds = ex.structureType === 'amrap' ? roundsToCount : (roundsToCount || 10);
+          const maxRounds = ex.structureType === 'amrap' ? 50 : (roundsToCount || 10);
           for (let j = 0; j < maxRounds; j++) {
             const isMasterRoundDone = Boolean(state.checkedSets[`${ex.id}-round-${j}`]) || (ex.structureType === 'amrap' && j < roundsToCount);
             const roundExs: ExerciseSnapshotV2[] = [];
@@ -627,37 +627,66 @@ export default function App() {
           blocks: v2Blocks
         };
 
-        // GESTIONE IMMUTABILE DEI PR
-        v2Blocks.forEach((block) => {
-          if (!('rounds' in block) && (block.type === 'weight' || block.type === 'bodyweight' || !block.type)) {
-            const maxW = Math.max(...block.sets.map((s) => s.weight || 0));
-            if (maxW > 0) {
-              const permId = block.exerciseId;
-              const existingPrIndex = nextPrs.findIndex((p) =>
-                (permId && p.exerciseId === permId) ||
-                (!p.exerciseId && p.name.trim().toLowerCase() === block.nameSnapshot.trim().toLowerCase())
-              );
+        // GESTIONE IMMUTABILE DEI PR (Esercizi singoli + Sotto-esercizi dei Circuiti)
+        const flatCandidates: Array<{ exerciseId: string; nameSnapshot: string; type?: string; sets: WorkoutSetV2[] }> = [];
 
-              if (existingPrIndex === -1) {
-                nextPrs.push({
-                  id: generateId(),
-                  exerciseId: permId,
-                  name: block.nameSnapshot,
-                  weight: String(maxW),
-                  history: [{ date: todayDateStr, weight: String(maxW) }]
+        v2Blocks.forEach((block) => {
+          if (!('rounds' in block)) {
+            flatCandidates.push(block);
+          } else {
+            block.rounds?.forEach((r) => {
+              r.exercises?.forEach((sub) => {
+                flatCandidates.push(sub);
+              });
+            });
+          }
+        });
+
+        // Raccogliamo il carico massimo per ogni esercizio (solo weight, bodyweight o undefined)
+        const exerciseMaxWeights = new Map<string, { exerciseId: string; nameSnapshot: string; maxW: number }>();
+
+        flatCandidates.forEach((cand) => {
+          if (cand.type === 'weight' || cand.type === 'bodyweight' || !cand.type) {
+            const maxW = Math.max(0, ...cand.sets.map((s) => s.weight || 0));
+            if (maxW > 0) {
+              const key = cand.exerciseId || cand.nameSnapshot.trim().toLowerCase();
+              const existing = exerciseMaxWeights.get(key);
+              if (!existing || maxW > existing.maxW) {
+                exerciseMaxWeights.set(key, {
+                  exerciseId: cand.exerciseId,
+                  nameSnapshot: cand.nameSnapshot,
+                  maxW
                 });
-              } else {
-                const exPr = nextPrs[existingPrIndex];
-                if (maxW > (parseFloat(exPr.weight) || 0)) {
-                  nextPrs[existingPrIndex] = {
-                    ...exPr,
-                    weight: String(maxW),
-                    exerciseId: permId || exPr.exerciseId,
-                    name: block.nameSnapshot,
-                    history: [{ date: todayDateStr, weight: String(maxW) }, ...exPr.history]
-                  };
-                }
               }
+            }
+          }
+        });
+
+        exerciseMaxWeights.forEach(({ exerciseId, nameSnapshot, maxW }) => {
+          const permId = exerciseId;
+          const existingPrIndex = nextPrs.findIndex((p) =>
+            (permId && p.exerciseId === permId) ||
+            (!p.exerciseId && p.name.trim().toLowerCase() === nameSnapshot.trim().toLowerCase())
+          );
+
+          if (existingPrIndex === -1) {
+            nextPrs.push({
+              id: generateId(),
+              exerciseId: permId,
+              name: nameSnapshot,
+              weight: String(maxW),
+              history: [{ date: todayDateStr, weight: String(maxW) }]
+            });
+          } else {
+            const exPr = nextPrs[existingPrIndex];
+            if (maxW > (parseFloat(exPr.weight) || 0)) {
+              nextPrs[existingPrIndex] = {
+                ...exPr,
+                weight: String(maxW),
+                exerciseId: permId || exPr.exerciseId,
+                name: nameSnapshot,
+                history: [{ date: todayDateStr, weight: String(maxW) }, ...exPr.history]
+              };
             }
           }
         });
@@ -857,8 +886,6 @@ export default function App() {
               });
             } else {
               nextCheckedSets[`${circuitId}-round-${setIndex}`] = true;
-              const circuitEl = document.getElementById(`circuit-${circuitId}`);
-              circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
           }
         }
@@ -879,14 +906,6 @@ export default function App() {
               exEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
           });
-        } else {
-          if (circuitId) {
-            const circuitEl = document.getElementById(`circuit-${circuitId}`);
-            circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          } else {
-            const exEl = document.getElementById(`ex-container-${exId}`) || document.getElementById(`exercise-${exId}`);
-            exEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
         }
       }
     }
@@ -1006,8 +1025,6 @@ export default function App() {
             });
           } else {
             nextCheckedSets[`${circuitId}-round-${setIndex}`] = true;
-            const circuitEl = document.getElementById(`circuit-${circuitId}`);
-            circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }
         }
       }
@@ -1024,14 +1041,6 @@ export default function App() {
             exEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }
         });
-      } else {
-        if (circuitId) {
-          const circuitEl = document.getElementById(`circuit-${circuitId}`);
-          circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        } else {
-          const exEl = document.getElementById(`ex-container-${exId}`) || document.getElementById(`exercise-${exId}`);
-          exEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
       }
     }
 

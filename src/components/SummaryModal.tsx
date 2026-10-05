@@ -1,7 +1,7 @@
 // src/components/SummaryModal.tsx
 import React, { useEffect, useState, useMemo } from 'react';
 import confetti from 'canvas-confetti';
-import { WorkoutSessionV2, CircuitSnapshotV2, ExerciseSnapshotV2 } from '../types/v2';
+import { WorkoutSessionV2, CircuitSnapshotV2, ExerciseSnapshotV2, WorkoutSetV2 } from '../types/v2';
 import { AppState } from '../types/gym';
 import { getExerciseCoachAdvice, getCircuitCoachAdvice } from '../utils/coach';
 
@@ -70,96 +70,141 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({
       return items;
     }
 
-    // 1. Confronto Esercizi Singoli
-    newSnapshot.blocks.forEach((nBlock) => {
-      if (!('rounds' in nBlock)) {
-        const oBlock = previousSnapshot.blocks.find(
-          (b): b is ExerciseSnapshotV2 => !('rounds' in b) && (b.exerciseId === nBlock.exerciseId || b.nameSnapshot.trim().toLowerCase() === nBlock.nameSnapshot.trim().toLowerCase())
-        );
-
-        if (oBlock) {
-          const nSets = nBlock.sets || [];
-          const oSets = oBlock.sets || [];
-          const nMaxW = Math.max(0, ...nSets.map((s) => s.weight || 0));
-          const oMaxW = Math.max(0, ...oSets.map((s) => s.weight || 0));
-          const nTotReps = nSets.reduce((sum, s) => sum + (s.reps || 0), 0);
-          const oTotReps = oSets.reduce((sum, s) => sum + (s.reps || 0), 0);
-
-          // A) Record di Carico (PR)
-          if (nMaxW > oMaxW && nMaxW > 0) {
-            items.push({
-              title: `${nBlock.nameSnapshot} — Nuovo Record di Carico!`,
-              description: `Carico massimo aumentato di +${(nMaxW - oMaxW).toFixed(1)}kg (ora ${nMaxW}kg)`,
-              type: 'pr'
+    // Helper per estrarre e aggregare tutti gli esercizi (singoli e sotto-esercizi di circuiti)
+    const extractAggregatedExercises = (snapshot: WorkoutSessionV2) => {
+      const map = new Map<string, { exerciseId: string; nameSnapshot: string; type?: string; sets: WorkoutSetV2[] }>();
+      snapshot.blocks.forEach((block) => {
+        if (!('rounds' in block)) {
+          const key = block.exerciseId || block.nameSnapshot.trim().toLowerCase();
+          const existing = map.get(key);
+          if (existing) {
+            existing.sets.push(...(block.sets || []));
+          } else {
+            map.set(key, {
+              exerciseId: block.exerciseId,
+              nameSnapshot: block.nameSnapshot,
+              type: block.type,
+              sets: [...(block.sets || [])]
             });
           }
-
-          // B) Miglioramento RIR a parità di carico (Efficienza Neurale)
-          if (nMaxW === oMaxW && nMaxW > 0) {
-            const nRirs = nSets
-              .filter(s => (s.weight || 0) === nMaxW && s.rir != null && !isNaN(s.rir) && s.rir >= 0)
-              .map(s => s.rir as number);
-            const oRirs = oSets
-              .filter(s => (s.weight || 0) === oMaxW && s.rir != null && !isNaN(s.rir) && s.rir >= 0)
-              .map(s => s.rir as number);
-
-            if (nRirs.length > 0 && oRirs.length > 0) {
-              const nAvgRir = nRirs.reduce((a, b) => a + b, 0) / nRirs.length;
-              const oAvgRir = oRirs.reduce((a, b) => a + b, 0) / oRirs.length;
-              if (nAvgRir - oAvgRir >= 0.5) {
-                items.push({
-                  title: `${nBlock.nameSnapshot} — Miglioramento Margine RIR!`,
-                  description: `A parità di carico (${nMaxW}kg), il margine RIR è salito da ${oAvgRir.toFixed(1)} a ${nAvgRir.toFixed(1)} (+${(nAvgRir - oAvgRir).toFixed(1)}). Minore sforzo percepito allo stesso peso!`,
-                  type: 'neural'
+        } else {
+          block.rounds?.forEach((r) => {
+            r.exercises?.forEach((sub) => {
+              const key = sub.exerciseId || sub.nameSnapshot.trim().toLowerCase();
+              const existing = map.get(key);
+              if (existing) {
+                existing.sets.push(...(sub.sets || []));
+              } else {
+                map.set(key, {
+                  exerciseId: sub.exerciseId,
+                  nameSnapshot: sub.nameSnapshot,
+                  type: sub.type,
+                  sets: [...(sub.sets || [])]
                 });
               }
+            });
+          });
+        }
+      });
+      return Array.from(map.values());
+    };
+
+    const nExercises = extractAggregatedExercises(newSnapshot);
+    const oExercises = extractAggregatedExercises(previousSnapshot);
+
+    // 1. Confronto Esercizi (Singoli e Sotto-esercizi di circuiti)
+    nExercises.forEach((nBlock) => {
+      const oBlock = oExercises.find(
+        (b) => (b.exerciseId && b.exerciseId === nBlock.exerciseId) || b.nameSnapshot.trim().toLowerCase() === nBlock.nameSnapshot.trim().toLowerCase()
+      );
+
+      if (oBlock) {
+        const nSets = nBlock.sets || [];
+        const oSets = oBlock.sets || [];
+        const nMaxW = Math.max(0, ...nSets.map((s) => s.weight || 0));
+        const oMaxW = Math.max(0, ...oSets.map((s) => s.weight || 0));
+        const nTotReps = nSets.reduce((sum, s) => sum + (s.reps || 0), 0);
+        const oTotReps = oSets.reduce((sum, s) => sum + (s.reps || 0), 0);
+
+        // A) Record di Carico (PR)
+        if (nMaxW > oMaxW && nMaxW > 0) {
+          items.push({
+            title: `${nBlock.nameSnapshot} — Nuovo Record di Carico!`,
+            description: `Carico massimo aumentato di +${(nMaxW - oMaxW).toFixed(1)}kg (ora ${nMaxW}kg)`,
+            type: 'pr'
+          });
+        }
+
+        // B) Miglioramento RIR a parità di carico (Efficienza Neurale)
+        if (nMaxW === oMaxW) {
+          const nRirs = nSets
+            .filter(s => (s.weight || 0) === nMaxW && s.rir != null && !isNaN(s.rir) && s.rir >= 0)
+            .map(s => s.rir as number);
+          const oRirs = oSets
+            .filter(s => (s.weight || 0) === oMaxW && s.rir != null && !isNaN(s.rir) && s.rir >= 0)
+            .map(s => s.rir as number);
+
+          if (nRirs.length > 0 && oRirs.length > 0) {
+            const nAvgRir = nRirs.reduce((a, b) => a + b, 0) / nRirs.length;
+            const oAvgRir = oRirs.reduce((a, b) => a + b, 0) / oRirs.length;
+            if (nAvgRir - oAvgRir >= 0.5) {
+              const loadLabel = nMaxW > 0 ? `${nMaxW}kg` : 'BW';
+              items.push({
+                title: `${nBlock.nameSnapshot} — Miglioramento Margine RIR!`,
+                description: `A parità di carico (${loadLabel}), il margine RIR è salito da ${oAvgRir.toFixed(1)} a ${nAvgRir.toFixed(1)} (+${(nAvgRir - oAvgRir).toFixed(1)}). Minore sforzo percepito allo stesso peso!`,
+                type: 'neural'
+              });
             }
           }
+        }
 
-          // C) Maggior numero di ripetizioni sul Top Set o Volume
-          if (nMaxW === oMaxW) {
-            const nTopSetReps = Math.max(0, ...nSets.filter(s => (s.weight || 0) === nMaxW).map(s => s.reps || 0));
-            const oTopSetReps = Math.max(0, ...oSets.filter(s => (s.weight || 0) === oMaxW).map(s => s.reps || 0));
+        // C) Maggior numero di ripetizioni sul Top Set o Volume
+        if (nMaxW === oMaxW) {
+          const nTopSetReps = Math.max(0, ...nSets.filter(s => (s.weight || 0) === nMaxW).map(s => s.reps || 0));
+          const oTopSetReps = Math.max(0, ...oSets.filter(s => (s.weight || 0) === oMaxW).map(s => s.reps || 0));
 
-            if (nTopSetReps > oTopSetReps && oTopSetReps > 0) {
-              items.push({
-                title: `${nBlock.nameSnapshot} — Più Reps sul Top Set!`,
-                description: `Top set portato da ${oTopSetReps} a ${nTopSetReps} ripetizioni a ${nMaxW > 0 ? nMaxW + 'kg' : 'BW'} (+${nTopSetReps - oTopSetReps} reps)!`,
-                type: 'reps'
-              });
-            } else if (nTotReps > oTotReps && oTotReps > 0) {
-              items.push({
-                title: `${nBlock.nameSnapshot} — Più Volume Totale!`,
-                description: `Completate +${nTotReps - oTotReps} ripetizioni complessive a parità di carico (${nTotReps} vs ${oTotReps} reps).`,
-                type: 'reps'
-              });
-            }
-          }
-
-          // D) Isometria / Time under tension (TUT)
-          if (nBlock.type === 'time') {
-            const nDur = nSets.reduce((sum, s) => sum + (s.durationSec || 0), 0);
-            const oDur = oSets.reduce((sum, s) => sum + (s.durationSec || 0), 0);
-            if (nDur > oDur && oDur > 0) {
-              items.push({
-                title: `${nBlock.nameSnapshot} — Più Tempo Sotto Tensione!`,
-                description: `Tenuta complessiva aumentata di +${Math.round(nDur - oDur)}s (${Math.round(nDur)}s vs ${Math.round(oDur)}s). Time Under Tension incrementato!`,
-                type: 'tut'
-              });
-            }
-          }
-
-          // E) Carico inferiore
-          if (nMaxW < oMaxW && nMaxW > 0) {
+          if (nTopSetReps > oTopSetReps && oTopSetReps > 0) {
             items.push({
-              title: `${nBlock.nameSnapshot} — Carico Inferiore`,
-              description: `Carico massimo ridotto di -${(oMaxW - nMaxW).toFixed(1)}kg rispetto alla scorsa sessione`,
-              type: 'worse'
+              title: `${nBlock.nameSnapshot} — Più Reps sul Top Set!`,
+              description: `Top set portato da ${oTopSetReps} a ${nTopSetReps} ripetizioni a ${nMaxW > 0 ? nMaxW + 'kg' : 'BW'} (+${nTopSetReps - oTopSetReps} reps)!`,
+              type: 'reps'
+            });
+          } else if (nTotReps > oTotReps && oTotReps > 0) {
+            items.push({
+              title: `${nBlock.nameSnapshot} — Più Volume Totale!`,
+              description: `Completate +${nTotReps - oTotReps} ripetizioni complessive a parità di carico (${nTotReps} vs ${oTotReps} reps).`,
+              type: 'reps'
             });
           }
         }
-      } else {
-        // 2. Confronto Circuiti (EMOM / AMRAP)
+
+        // D) Isometria / Time under tension (TUT)
+        if (nBlock.type === 'time') {
+          const nDur = nSets.reduce((sum, s) => sum + (s.durationSec || 0), 0);
+          const oDur = oSets.reduce((sum, s) => sum + (s.durationSec || 0), 0);
+          if (nDur > oDur && oDur > 0) {
+            items.push({
+              title: `${nBlock.nameSnapshot} — Più Tempo Sotto Tensione!`,
+              description: `Tenuta complessiva aumentata di +${Math.round(nDur - oDur)}s (${Math.round(nDur)}s vs ${Math.round(oDur)}s). Time Under Tension incrementato!`,
+              type: 'tut'
+            });
+          }
+        }
+
+        // E) Carico inferiore
+        if (nMaxW < oMaxW && nMaxW > 0) {
+          items.push({
+            title: `${nBlock.nameSnapshot} — Carico Inferiore`,
+            description: `Carico massimo ridotto di -${(oMaxW - nMaxW).toFixed(1)}kg rispetto alla scorsa sessione`,
+            type: 'worse'
+          });
+        }
+      }
+    });
+
+    // 2. Confronto Circuiti (EMOM / AMRAP)
+    newSnapshot.blocks.forEach((nBlock) => {
+      if ('rounds' in nBlock) {
         const nCirc = nBlock as CircuitSnapshotV2;
         const oCirc = previousSnapshot.blocks.find(
           (b): b is CircuitSnapshotV2 => 'rounds' in b && (b.id === nCirc.id || b.nameSnapshot.trim().toLowerCase() === nCirc.nameSnapshot.trim().toLowerCase())
