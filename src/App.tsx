@@ -102,7 +102,7 @@ export default function App() {
   const restTimerIntervalRef = useRef<number | null>(null);
 
   // Inline Timers (for time-based exercises like plank)
-  const [activeInlineTimers, setActiveInlineTimers] = useState<Record<string, number>>({});
+  const [inlineTimerCountdown, setInlineTimerCountdown] = useState<Record<string, number>>({});
   const inlineTimerIntervalsRef = useRef<Record<string, number>>({});
 
   // Master Timers (for EMOM / AMRAP)
@@ -357,8 +357,11 @@ export default function App() {
     cleanRecord(nextState.setDurations);
     cleanRecord(nextState.setRpe);
     cleanRecord(nextState.setCustomFields);
+    if (nextState.activeInlineTimers) {
+      cleanRecord(nextState.activeInlineTimers);
+    }
 
-    setActiveInlineTimers((prev) => {
+    setInlineTimerCountdown((prev) => {
       const updated = { ...prev };
       Object.keys(updated).forEach((k) => {
         if (k.startsWith(`${targetId}-`)) {
@@ -670,6 +673,7 @@ export default function App() {
         const newState: AppState = {
           ...state,
           activeMasterTimer: null, // 🔥 Spegne il timer se termini l'allenamento
+          activeInlineTimers: {},
           deloadDates: nextDeloadDates,
           activeWorkouts: nextActiveWorkouts,
           registryV2: nextRegistry,
@@ -689,7 +693,7 @@ export default function App() {
         setState(newState);
         setSummaryData({ newSnapshot: v2Session, prevSnapshot });
       } else {
-        const newState = { ...state, activeWorkouts: nextActiveWorkouts, activeMasterTimer: null, amrapState: {} };
+        const newState = { ...state, activeWorkouts: nextActiveWorkouts, activeMasterTimer: null, activeInlineTimers: {}, amrapState: {} };
         await saveGymState(newState);
         setState(newState);
         showToast('Allenamento terminato (nessuna serie registrata).');
@@ -1043,26 +1047,70 @@ export default function App() {
   ) => {
     if (!state) return;
     initAudio();
-    if (activeInlineTimers[setId]) {
-      if (inlineTimerIntervalsRef.current[setId]) {
-        safeClearInterval(inlineTimerIntervalsRef.current[setId]);
-        delete inlineTimerIntervalsRef.current[setId];
-      }
-      setActiveInlineTimers((prev) => {
-        const next = { ...prev };
-        delete next[setId];
+
+    if (state.activeInlineTimers?.[setId]) {
+      setState((prev) => {
+        if (!prev) return null;
+        const nextInline = { ...(prev.activeInlineTimers || {}) };
+        delete nextInline[setId];
+        const next = { ...prev, activeInlineTimers: nextInline };
+        saveGymState(next).catch(console.warn);
         return next;
       });
       return;
     }
-    setActiveInlineTimers((prev) => ({ ...prev, [setId]: durationSec }));
-    const endTime = Date.now() + durationSec * 1000;
-    inlineTimerIntervalsRef.current[setId] = safeSetInterval(() => {
-      const remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
-      if (remaining <= 0) {
-        safeClearInterval(inlineTimerIntervalsRef.current[setId]);
-        delete inlineTimerIntervalsRef.current[setId];
-        setActiveInlineTimers((prev) => {
+
+    setState((prev) => {
+      if (!prev) return null;
+      const nextInline = {
+        ...(prev.activeInlineTimers || {}),
+        [setId]: {
+          startTimestamp: Date.now(),
+          durationSec,
+          pauseSec,
+          prefill
+        }
+      };
+      const next = { ...prev, activeInlineTimers: nextInline };
+      saveGymState(next).catch(console.warn);
+      return next;
+    });
+  };
+
+  // 🔴 Ricostruzione e gestione sincronizzata dei Timer Inline persistenti
+  useEffect(() => {
+    const inlineTimers = state?.activeInlineTimers || {};
+    const activeIds = Object.keys(inlineTimers);
+
+    // Pulizia degli intervalli per i timer rimossi
+    Object.keys(inlineTimerIntervalsRef.current).forEach((id) => {
+      if (!inlineTimers[id]) {
+        safeClearInterval(inlineTimerIntervalsRef.current[id]);
+        delete inlineTimerIntervalsRef.current[id];
+        setInlineTimerCountdown((prev) => {
+          if (!(id in prev)) return prev;
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+      }
+    });
+
+    if (activeIds.length === 0) return;
+
+    activeIds.forEach((setId) => {
+      const timer = inlineTimers[setId];
+      if (!timer) return;
+      const { startTimestamp, durationSec, pauseSec, prefill } = timer;
+      const elapsed = (Date.now() - startTimestamp) / 1000;
+      const remaining = Math.max(0, Math.ceil(durationSec - elapsed));
+
+      const completeInlineSet = () => {
+        if (inlineTimerIntervalsRef.current[setId]) {
+          safeClearInterval(inlineTimerIntervalsRef.current[setId]);
+          delete inlineTimerIntervalsRef.current[setId];
+        }
+        setInlineTimerCountdown((prev) => {
           const next = { ...prev };
           delete next[setId];
           return next;
@@ -1075,29 +1123,48 @@ export default function App() {
           const nextSetWeights = { ...prev.setWeights };
           const nextSetRir = { ...prev.setRir };
           const nextSetRpe = { ...prev.setRpe };
-          // 🔴 Congeliamo i dati al termine del timer
+
           if (nextSetReps[setId] === undefined) nextSetReps[setId] = String(durationSec);
           if (nextSetWeights[setId] === undefined) nextSetWeights[setId] = prefill.weight;
           if (prefill.rir !== undefined && nextSetRir[setId] === undefined) nextSetRir[setId] = prefill.rir;
           if (prefill.rpe !== undefined && nextSetRpe[setId] === undefined) nextSetRpe[setId] = prefill.rpe;
 
-          const nextState = {
+          const nextInline = { ...(prev.activeInlineTimers || {}) };
+          delete nextInline[setId];
+
+          const nextState: AppState = {
             ...prev,
             checkedSets: nextCheckedSets,
             setReps: nextSetReps,
             setWeights: nextSetWeights,
             setRir: nextSetRir,
-            setRpe: nextSetRpe
+            setRpe: nextSetRpe,
+            activeInlineTimers: nextInline
           };
           saveGymState(nextState).catch(console.warn);
           return nextState;
         });
         if (pauseSec > 0) startRestTimer(pauseSec);
+      };
+
+      if (remaining <= 0) {
+        completeInlineSet();
       } else {
-        setActiveInlineTimers((prev) => ({ ...prev, [setId]: remaining }));
+        setInlineTimerCountdown((prev) => ({ ...prev, [setId]: remaining }));
+        if (!inlineTimerIntervalsRef.current[setId]) {
+          inlineTimerIntervalsRef.current[setId] = safeSetInterval(() => {
+            const curElapsed = (Date.now() - startTimestamp) / 1000;
+            const curRemaining = Math.max(0, Math.ceil(durationSec - curElapsed));
+            if (curRemaining <= 0) {
+              completeInlineSet();
+            } else {
+              setInlineTimerCountdown((prev) => ({ ...prev, [setId]: curRemaining }));
+            }
+          }, 250);
+        }
       }
-    }, 250);
-  };
+    });
+  }, [state?.activeInlineTimers]);
 
   // 3. SOSTITUISCI handleStartEmom e handleStartAmrap CON QUESTE
   const handleStartEmom = async (circuitId: string, totalMin: number, intervalSec: number) => {
@@ -1205,15 +1272,20 @@ export default function App() {
         const remainingRound = Math.max(0, Math.ceil((currentRound + 1) * intSec - elapsedSec));
 
         if (currentRound > lastAnnouncedRoundOrPacing) {
+          const missedRounds = currentRound - lastAnnouncedRoundOrPacing;
           lastAnnouncedRoundOrPacing = currentRound;
           setState((prev) => {
             if (!prev) return null;
-            const next = { ...prev, checkedSets: { ...prev.checkedSets, [`${circuitId}-round-${currentRound - 1}`]: true } };
+            const nextCheckedSets = { ...prev.checkedSets };
+            // Recupera tutti i giri completati mentre l'app era in sospensione
+            for (let r = currentRound - missedRounds; r < currentRound; r++) {
+              nextCheckedSets[`${circuitId}-round-${r}`] = true;
+            }
+            const next = { ...prev, checkedSets: nextCheckedSets };
             saveGymState(next).catch(console.warn);
             return next;
           });
-          
-          // Suona solo se Safari non stava dormendo da ore (evita spam di suoni arretrati)
+          // Suona la tromba solo se il giro è appena scattato (evita spam sonoro al rientro)
           if (elapsedSec - (currentRound * intSec) < 5) playTrumpet();
         }
         setActiveMasterTimer({ circuitId, type, remainingSec: remainingRound, activeEmomRound: currentRound, totalRounds, intervalSec });
@@ -1580,7 +1652,7 @@ export default function App() {
                     isWorkoutActive={isWorkoutActive}
                     isEditMode={state.isEditMode}
                     state={state}
-                    activeInlineTimerSec={activeInlineTimers}
+                    activeInlineTimerSec={inlineTimerCountdown}
                     onOpenVideo={(url) => setVideoModalUrl(url)}
                     onOpenEffortModal={(setId, isRpe) => setEffortTarget({ setId, isRpe })}
                     onRunInlineTimer={(setId, dur, pauseSec, prefill) => 
@@ -1693,7 +1765,7 @@ export default function App() {
                     isWorkoutActive={isWorkoutActive}
                     isEditMode={state.isEditMode}
                     state={state}
-                    activeInlineTimerSec={activeInlineTimers}
+                    activeInlineTimerSec={inlineTimerCountdown}
                     onRunInlineTimer={(setId, dur, pauseSec, prefill) => 
                       handleRunInlineTimer(setId, dur, pauseSec, prefill)
                     }

@@ -150,6 +150,7 @@ export interface AppState {
   setCustomFields: Record<string, Record<string, string>>;
   currentEffortSelection: { setId: string; targetId: string; isRpe: boolean } | null;
   activeMasterTimer: PersistentMasterTimer | null;
+  activeInlineTimers: Record<string, { startTimestamp: number; durationSec: number; pauseSec: number; prefill: { weight: string; rir?: string; rpe?: string } }>;
   
   // DATI DI DOMINIO
   prs: PRRecord[];
