@@ -207,9 +207,7 @@ export default function App() {
     setState((prev) => {
       if (!prev) return null;
       if (prev.weights[id] === cleanVal) return prev;
-      const nextState = { ...prev, weights: { ...prev.weights, [id]: cleanVal } };
-      saveGymState(nextState).catch(console.warn);
-      return nextState;
+      return { ...prev, weights: { ...prev.weights, [id]: cleanVal } };
     });
   }, []);
 
@@ -218,9 +216,7 @@ export default function App() {
     setState((prev) => {
       if (!prev) return null;
       if (prev.setWeights[setId] === cleanVal) return prev;
-      const nextState = { ...prev, setWeights: { ...prev.setWeights, [setId]: cleanVal } };
-      saveGymState(nextState).catch(console.warn);
-      return nextState;
+      return { ...prev, setWeights: { ...prev.setWeights, [setId]: cleanVal } };
     });
   }, []);
 
@@ -230,9 +226,7 @@ export default function App() {
       if (!prev) return null;
       const allFields = prev.setCustomFields || {};
       const currentFields = allFields[setId] || {};
-      const nextState = { ...prev, setCustomFields: { ...allFields, [setId]: { ...currentFields, [fieldId]: val } } };
-      saveGymState(nextState).catch(console.warn);
-      return nextState;
+      return { ...prev, setCustomFields: { ...allFields, [setId]: { ...currentFields, [fieldId]: val } } };
     });
   }, []);
 
@@ -1714,7 +1708,6 @@ export default function App() {
                               : t
                           )
                         };
-                        saveGymState(next).catch(console.warn);
                         return next;
                       });
                     }}
@@ -1891,7 +1884,6 @@ export default function App() {
                               : t
                           )
                         };
-                        saveGymState(next).catch(console.warn);
                         return next;
                       });
                     }}
@@ -2046,7 +2038,6 @@ export default function App() {
                               : t
                           )
                         };
-                        saveGymState(next).catch(console.warn);
                         return next;
                       });
                     }}
