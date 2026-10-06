@@ -772,16 +772,6 @@ export default function App() {
         }
       });
 
-      const todayStr = getTodayStr();
-      const sessionToDelete = (state.sessionsV2 || []).find((s) => s.planId === tabId && s.date === todayStr);
-      let nextSessionsV2 = state.sessionsV2 || [];
-      const deletedSessionIds: string[] = [];
-
-      if (sessionToDelete) {
-        deletedSessionIds.push(sessionToDelete.id);
-        nextSessionsV2 = nextSessionsV2.filter((s) => s.id !== sessionToDelete.id);
-      }
-
       const newState = {
         ...state,
         checkedSets: nextCheckedSets,
@@ -789,12 +779,11 @@ export default function App() {
         setRir: nextSetRir,
         setRpe: nextSetRpe,
         amrapState: nextAmrapState,
-        activeMasterTimer: null,
-        sessionsV2: nextSessionsV2
+        activeMasterTimer: null
       };
       
       setState(newState);
-      await saveGymState(newState, false, undefined, deletedSessionIds);
+      await saveGymState(newState);
       showToast('Sessione riavviata.');
     }
   };
