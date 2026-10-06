@@ -392,7 +392,18 @@ export default function App() {
     if (!state) return;
     initAudio();
     const todayStr = getTodayStr();
-    const newState = { ...state };
+    const newState = {
+      ...state,
+      checkedSets: { ...state.checkedSets },
+      setReps: { ...state.setReps },
+      setRir: { ...state.setRir },
+      setRpe: { ...state.setRpe },
+      setWeights: { ...state.setWeights },
+      setDurations: { ...state.setDurations },
+      setCustomFields: { ...state.setCustomFields },
+      amrapState: { ...state.amrapState },
+      activeWorkouts: { ...state.activeWorkouts }
+    };
 
     const tab = newState.plan.find((t) => t.id === tabId);
 
@@ -405,6 +416,9 @@ export default function App() {
             delete newState.setReps[`${ex.id}-${i}`];
             delete newState.setRir[`${ex.id}-${i}`];
             delete newState.setRpe[`${ex.id}-${i}`];
+            delete newState.setWeights[`${ex.id}-${i}`];
+            delete newState.setDurations[`${ex.id}-${i}`];
+            delete newState.setCustomFields[`${ex.id}-${i}`];
           }
         } else if (ex.type === 'superset') {
           delete newState.amrapState[ex.id];
@@ -415,6 +429,9 @@ export default function App() {
               delete newState.setReps[`${sub.id}-${j}`];
               delete newState.setRir[`${sub.id}-${j}`];
               delete newState.setRpe[`${sub.id}-${j}`];
+              delete newState.setWeights[`${sub.id}-${j}`];
+              delete newState.setDurations[`${sub.id}-${j}`];
+              delete newState.setCustomFields[`${sub.id}-${j}`];
             });
           }
         }
@@ -741,6 +758,9 @@ export default function App() {
       const nextSetReps = { ...state.setReps };
       const nextSetRir = { ...state.setRir };
       const nextSetRpe = { ...state.setRpe };
+      const nextSetWeights = { ...state.setWeights };
+      const nextSetDurations = { ...state.setDurations };
+      const nextSetCustomFields = { ...state.setCustomFields };
       const nextAmrapState = { ...state.amrapState };
 
       const tab = state.plan.find((t) => t.id === tabId);
@@ -751,6 +771,9 @@ export default function App() {
             delete nextSetReps[`${ex.id}-${i}`];
             delete nextSetRir[`${ex.id}-${i}`];
             delete nextSetRpe[`${ex.id}-${i}`];
+            delete nextSetWeights[`${ex.id}-${i}`];
+            delete nextSetDurations[`${ex.id}-${i}`];
+            delete nextSetCustomFields[`${ex.id}-${i}`];
           }
         } else if (ex.type === 'superset') {
           delete nextAmrapState[ex.id];
@@ -761,6 +784,9 @@ export default function App() {
               delete nextSetReps[`${sub.id}-${j}`];
               delete nextSetRir[`${sub.id}-${j}`];
               delete nextSetRpe[`${sub.id}-${j}`];
+              delete nextSetWeights[`${sub.id}-${j}`];
+              delete nextSetDurations[`${sub.id}-${j}`];
+              delete nextSetCustomFields[`${sub.id}-${j}`];
             });
           }
         }
@@ -772,6 +798,9 @@ export default function App() {
         setReps: nextSetReps,
         setRir: nextSetRir,
         setRpe: nextSetRpe,
+        setWeights: nextSetWeights,
+        setDurations: nextSetDurations,
+        setCustomFields: nextSetCustomFields,
         amrapState: nextAmrapState,
         activeMasterTimer: null
       };
