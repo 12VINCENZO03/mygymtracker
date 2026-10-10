@@ -48,16 +48,14 @@ import { VideoModal } from './components/VideoModal';
 
 const sanitizeNumericInput = (val: string | number): string => {
   if (val === undefined || val === null) return '';
-  
-  // 1. Sostituisce la virgola col punto e rimuove TUTTO ciò che non è numero, punto o meno
   let cleaned = String(val).replace(',', '.').replace(/[^0-9.\-]/g, '');
   
-  // 2. Se è vuoto o c'è solo un punto/trattino, restituisce stringa vuota
-  if (cleaned === '' || cleaned === '.' || cleaned === '-') return '';
-  
-  // 3. Converte in numero
-  const parsed = parseFloat(cleaned);
-  return !isNaN(parsed) ? parsed.toString() : '';
+  // Previene punti multipli (es. 10.5.2) ma permette di digitare "10."
+  const parts = cleaned.split('.');
+  if (parts.length > 2) {
+    cleaned = parts[0] + '.' + parts.slice(1).join('');
+  }
+  return cleaned;
 };
 
 export default function App() {
@@ -819,111 +817,104 @@ export default function App() {
     isSub = false,
     circuitId?: string
   ) => {
-    if (!state) return;
     initAudio();
     const setId = `${exId}-${setIndex}`;
-    const isChecked = Boolean(state.checkedSets[setId]);
 
-    // Shallow copy sicura solo dei dizionari interessati (Immutabilità granulare)
-    const nextCheckedSets = { ...state.checkedSets };
-    let nextSetReps = state.setReps;
-    let nextSetWeights = state.setWeights;
-    let nextSetRir = state.setRir;
-    let nextSetRpe = state.setRpe;
-    let nextSetCustomFields = state.setCustomFields || {};
+    setState((prev) => {
+      if (!prev) return null;
 
-    if (isChecked) {
-      delete nextCheckedSets[setId];
-    } else {
-      nextCheckedSets[setId] = true;
-      if (nextSetReps[setId] === undefined) {
-        nextSetReps = { ...nextSetReps, [setId]: prefill.reps };
-      }
-      if (nextSetWeights[setId] === undefined) {
-        nextSetWeights = { ...nextSetWeights, [setId]: prefill.weight };
-      }
-      if (prefill.rir !== undefined && nextSetRir[setId] === undefined) {
-        nextSetRir = { ...nextSetRir, [setId]: prefill.rir };
-      }
-      if (prefill.rpe !== undefined && nextSetRpe[setId] === undefined) {
-        nextSetRpe = { ...nextSetRpe, [setId]: prefill.rpe };
-      }
-      if (prefill.customFields && Object.keys(prefill.customFields).length > 0) {
-        const currentFields = nextSetCustomFields[setId] || {};
-        nextSetCustomFields = { ...nextSetCustomFields, [setId]: { ...prefill.customFields, ...currentFields } };
-      }
-    }
+      const isChecked = Boolean(prev.checkedSets[setId]);
+      const nextCheckedSets = { ...prev.checkedSets };
+      let nextSetReps = { ...prev.setReps };
+      let nextSetWeights = { ...prev.setWeights };
+      let nextSetRir = { ...prev.setRir };
+      let nextSetRpe = { ...prev.setRpe };
+      let nextSetCustomFields = { ...(prev.setCustomFields || {}) };
 
-    const nextState = {
-      ...state,
-      checkedSets: nextCheckedSets,
-      setReps: nextSetReps,
-      setWeights: nextSetWeights,
-      setRir: nextSetRir,
-      setRpe: nextSetRpe,
-      setCustomFields: nextSetCustomFields
-    };
+      if (isChecked) {
+        delete nextCheckedSets[setId];
+      } else {
+        nextCheckedSets[setId] = true;
+        if (nextSetReps[setId] === undefined) nextSetReps[setId] = prefill.reps;
+        if (nextSetWeights[setId] === undefined) nextSetWeights[setId] = prefill.weight;
+        if (prefill.rir !== undefined && nextSetRir[setId] === undefined) nextSetRir[setId] = prefill.rir;
+        if (prefill.rpe !== undefined && nextSetRpe[setId] === undefined) nextSetRpe[setId] = prefill.rpe;
+        if (prefill.customFields && Object.keys(prefill.customFields).length > 0) {
+          const currentFields = nextSetCustomFields[setId] || {};
+          nextSetCustomFields[setId] = { ...prefill.customFields, ...currentFields };
+        }
+      }
 
-    // Gestione Side Effects
-    if (!isChecked) {
       let handledCircuitRest = false;
-      if (isSub && circuitId) {
-        const currentTab = nextState.plan.find((t) => t.id === nextState.activeTab);
-        const circuit = currentTab?.exercises.find((e) => e.id === circuitId);
-        
-        if (circuit && circuit.type === 'superset' && circuit.structureType === 'classic') {
-          const lastRealEx = [...circuit.exercises].reverse().find((e) => e.metricType !== 'rest');
-          
-          if (lastRealEx && lastRealEx.id === exId) {
-            handledCircuitRest = true;
-            const circuitPause = circuit.pause !== undefined ? circuit.pause : 90;
-            if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-              try { navigator.vibrate(20); } catch { /* ignore */ }
-            }
-            playShortBeep();
-            
-            if (circuitPause > 0) {
-              startRestTimer(circuitPause, async () => {
-                setState((prev) => {
-                  if (!prev) return null;
-                  const next = {
-                    ...prev,
-                    checkedSets: { ...prev.checkedSets, [`${circuitId}-round-${setIndex}`]: true }
-                  };
-                  saveGymState(next).catch(console.warn);
-                  return next;
+      if (!isChecked) {
+        if (isSub && circuitId) {
+          const currentTab = prev.plan.find((t) => t.id === prev.activeTab);
+          const circuit = currentTab?.exercises.find((e) => e.id === circuitId);
+
+          if (circuit && circuit.type === 'superset' && circuit.structureType === 'classic') {
+            const lastRealEx = [...circuit.exercises].reverse().find((e) => e.metricType !== 'rest');
+
+            if (lastRealEx && lastRealEx.id === exId) {
+              handledCircuitRest = true;
+              const circuitPause = circuit.pause !== undefined ? circuit.pause : 90;
+              if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+                try { navigator.vibrate(20); } catch { /* ignore */ }
+              }
+              playShortBeep();
+
+              if (circuitPause > 0) {
+                startRestTimer(circuitPause, async () => {
+                  setState((p) => {
+                    if (!p) return null;
+                    const n = {
+                      ...p,
+                      checkedSets: { ...p.checkedSets, [`${circuitId}-round-${setIndex}`]: true }
+                    };
+                    saveGymState(n).catch(console.warn);
+                    return n;
+                  });
+                  const circuitEl = document.getElementById(`circuit-${circuitId}`);
+                  circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 });
+              } else {
+                nextCheckedSets[`${circuitId}-round-${setIndex}`] = true;
+              }
+            }
+          }
+        }
+
+        if (!handledCircuitRest) {
+          if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+            try { navigator.vibrate(20); } catch { /* ignore */ }
+          }
+          playShortBeep();
+          if (pauseSec > 0) {
+            startRestTimer(pauseSec, () => {
+              if (circuitId) {
                 const circuitEl = document.getElementById(`circuit-${circuitId}`);
                 circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              });
-            } else {
-              nextCheckedSets[`${circuitId}-round-${setIndex}`] = true;
-            }
+              } else {
+                const exEl = document.getElementById(`ex-container-${exId}`) || document.getElementById(`exercise-${exId}`);
+                exEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }
+            });
           }
         }
       }
 
-      if (!handledCircuitRest) {
-        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-          try { navigator.vibrate(20); } catch { /* ignore */ }
-        }
-        playShortBeep();
-        if (pauseSec > 0) {
-          startRestTimer(pauseSec, () => {
-            if (circuitId) {
-              const circuitEl = document.getElementById(`circuit-${circuitId}`);
-              circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            } else {
-              const exEl = document.getElementById(`ex-container-${exId}`) || document.getElementById(`exercise-${exId}`);
-              exEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-          });
-        }
-      }
-    }
+      const next = {
+        ...prev,
+        checkedSets: nextCheckedSets,
+        setReps: nextSetReps,
+        setWeights: nextSetWeights,
+        setRir: nextSetRir,
+        setRpe: nextSetRpe,
+        setCustomFields: nextSetCustomFields
+      };
 
-    setState(nextState); // Immediato / ottimistico per massima fluidità
-    await saveGymState(nextState); // Persistenza sicura su IndexedDB
+      saveGymState(next).catch(console.warn);
+      return next;
+    });
   };
 
   const handleLongPressSet = (
