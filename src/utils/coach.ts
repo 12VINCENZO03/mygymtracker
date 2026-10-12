@@ -635,7 +635,23 @@ export function analyzeTUTProgression(ctx: ProgressionContext): CoachAdvice | nu
     const prevAvgDur = getAvgDuration(history[1]);
     const avgRir = getAvgRir(history[0]);
 
-    if (curAvgDur > prevAvgDur && curAvgDur > 0) {
+    // Novità: Estrazione peso medio per rilevare progressioni di zavorra su isometrie
+    const getAvgW = (h: WeightHistoryEntry) => {
+      const vals = Object.values(h.weights || {}).map((v) => parseFloat(v) || 0);
+      return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : (parseFloat(h.weight) || 0);
+    };
+    const curAvgW = getAvgW(history[0]);
+    const prevAvgW = getAvgW(history[1]);
+
+    if (curAvgW > prevAvgW) {
+      const wGain = Math.round((curAvgW - prevAvgW) * 10) / 10;
+      return {
+        badge: 'increase',
+        title: 'Progressione Zavorra TUT',
+        message: `DIAGNOSI: Carico/zavorra aumentato da ${prevAvgW}kg a ${curAvgW}kg (+${wGain}kg) con durata media di ${Math.round(curAvgDur)}s. AZIONE: Ottimo sovraccarico progressivo sull'isometria. Consolida il nuovo carico mantenendo la tecnica impeccabile.`,
+        compactText: `TUT +${wGain}kg (${Math.round(curAvgDur)}s tenuta)`
+      };
+    } else if (curAvgDur > prevAvgDur && curAvgDur > 0) {
       const gain = Math.round(curAvgDur - prevAvgDur);
       return {
         badge: 'increase',

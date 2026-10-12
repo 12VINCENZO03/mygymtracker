@@ -393,8 +393,14 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
         {Array.from({ length: ex.sets }).map((_, setIdx) => {
           const setId = `${ex.id}-${setIdx}`;
           const isChecked = Boolean(state.checkedSets[setId]);
+          const isTimeType = ex.metricType === 'time';
           const hist = getHistoricalSetData(setIdx);
-          const defaultTargetReps = hist?.reps !== undefined ? hist.reps : (ex.reps || '10');
+          
+          // FIX: Se l'esercizio è a tempo, peschiamo workSec (di default 60), altrimenti reps (di default 10)
+          const defaultTargetReps = hist?.reps !== undefined 
+            ? hist.reps 
+            : (isTimeType ? String(ex.workSec || 60) : (ex.reps || '10'));
+            
           const actualReps = state.setReps[setId] ?? defaultTargetReps;
           
           let displayWeight = state.setWeights?.[setId];
@@ -418,7 +424,6 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
           const currentEffort = isCardio ? state.setRpe[setId] : state.setRir[setId];
           const histEffort = isCardio ? hist?.rpe : hist?.rir;
           const displayEffort = currentEffort !== undefined && currentEffort !== '' ? currentEffort : histEffort;
-          const isTimeType = ex.metricType === 'time';
           const timerRemaining = activeInlineTimerSec[setId];
           const isTimerRunning = timerRemaining !== undefined && timerRemaining > 0;
 

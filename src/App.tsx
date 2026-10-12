@@ -1822,7 +1822,10 @@ export default function App() {
                             if (sub.metricType !== 'rest') {
                               const setId = `${sub.id}-${curRoundIdx}`;
                               nextCheckedSets[setId] = true;
-                              if (nextSetReps[setId] === undefined) nextSetReps[setId] = sub.reps || '10';
+                              if (nextSetReps[setId] === undefined) {
+                                const isTime = sub.metricType === 'time';
+                                nextSetReps[setId] = isTime ? String(sub.workSec || 60) : (sub.reps || '10');
+                              }
                               if (nextSetWeights[setId] === undefined) nextSetWeights[setId] = prev.weights[sub.id] || '0';
                             }
                           });

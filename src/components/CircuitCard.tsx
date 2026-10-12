@@ -480,7 +480,10 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
       .map((sub) => {
         const setId = `${sub.id}-${curRound}`;
         const histSet = getHistoricalSetDataV2(state.sessionsV2, curRound + 1, sub.exerciseId, sub.name);
-        const defaultTargetReps = histSet?.reps !== undefined ? String(histSet.reps) : (sub.reps || '10');
+        const isTimeType = sub.metricType === 'time';
+        const defaultTargetReps = histSet?.reps !== undefined 
+          ? String(histSet.reps) 
+          : (isTimeType ? String(sub.workSec || 60) : (sub.reps || '10'));
         const actualReps = state.setReps[setId] ?? defaultTargetReps;
 
         let displayWeight = state.setWeights?.[setId];
@@ -777,7 +780,10 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                     const setId = `${sub.id}-${rIdx}`;
                     const isChecked = Boolean(state.checkedSets[setId]);
                     const histSet = getHistoricalSetDataV2(state.sessionsV2, rIdx + 1, sub.exerciseId, sub.name);
-                    const defaultTargetReps = histSet?.reps !== undefined ? String(histSet.reps) : (sub.reps || '10');
+                    const isTimeType = sub.metricType === 'time';
+                    const defaultTargetReps = histSet?.reps !== undefined 
+                      ? String(histSet.reps) 
+                      : (isTimeType ? String(sub.workSec || 60) : (sub.reps || '10'));
                     const actualReps = state.setReps[setId] ?? defaultTargetReps;
 
                     let displayWeight = state.setWeights?.[setId];
@@ -1034,7 +1040,10 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                     const setId = `${sub.id}-${rIdx}`;
                     const isChecked = Boolean(state.checkedSets[setId]);
                     const histSet = getHistoricalSetDataV2(state.sessionsV2, rIdx + 1, sub.exerciseId, sub.name);
-                    const defaultTargetReps = histSet?.reps !== undefined ? String(histSet.reps) : (sub.reps || '10');
+                    const isTimeType = sub.metricType === 'time';
+                    const defaultTargetReps = histSet?.reps !== undefined 
+                      ? String(histSet.reps) 
+                      : (isTimeType ? String(sub.workSec || 60) : (sub.reps || '10'));
                     const actualReps = state.setReps[setId] ?? defaultTargetReps;
 
                     let displayWeight = state.setWeights?.[setId];
