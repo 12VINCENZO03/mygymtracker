@@ -19,11 +19,11 @@ interface ExerciseCardProps {
   onSaveSetWeight: (setId: string, val: string) => void;
   onSaveCustomField: (setId: string, fieldId: string, val: string) => void;
   onUpdateRegistry?: (permId: string, field: string, val: any) => void;
-  onToggleSet: (setIndex: number, pauseSec: number, prefill: { reps: string; weight: string; rir?: string; rpe?: string; customFields?: Record<string, string> }) => void;
-  onLongPressSet: (setIndex: number, pauseSec: number, prefill: { reps: string; weight: string; rir?: string; rpe?: string; customFields?: Record<string, string> }) => void;
+  onToggleSet: (setIndex: number, pauseSec: number, prefill: { reps: string; weight: string; rir?: string; rpe?: string; customFields?: Record<string, any> }) => void;
+  onLongPressSet: (setIndex: number, pauseSec: number, prefill: { reps: string; weight: string; rir?: string; rpe?: string; customFields?: Record<string, any> }) => void;
   onOpenEffortModal: (setId: string, isRpe: boolean) => void;
   onOpenVideo: (url: string) => void;
-  onRunInlineTimer: (setId: string, durationSec: number, pauseSec: number, prefill: { weight: string; rir?: string; rpe?: string }) => void;
+  onRunInlineTimer: (setId: string, durationSec: number, pauseSec: number, prefill: { reps?: string; weight: string; rir?: string; rpe?: string; customFields?: Record<string, any> }) => void;
   activeInlineTimerSec: Record<string, number>;
 }
 
@@ -456,11 +456,25 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                   <button
                     type="button"
                     disabled={!isWorkoutActive}
-                    onClick={() => {
-                      const dur = Math.max(0, parseInt(actualReps) || ex.workSec || 60);
-                      onRunInlineTimer(setId, dur, ex.pause || 0, prefillData);
+                    onPointerDown={() => handlePointerDown(setIdx, prefillData)}
+                    onPointerUp={() => {
+                      if (pressTimerRef.current) {
+                        clearTimeout(pressTimerRef.current);
+                        pressTimerRef.current = null;
+                      }
+                      if (!isLongPressRef.current) {
+                        if (isChecked) {
+                          // Se è già spuntato, il tap toglie la spunta
+                          onToggleSet(setIdx, ex.pause || 0, prefillData);
+                        } else {
+                          // Se non è spuntato, avvia il timer
+                          const dur = Math.max(0, parseInt(String(actualReps)) || ex.workSec || 60);
+                          onRunInlineTimer(setId, dur, ex.pause || 0, prefillData);
+                        }
+                      }
                     }}
-                    className={`w-28 py-3.5 rounded-2xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm active:scale-[0.98] ${
+                    onPointerLeave={handlePointerCancel}
+                    className={`w-28 py-3.5 rounded-2xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
                       isChecked
                         ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-emerald-500/20'
                         : isTimerRunning
