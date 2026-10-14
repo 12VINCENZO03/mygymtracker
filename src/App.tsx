@@ -1156,7 +1156,18 @@ export default function App() {
           saveGymState(nextState).catch(console.warn);
           return nextState;
         });
-        if (pauseSec > 0) startRestTimer(pauseSec);
+        const lastHyphen = setId.lastIndexOf('-');
+        const exId = lastHyphen !== -1 ? setId.substring(0, lastHyphen) : setId;
+        const targetEl = document.getElementById(`circuit-${exId}`) ||
+          document.getElementById(`ex-container-${exId}`) ||
+          document.getElementById(`exercise-${exId}`);
+        if (pauseSec > 0 && targetEl) {
+          startRestTimer(pauseSec, () => {
+            targetEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          });
+        } else if (pauseSec > 0) {
+          startRestTimer(pauseSec);
+        }
       };
 
       if (remaining <= 0) {

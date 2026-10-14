@@ -815,8 +815,13 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                       weight: displayWeight,
                       rir: !isCardio && displayEffort !== undefined && displayEffort !== '' ? String(displayEffort) : undefined,
                       rpe: isCardio && displayEffort !== undefined && displayEffort !== '' ? String(displayEffort) : undefined,
-                      customFields: histSet?.customFields || {}
+                      customFields: histSet?.customFields
+                        ? Object.fromEntries(Object.entries(histSet.customFields).map(([k, v]) => [k, String(v)]))
+                        : {}
                     };
+
+                    const timerRemaining = activeInlineTimerSec?.[setId];
+                    const isTimerRunning = timerRemaining !== undefined && timerRemaining > 0;
 
                     return (
                       <div key={sub.id} className="bg-zinc-900/50 p-3.5 rounded-2xl border border-zinc-800/60 flex flex-col gap-2">
@@ -863,28 +868,62 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                         )}
 
                         <div className="flex items-center gap-2.5">
-                          <button
-                            type="button"
-                            disabled={!isWorkoutActive}
-                            onPointerDown={() => handlePointerDown(sub.id, rIdx, sub.pause || 0, prefillData)}
-                            onPointerUp={() => handlePointerUp(sub.id, rIdx, sub.pause || 0, prefillData, actualReps)}
-                            onPointerLeave={handlePointerCancel}
-                            className={`flex-1 py-3 rounded-xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
-                              isChecked
-                                ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-emerald-500/20'
-                                : 'bg-zinc-800/80 text-zinc-200 border-zinc-700/60 hover:bg-zinc-700'
-                            }`}
-                          >
-                            {isChecked ? (
-                              (isCardio || actualReps === defaultTargetReps) ? (
-                                <i className="fa-solid fa-check text-lg" />
+                          {isTimeType ? (
+                            <button
+                              type="button"
+                              disabled={!isWorkoutActive}
+                              onPointerDown={() => handlePointerDown(sub.id, rIdx, sub.pause || 0, prefillData)}
+                              onPointerUp={() => {
+                                if (pressTimerRef.current) {
+                                  clearTimeout(pressTimerRef.current);
+                                  pressTimerRef.current = null;
+                                }
+                                if (!isLongPressRef.current) {
+                                  if (isChecked) {
+                                    // Se è già spuntato, il tap toglie la spunta
+                                    onToggleSubSet(sub.id, rIdx, sub.pause || 0, prefillData);
+                                  } else {
+                                    // Se non è spuntato, avvia il timer
+                                    const dur = Math.max(0, parseInt(String(actualReps)) || sub.workSec || 60);
+                                    onRunInlineTimer(setId, dur, sub.pause || 0, prefillData);
+                                  }
+                                }
+                              }}
+                              onPointerLeave={handlePointerCancel}
+                              className={`flex-1 py-3 rounded-xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
+                                isChecked
+                                  ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-emerald-500/20'
+                                  : isTimerRunning
+                                  ? 'bg-emerald-600 text-zinc-950 border-emerald-400 animate-pulse'
+                                  : 'bg-zinc-800/80 text-zinc-200 border-zinc-700/60 hover:bg-zinc-700'
+                              }`}
+                            >
+                              {isTimerRunning ? `${timerRemaining}s` : isChecked ? <i className="fa-solid fa-check text-lg" /> : `${actualReps}s`}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={!isWorkoutActive}
+                              onPointerDown={() => handlePointerDown(sub.id, rIdx, sub.pause || 0, prefillData)}
+                              onPointerUp={() => handlePointerUp(sub.id, rIdx, sub.pause || 0, prefillData, actualReps)}
+                              onPointerLeave={handlePointerCancel}
+                              className={`flex-1 py-3 rounded-xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
+                                isChecked
+                                  ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-emerald-500/20'
+                                  : 'bg-zinc-800/80 text-zinc-200 border-zinc-700/60 hover:bg-zinc-700'
+                              }`}
+                            >
+                              {isChecked ? (
+                                (isCardio || actualReps === defaultTargetReps) ? (
+                                  <i className="fa-solid fa-check text-lg" />
+                                ) : (
+                                  `${actualReps} reps`
+                                )
                               ) : (
-                                `${actualReps} reps`
-                              )
-                            ) : (
-                              isCardio ? 'Fatto' : `${actualReps} reps`
-                            )}
-                          </button>
+                                isCardio ? 'Fatto' : `${actualReps} reps`
+                              )}
+                            </button>
+                          )}
                           <button
                             type="button"
                             disabled={!isWorkoutActive}
@@ -1075,8 +1114,13 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                       weight: displayWeight,
                       rir: !isCardio && displayEffort !== undefined && displayEffort !== '' ? String(displayEffort) : undefined,
                       rpe: isCardio && displayEffort !== undefined && displayEffort !== '' ? String(displayEffort) : undefined,
-                      customFields: histSet?.customFields || {}
+                      customFields: histSet?.customFields
+                        ? Object.fromEntries(Object.entries(histSet.customFields).map(([k, v]) => [k, String(v)]))
+                        : {}
                     };
+
+                    const timerRemaining = activeInlineTimerSec?.[setId];
+                    const isTimerRunning = timerRemaining !== undefined && timerRemaining > 0;
 
                     let emomClass = '';
                     if (isEmom) {
@@ -1095,28 +1139,62 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                           <span className="text-[10px] font-black text-zinc-500 w-12 uppercase bg-zinc-950/80 border border-zinc-800/80 px-2 py-3.5 rounded-2xl text-center shadow-sm shrink-0">
                             G{rIdx + 1}
                           </span>
-                          <button
-                            type="button"
-                            disabled={!isWorkoutActive}
-                            onPointerDown={() => handlePointerDown(sub.id, rIdx, sub.pause || 0, prefillData)}
-                            onPointerUp={() => handlePointerUp(sub.id, rIdx, sub.pause || 0, prefillData, actualReps)}
-                            onPointerLeave={handlePointerCancel}
-                            className={`w-28 py-3.5 rounded-2xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
-                              isChecked
-                                ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-emerald-500/20'
-                                : 'bg-zinc-800/80 text-zinc-200 border-zinc-700/60 hover:bg-zinc-700'
-                            }`}
-                          >
-                            {isChecked ? (
-                              (isCardio || actualReps === defaultTargetReps) ? (
-                                <i className="fa-solid fa-check text-lg" />
+                          {isTimeType ? (
+                            <button
+                              type="button"
+                              disabled={!isWorkoutActive}
+                              onPointerDown={() => handlePointerDown(sub.id, rIdx, sub.pause || 0, prefillData)}
+                              onPointerUp={() => {
+                                if (pressTimerRef.current) {
+                                  clearTimeout(pressTimerRef.current);
+                                  pressTimerRef.current = null;
+                                }
+                                if (!isLongPressRef.current) {
+                                  if (isChecked) {
+                                    // Se è già spuntato, il tap toglie la spunta
+                                    onToggleSubSet(sub.id, rIdx, sub.pause || 0, prefillData);
+                                  } else {
+                                    // Se non è spuntato, avvia il timer
+                                    const dur = Math.max(0, parseInt(String(actualReps)) || sub.workSec || 60);
+                                    onRunInlineTimer(setId, dur, sub.pause || 0, prefillData);
+                                  }
+                                }
+                              }}
+                              onPointerLeave={handlePointerCancel}
+                              className={`w-28 py-3.5 rounded-2xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
+                                isChecked
+                                  ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-emerald-500/20'
+                                  : isTimerRunning
+                                  ? 'bg-emerald-600 text-zinc-950 border-emerald-400 animate-pulse'
+                                  : 'bg-zinc-800/80 text-zinc-200 border-zinc-700/60 hover:bg-zinc-700'
+                              }`}
+                            >
+                              {isTimerRunning ? `${timerRemaining}s` : isChecked ? <i className="fa-solid fa-check text-lg" /> : `${actualReps}s`}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={!isWorkoutActive}
+                              onPointerDown={() => handlePointerDown(sub.id, rIdx, sub.pause || 0, prefillData)}
+                              onPointerUp={() => handlePointerUp(sub.id, rIdx, sub.pause || 0, prefillData, actualReps)}
+                              onPointerLeave={handlePointerCancel}
+                              className={`w-28 py-3.5 rounded-2xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
+                                isChecked
+                                  ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-emerald-500/20'
+                                  : 'bg-zinc-800/80 text-zinc-200 border-zinc-700/60 hover:bg-zinc-700'
+                              }`}
+                            >
+                              {isChecked ? (
+                                (isCardio || actualReps === defaultTargetReps) ? (
+                                  <i className="fa-solid fa-check text-lg" />
+                                ) : (
+                                  `${actualReps} reps`
+                                )
                               ) : (
-                                `${actualReps} reps`
-                              )
-                            ) : (
-                              isCardio ? 'Fatto' : `${actualReps} reps`
-                            )}
-                          </button>
+                                isCardio ? 'Fatto' : `${actualReps} reps`
+                              )}
+                            </button>
+                          )}
                           <button
                             type="button"
                             disabled={!isWorkoutActive}
