@@ -22,6 +22,7 @@ interface CircuitCardProps {
   onDeleteSubEx: (subId: string) => void;
   onMoveSubEx: (subId: string, dir: number) => void;
   onSaveWeight: (subId: string, val: string) => void;
+  onSaveSetWeight: (setId: string, val: string) => void;
   onSaveCustomField?: (setId: string, fieldId: string, val: string) => void;
   onToggleSubSet: (subId: string, roundIndex: number, pauseSec: number, prefill: { reps: string; weight: string; rir?: string; rpe?: string; customFields?: Record<string, string> }) => void;
   onLongPressSubSet: (subId: string, roundIndex: number, pauseSec: number, prefill: { reps: string; weight: string; rir?: string; rpe?: string; customFields?: Record<string, string> }) => void;
@@ -56,6 +57,7 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
   onDeleteSubEx,
   onMoveSubEx,
   onSaveWeight,
+  onSaveSetWeight,
   onSaveCustomField,
   onToggleSubSet,
   onLongPressSubSet,
@@ -853,7 +855,7 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                               inputMode="decimal"
                               disabled={!isWorkoutActive}
                               value={displayWeight}
-                              onChange={(e) => onSaveWeight(sub.id, e.target.value)}
+                              onChange={(e) => onSaveSetWeight(setId, e.target.value)}
                               placeholder={histSet?.weight ? String(histSet.weight) : "Carico (kg)"}
                               className="bg-transparent text-white w-full py-1 outline-none font-bold text-xs disabled:opacity-50"
                             />

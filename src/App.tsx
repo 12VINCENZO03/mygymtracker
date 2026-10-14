@@ -1198,7 +1198,7 @@ export default function App() {
       }
     };
     setState(newState);
-    await saveGymState(newState, false); // Sincrono
+    await saveGymState(newState, false); // sessionsChanged: false, non tocchiamo lo storico sessioni qui
   };
 
   const handleStartAmrap = async (circuitId: string, totalMin: number, pacingSec?: number) => {
@@ -1220,7 +1220,7 @@ export default function App() {
       }
     };
     setState(newState);
-    await saveGymState(newState, false); // Sincrono
+    await saveGymState(newState, false); // sessionsChanged: false, non tocchiamo lo storico sessioni qui
   };
 
   // 4. 🔥 AGGIUNGI QUESTO USE_EFFECT SUBITO SOTTO AGLI ALTRI (Il cuore dell'Anti-Crash)
@@ -1885,6 +1885,7 @@ export default function App() {
                       }
                     }}
                     onSaveWeight={(subId, val) => handleSaveWeight(subId, val)}
+                    onSaveSetWeight={handleSaveSetWeight}
                     onToggleSubSet={(subId, roundIdx, pauseSec, prefill) =>
                       handleToggleSet(subId, roundIdx, pauseSec, prefill, true, ex.id)
                     }

@@ -836,6 +836,33 @@ export function getExerciseCoachAdvice(
 
     if (!history || history.length === 0) {
       const bm = state.bodyMetrics;
+      const ffm = bm?.ffm ? parseFloat(String(bm.ffm)) : 0;
+      if (isWeightType && ffm > 0 && metricType !== 'bodyweight') {
+        const exDef = (permanentExId && state.registryV2?.[permanentExId]) ? state.registryV2[permanentExId] : null;
+        let multiplier = 0.35; // stima standard prudenziale (~35% FFM)
+        const pattern = exDef?.movementPattern;
+
+        if (pattern === 'squat' || pattern === 'hinge') {
+          multiplier = 0.5;
+        } else if (pattern === 'horizontal_push' || pattern === 'horizontal_pull' || pattern === 'vertical_pull') {
+          multiplier = 0.4;
+        } else if (pattern === 'vertical_push' || pattern === 'lunge') {
+          multiplier = 0.3;
+        } else if (pattern && pattern.startsWith('isolation_')) {
+          multiplier = 0.15;
+        }
+
+        const rawEst = ffm * multiplier;
+        const estWeight = rawEst >= 20 ? Math.round(rawEst / 2.5) * 2.5 : Math.round(rawEst * 2) / 2;
+
+        return {
+          badge: 'info',
+          title: 'Stima Iniziale (FFM)',
+          message: `DIAGNOSI: Nessuno storico presente. In base alla tua massa magra (${ffm}kg FFM), carico di partenza stimato: ~${estWeight}kg. AZIONE: Esegui serie di riscaldamento progressive ed esplora il carico attorno a ~${estWeight}kg calibrandolo sulle sensazioni odierne.`,
+          compactText: `STIMA INIZIALE - ~${estWeight}kg (da calibrare)`
+        };
+      }
+
       if (bm && bm.ffm && isWeightType) {
         return {
           badge: 'info',
