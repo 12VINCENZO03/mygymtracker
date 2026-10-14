@@ -1128,6 +1128,37 @@ export default function App() {
           return next;
         });
         playTrumpet();
+
+        // Estrazione ID
+        const lastDash = setId.lastIndexOf('-');
+        const parsedExId = lastDash !== -1 ? setId.substring(0, lastDash) : setId;
+        const parsedSetIdx = lastDash !== -1 ? parseInt(setId.substring(lastDash + 1), 10) || 0 : 0;
+
+        let foundCircuitId: string | undefined;
+        let circuitPause = 90;
+        let isLastInCircuit = false;
+
+        // PRE-CALCOLO (Fuori dal setState)
+        if (state) {
+          const currentTab = state.plan.find((t) => t.id === state.activeTab);
+          if (currentTab) {
+            for (const ex of currentTab.exercises) {
+              if (ex.type === 'superset' && ex.exercises.some((s) => s.id === parsedExId)) {
+                foundCircuitId = ex.id;
+                if (ex.structureType === 'classic') {
+                  const lastRealEx = [...ex.exercises].reverse().find((e) => e.metricType !== 'rest');
+                  if (lastRealEx && lastRealEx.id === parsedExId) {
+                    isLastInCircuit = true;
+                    circuitPause = ex.pause !== undefined ? ex.pause : 90;
+                  }
+                }
+                break;
+              }
+            }
+          }
+        }
+
+        // UPDATE DI STATO PURO
         setState((prev) => {
           if (!prev) return null;
           const nextCheckedSets = { ...prev.checkedSets, [setId]: true };
@@ -1140,6 +1171,10 @@ export default function App() {
           if (nextSetWeights[setId] === undefined) nextSetWeights[setId] = prefill.weight;
           if (prefill.rir !== undefined && nextSetRir[setId] === undefined) nextSetRir[setId] = prefill.rir;
           if (prefill.rpe !== undefined && nextSetRpe[setId] === undefined) nextSetRpe[setId] = prefill.rpe;
+
+          if (foundCircuitId && isLastInCircuit && circuitPause <= 0) {
+            nextCheckedSets[`${foundCircuitId}-round-${parsedSetIdx}`] = true;
+          }
 
           const nextInline = { ...(prev.activeInlineTimers || {}) };
           delete nextInline[setId];
@@ -1156,17 +1191,35 @@ export default function App() {
           saveGymState(nextState).catch(console.warn);
           return nextState;
         });
-        const lastHyphen = setId.lastIndexOf('-');
-        const exId = lastHyphen !== -1 ? setId.substring(0, lastHyphen) : setId;
-        const targetEl = document.getElementById(`circuit-${exId}`) ||
-          document.getElementById(`ex-container-${exId}`) ||
-          document.getElementById(`exercise-${exId}`);
-        if (pauseSec > 0 && targetEl) {
-          startRestTimer(pauseSec, () => {
-            targetEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          });
-        } else if (pauseSec > 0) {
-          startRestTimer(pauseSec);
+
+        // SIDE-EFFECTS (Fuori dal setState)
+        if (foundCircuitId && isLastInCircuit) {
+          if (circuitPause > 0) {
+            startRestTimer(circuitPause, () => {
+              setState((p) => {
+                if (!p) return null;
+                const n = { ...p, checkedSets: { ...p.checkedSets, [`${foundCircuitId}-round-${parsedSetIdx}`]: true } };
+                saveGymState(n).catch(console.warn);
+                return n;
+              });
+              const circuitEl = document.getElementById(`circuit-${foundCircuitId}`);
+              circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+          }
+        } else {
+          const targetEl = foundCircuitId
+            ? document.getElementById(`circuit-${foundCircuitId}`)
+            : (document.getElementById(`circuit-${parsedExId}`) ||
+               document.getElementById(`ex-container-${parsedExId}`) ||
+               document.getElementById(`exercise-${parsedExId}`));
+
+          if (pauseSec > 0 && targetEl) {
+            startRestTimer(pauseSec, () => {
+              targetEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+          } else if (pauseSec > 0) {
+            startRestTimer(pauseSec);
+          }
         }
       };
 
