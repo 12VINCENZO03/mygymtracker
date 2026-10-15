@@ -96,6 +96,7 @@ export default function App() {
   // Rest Timer Bubble
   const [restTimerSeconds, setRestTimerSeconds] = useState(0);
   const [isRestTimerActive, setIsRestTimerActive] = useState(false);
+  const [isStopwatchMode, setIsStopwatchMode] = useState(false);
   const restTimerCallbackRef = useRef<(() => void) | null>(null);
   const restTimerIntervalRef = useRef<number | null>(null);
 
@@ -291,6 +292,7 @@ export default function App() {
       restTimerIntervalRef.current = null;
     }
     setIsRestTimerActive(false);
+    setIsStopwatchMode(false);
     setRestTimerSeconds(0);
     if (restTimerCallbackRef.current) {
       const cb = restTimerCallbackRef.current;
@@ -301,31 +303,50 @@ export default function App() {
 
   const startRestTimer = useCallback(
     (seconds: number, onFinished?: () => void) => {
+      initAudio();
+      playShortBeep();
+
       if (restTimerIntervalRef.current) {
         safeClearInterval(restTimerIntervalRef.current);
+        restTimerIntervalRef.current = null;
       }
-      const dur = seconds > 0 ? seconds : 90;
-      setRestTimerSeconds(dur);
-      setIsRestTimerActive(true);
+
       restTimerCallbackRef.current = onFinished || null;
-      const endTime = Date.now() + dur * 1000;
-      restTimerIntervalRef.current = safeSetInterval(() => {
-        const remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
-        if (remaining <= 0) {
-          if (restTimerIntervalRef.current) safeClearInterval(restTimerIntervalRef.current);
-          restTimerIntervalRef.current = null;
-          setIsRestTimerActive(false);
-          setRestTimerSeconds(0);
-          playTrumpet();
-          if (restTimerCallbackRef.current) {
-            const cb = restTimerCallbackRef.current;
-            restTimerCallbackRef.current = null;
-            cb();
+
+      if (seconds <= 0) {
+        setIsStopwatchMode(true);
+        setRestTimerSeconds(0);
+        setIsRestTimerActive(true);
+        const startTime = Date.now();
+        restTimerIntervalRef.current = safeSetInterval(() => {
+          const elapsed = Math.floor((Date.now() - startTime) / 1000);
+          setRestTimerSeconds(elapsed);
+        }, 250);
+      } else {
+        setIsStopwatchMode(false);
+        const dur = seconds;
+        setRestTimerSeconds(dur);
+        setIsRestTimerActive(true);
+        const endTime = Date.now() + dur * 1000;
+        restTimerIntervalRef.current = safeSetInterval(() => {
+          const remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
+          if (remaining <= 0) {
+            if (restTimerIntervalRef.current) safeClearInterval(restTimerIntervalRef.current);
+            restTimerIntervalRef.current = null;
+            setIsRestTimerActive(false);
+            setIsStopwatchMode(false);
+            setRestTimerSeconds(0);
+            playTrumpet();
+            if (restTimerCallbackRef.current) {
+              const cb = restTimerCallbackRef.current;
+              restTimerCallbackRef.current = null;
+              cb();
+            }
+          } else {
+            setRestTimerSeconds(remaining);
           }
-        } else {
-          setRestTimerSeconds(remaining);
-        }
-      }, 250);
+        }, 250);
+      }
     },
     []
   );
@@ -820,10 +841,29 @@ export default function App() {
     initAudio();
     const setId = `${exId}-${setIndex}`;
 
+    // PRE-CALCOLO FUORI DA setState
+    const isChecked = Boolean(state?.checkedSets[setId]);
+    let handledCircuitRest = false;
+    let circuitPause = 90;
+
+    if (!isChecked && isSub && circuitId && state) {
+      const currentTab = state.plan.find((t) => t.id === state.activeTab);
+      const circuit = currentTab?.exercises.find((e) => e.id === circuitId);
+
+      if (circuit && circuit.type === 'superset' && circuit.structureType === 'classic') {
+        const lastRealEx = [...circuit.exercises].reverse().find((e) => e.metricType !== 'rest');
+        if (lastRealEx && lastRealEx.id === exId) {
+          handledCircuitRest = true;
+          circuitPause = circuit.pause !== undefined ? circuit.pause : 90;
+        }
+      }
+    }
+
+    // AGGIORNAMENTO STATO PURO
     setState((prev) => {
       if (!prev) return null;
 
-      const isChecked = Boolean(prev.checkedSets[setId]);
+      const wasChecked = Boolean(prev.checkedSets[setId]);
       const nextCheckedSets = { ...prev.checkedSets };
       let nextSetReps = { ...prev.setReps };
       let nextSetWeights = { ...prev.setWeights };
@@ -831,7 +871,7 @@ export default function App() {
       let nextSetRpe = { ...prev.setRpe };
       let nextSetCustomFields = { ...(prev.setCustomFields || {}) };
 
-      if (isChecked) {
+      if (wasChecked) {
         delete nextCheckedSets[setId];
       } else {
         nextCheckedSets[setId] = true;
@@ -842,63 +882,6 @@ export default function App() {
         if (prefill.customFields && Object.keys(prefill.customFields).length > 0) {
           const currentFields = nextSetCustomFields[setId] || {};
           nextSetCustomFields[setId] = { ...prefill.customFields, ...currentFields };
-        }
-      }
-
-      let handledCircuitRest = false;
-      if (!isChecked) {
-        if (isSub && circuitId) {
-          const currentTab = prev.plan.find((t) => t.id === prev.activeTab);
-          const circuit = currentTab?.exercises.find((e) => e.id === circuitId);
-
-          if (circuit && circuit.type === 'superset' && circuit.structureType === 'classic') {
-            const lastRealEx = [...circuit.exercises].reverse().find((e) => e.metricType !== 'rest');
-
-            if (lastRealEx && lastRealEx.id === exId) {
-              handledCircuitRest = true;
-              const circuitPause = circuit.pause !== undefined ? circuit.pause : 90;
-              if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-                try { navigator.vibrate(20); } catch { /* ignore */ }
-              }
-              playShortBeep();
-
-              if (circuitPause > 0) {
-                startRestTimer(circuitPause, async () => {
-                  setState((p) => {
-                    if (!p) return null;
-                    const n = {
-                      ...p,
-                      checkedSets: { ...p.checkedSets, [`${circuitId}-round-${setIndex}`]: true }
-                    };
-                    saveGymState(n).catch(console.warn);
-                    return n;
-                  });
-                  const circuitEl = document.getElementById(`circuit-${circuitId}`);
-                  circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                });
-              } else {
-                nextCheckedSets[`${circuitId}-round-${setIndex}`] = true;
-              }
-            }
-          }
-        }
-
-        if (!handledCircuitRest) {
-          if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-            try { navigator.vibrate(20); } catch { /* ignore */ }
-          }
-          playShortBeep();
-          if (pauseSec > 0) {
-            startRestTimer(pauseSec, () => {
-              if (circuitId) {
-                const circuitEl = document.getElementById(`circuit-${circuitId}`);
-                circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              } else {
-                const exEl = document.getElementById(`ex-container-${exId}`) || document.getElementById(`exercise-${exId}`);
-                exEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              }
-            });
-          }
         }
       }
 
@@ -915,6 +898,43 @@ export default function App() {
       saveGymState(next).catch(console.warn);
       return next;
     });
+
+    // SIDE-EFFECTS FUORI DA setState
+    if (!isChecked) {
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        try { navigator.vibrate(20); } catch { /* ignore */ }
+      }
+
+      if (handledCircuitRest && circuitId) {
+        startRestTimer(circuitPause, async () => {
+          setState((p) => {
+            if (!p) return null;
+            const n = {
+              ...p,
+              checkedSets: { ...p.checkedSets, [`${circuitId}-round-${setIndex}`]: true }
+            };
+            saveGymState(n).catch(console.warn);
+            return n;
+          });
+          const circuitEl = document.getElementById(`circuit-${circuitId}`);
+          circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      } else {
+        if (pauseSec > 0) {
+          startRestTimer(pauseSec, () => {
+            if (circuitId) {
+              const circuitEl = document.getElementById(`circuit-${circuitId}`);
+              circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else {
+              const exEl = document.getElementById(`ex-container-${exId}`) || document.getElementById(`exercise-${exId}`);
+              exEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          });
+        } else {
+          playShortBeep();
+        }
+      }
+    }
   };
 
   const handleLongPressSet = (
@@ -998,7 +1018,6 @@ export default function App() {
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       try { navigator.vibrate(20); } catch { /* ignore */ }
     }
-    playShortBeep();
 
     let handledCircuitRest = false;
     if (circuitId) {
@@ -1012,23 +1031,19 @@ export default function App() {
           handledCircuitRest = true;
           const circuitPause = circuit.pause !== undefined ? circuit.pause : 90;
           
-          if (circuitPause > 0) {
-            startRestTimer(circuitPause, async () => {
-              setState((prev) => {
-                if (!prev) return null;
-                const next = {
-                  ...prev,
-                  checkedSets: { ...prev.checkedSets, [`${circuitId}-round-${setIndex}`]: true }
-                };
-                saveGymState(next).catch(console.warn);
-                return next;
-              });
-              const circuitEl = document.getElementById(`circuit-${circuitId}`);
-              circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          startRestTimer(circuitPause, async () => {
+            setState((prev) => {
+              if (!prev) return null;
+              const next = {
+                ...prev,
+                checkedSets: { ...prev.checkedSets, [`${circuitId}-round-${setIndex}`]: true }
+              };
+              saveGymState(next).catch(console.warn);
+              return next;
             });
-          } else {
-            nextCheckedSets[`${circuitId}-round-${setIndex}`] = true;
-          }
+            const circuitEl = document.getElementById(`circuit-${circuitId}`);
+            circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          });
         }
       }
     }
@@ -1044,6 +1059,8 @@ export default function App() {
             exEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }
         });
+      } else {
+        playShortBeep();
       }
     }
 
@@ -1172,10 +1189,6 @@ export default function App() {
           if (prefill.rir !== undefined && nextSetRir[setId] === undefined) nextSetRir[setId] = prefill.rir;
           if (prefill.rpe !== undefined && nextSetRpe[setId] === undefined) nextSetRpe[setId] = prefill.rpe;
 
-          if (foundCircuitId && isLastInCircuit && circuitPause <= 0) {
-            nextCheckedSets[`${foundCircuitId}-round-${parsedSetIdx}`] = true;
-          }
-
           const nextInline = { ...(prev.activeInlineTimers || {}) };
           delete nextInline[setId];
 
@@ -1194,18 +1207,16 @@ export default function App() {
 
         // SIDE-EFFECTS (Fuori dal setState)
         if (foundCircuitId && isLastInCircuit) {
-          if (circuitPause > 0) {
-            startRestTimer(circuitPause, () => {
-              setState((p) => {
-                if (!p) return null;
-                const n = { ...p, checkedSets: { ...p.checkedSets, [`${foundCircuitId}-round-${parsedSetIdx}`]: true } };
-                saveGymState(n).catch(console.warn);
-                return n;
-              });
-              const circuitEl = document.getElementById(`circuit-${foundCircuitId}`);
-              circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          startRestTimer(circuitPause, () => {
+            setState((p) => {
+              if (!p) return null;
+              const n = { ...p, checkedSets: { ...p.checkedSets, [`${foundCircuitId}-round-${parsedSetIdx}`]: true } };
+              saveGymState(n).catch(console.warn);
+              return n;
             });
-          }
+            const circuitEl = document.getElementById(`circuit-${foundCircuitId}`);
+            circuitEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          });
         } else {
           const targetEl = foundCircuitId
             ? document.getElementById(`circuit-${foundCircuitId}`)
@@ -1571,6 +1582,7 @@ export default function App() {
         }}
         isRestTimerActive={isRestTimerActive}
         restTimerSeconds={restTimerSeconds}
+        isStopwatchMode={isStopwatchMode}
         onSkipTimer={skipRestTimer}
       />
 

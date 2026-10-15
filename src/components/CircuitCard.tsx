@@ -1244,17 +1244,18 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
       </div>
 
       {/* Classic Circuit Round Rest Buttons */}
-      {!isEmom && !isAmrap && (circuit.pause || 0) > 0 && (
+      {!isEmom && !isAmrap && (
         <div className="mt-5 pt-4 border-t border-zinc-800/60 flex flex-wrap gap-2 pl-2">
           {Array.from({ length: totalRounds }).map((_, rIdx) => {
             const roundKey = `${circuit.id}-round-${rIdx}`;
             const isDone = Boolean(state.checkedSets[roundKey]);
+            const pauseSec = circuit.pause !== undefined ? circuit.pause : 90;
             return (
               <button
                 key={rIdx}
                 type="button"
                 disabled={!isWorkoutActive}
-                onClick={() => onStartRoundRest(circuit.pause || 90, rIdx)}
+                onClick={() => onStartRoundRest(pauseSec, rIdx)}
                 className={`flex-1 py-3 px-3 rounded-2xl text-[11px] font-bold transition-all flex items-center justify-center gap-1.5 border outline-none active:scale-[0.98] shadow-sm ${
                   isDone
                     ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/50'
@@ -1262,7 +1263,11 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                 }`}
               >
                 <i className="fa-regular fa-clock" />
-                {isDone ? `Giro ${rIdx + 1} ✓` : `Rec. Giro ${rIdx + 1} (${circuit.pause || 90}s)`}
+                {isDone
+                  ? `Giro ${rIdx + 1} ✓`
+                  : pauseSec === 0
+                  ? `Fine Giro ${rIdx + 1}`
+                  : `Rec. Giro ${rIdx + 1} (${pauseSec}s)`}
               </button>
             );
           })}

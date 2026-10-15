@@ -17,6 +17,7 @@ interface HeaderProps {
   onAddTab: () => void;
   isRestTimerActive?: boolean;
   restTimerSeconds?: number;
+  isStopwatchMode?: boolean;
   onSkipTimer?: () => void;
 }
 
@@ -35,6 +36,7 @@ export const Header: React.FC<HeaderProps> = ({
   onAddTab,
   isRestTimerActive,
   restTimerSeconds,
+  isStopwatchMode,
   onSkipTimer
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -66,15 +68,23 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={onSkipTimer} 
               className="flex items-center gap-3 cursor-pointer group"
             >
-              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/30 group-active:scale-95 transition-transform">
+              <div className={`flex items-center justify-center w-10 h-10 rounded-full ${
+                isStopwatchMode 
+                  ? 'bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/30' 
+                  : 'bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/30'
+              } group-active:scale-95 transition-transform`}>
                 <i className="fa-solid fa-stopwatch text-lg animate-pulse" />
               </div>
               <div className="flex flex-col justify-center mt-1">
-                <span className="text-[26px] font-mono font-black text-white leading-none tracking-tight">
-                  {formatTime(restTimerSeconds)}
+                <span className={`text-[26px] font-mono font-black ${isStopwatchMode ? 'text-amber-400' : 'text-white'} leading-none tracking-tight`}>
+                  {isStopwatchMode ? `+${formatTime(restTimerSeconds)}` : formatTime(restTimerSeconds)}
                 </span>
-                <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest mt-1">
-                  Salta Recupero <i className="fa-solid fa-forward-step ml-0.5" />
+                <span className={`text-[9px] font-black ${isStopwatchMode ? 'text-amber-500' : 'text-emerald-500'} uppercase tracking-widest mt-1`}>
+                  {isStopwatchMode ? (
+                    <>Ferma e Prosegui <i className="fa-solid fa-check ml-0.5" /></>
+                  ) : (
+                    <>Salta Recupero <i className="fa-solid fa-forward-step ml-0.5" /></>
+                  )}
                 </span>
               </div>
             </div>
