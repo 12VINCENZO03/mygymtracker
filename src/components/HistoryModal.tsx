@@ -78,7 +78,7 @@ const SwipeableSessionCard: React.FC<{
           transform: `translateX(${offsetX}px)`,
           transition: isDragging.current ? 'none' : 'transform 0.2s cubic-bezier(0.32, 0.72, 0, 1)'
         }}
-        className="bg-zinc-900/70 border border-zinc-800/80 rounded-2xl p-4 flex justify-between items-center cursor-pointer relative z-10 w-full"
+        className="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-4 flex justify-between items-center cursor-pointer relative z-10 w-full"
       >
         <div className="truncate pr-3">
           <h4 className="text-white font-extrabold text-sm truncate max-w-[220px]">
