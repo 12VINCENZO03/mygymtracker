@@ -1078,6 +1078,15 @@ export default function App() {
     initAudio();
 
     if (state.activeInlineTimers?.[setId]) {
+      if (inlineTimerIntervalsRef.current[setId]) {
+        safeClearInterval(inlineTimerIntervalsRef.current[setId]);
+        delete inlineTimerIntervalsRef.current[setId];
+      }
+      setInlineTimerCountdown((prev) => {
+        const next = { ...prev };
+        delete next[setId];
+        return next;
+      });
       setState((prev) => {
         if (!prev) return null;
         const nextInline = { ...(prev.activeInlineTimers || {}) };
@@ -1088,6 +1097,12 @@ export default function App() {
       });
       return;
     }
+
+    if (inlineTimerIntervalsRef.current[setId]) {
+      safeClearInterval(inlineTimerIntervalsRef.current[setId]);
+      delete inlineTimerIntervalsRef.current[setId];
+    }
+    setInlineTimerCountdown((prev) => ({ ...prev, [setId]: durationSec }));
 
     setState((prev) => {
       if (!prev) return null;

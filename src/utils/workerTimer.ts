@@ -1,5 +1,6 @@
 // src/utils/workerTimer.ts
 
+
 const workerCode = `
   const intervals = {};
   self.onmessage = function(e) {
@@ -12,10 +13,15 @@ const workerCode = `
   };
 `;
 
-const blob = typeof Blob !== 'undefined' ? new Blob([workerCode], { type: 'application/javascript' }) : null;
-const timerWorker = typeof window !== 'undefined' && typeof Worker !== 'undefined' && blob
-  ? new Worker(URL.createObjectURL(blob))
-  : null;
+let timerWorker: Worker | null = null;
+try {
+  if (typeof window !== 'undefined' && typeof Worker !== 'undefined' && typeof Blob !== 'undefined') {
+    const blob = new Blob([workerCode], { type: 'application/javascript' });
+    timerWorker = new Worker(URL.createObjectURL(blob));
+  }
+} catch {
+  timerWorker = null;
+}
 
 const workerTimers: Record<number, () => void> = {};
 let workerTimerIdCounter = 0;
@@ -25,15 +31,23 @@ if (timerWorker) {
     const fn = workerTimers[e.data.id];
     if (fn) fn();
   };
+  timerWorker.onerror = function () {
+    timerWorker = null;
+  };
 }
 
 export function safeSetInterval(fn: () => void, delay: number): number {
   const id = ++workerTimerIdCounter;
   workerTimers[id] = fn;
   if (timerWorker) {
-    timerWorker.postMessage({ action: 'setInterval', id, delay });
+    try {
+      timerWorker.postMessage({ action: 'setInterval', id, delay });
+    } catch {
+      const timer = window.setInterval(fn, delay);
+      workerTimers[id] = () => window.clearInterval(timer);
+    }
   } else {
-    // Fallback if Web Workers are unavailable
+    // Fallback if Web Workers are unavailable or failed
     const timer = window.setInterval(fn, delay);
     workerTimers[id] = () => window.clearInterval(timer);
   }
@@ -43,9 +57,16 @@ export function safeSetInterval(fn: () => void, delay: number): number {
 export function safeClearInterval(id: number | null | undefined) {
   if (!id) return;
   if (timerWorker) {
-    timerWorker.postMessage({ action: 'clearInterval', id });
-  } else if (workerTimers[id]) {
+    try {
+      timerWorker.postMessage({ action: 'clearInterval', id });
+    } catch {
+      if (typeof workerTimers[id] === 'function') {
+        workerTimers[id]();
+      }
+    }
+  } else if (typeof workerTimers[id] === 'function') {
     workerTimers[id]();
   }
   delete workerTimers[id];
 }
+

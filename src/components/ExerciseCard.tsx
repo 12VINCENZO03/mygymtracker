@@ -312,7 +312,6 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
       clearTimeout(pressTimerRef.current);
       pressTimerRef.current = null;
     }
-    isLongPressRef.current = false;
   };
 
   return (
@@ -425,7 +424,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
           const histEffort = isCardio ? hist?.rpe : hist?.rir;
           const displayEffort = currentEffort !== undefined && currentEffort !== '' ? currentEffort : histEffort;
           const timerRemaining = activeInlineTimerSec[setId];
-          const isTimerRunning = timerRemaining !== undefined && timerRemaining > 0;
+          const isTimerRunning = activeInlineTimerSec?.[setId] !== undefined || Boolean(state.activeInlineTimers?.[setId]);
 
           const prefillData = {
             reps: actualReps,
@@ -456,24 +455,25 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                   <button
                     type="button"
                     disabled={!isWorkoutActive}
-                    onPointerDown={() => handlePointerDown(setIdx, prefillData)}
-                    onPointerUp={() => {
-                      if (pressTimerRef.current) {
-                        clearTimeout(pressTimerRef.current);
-                        pressTimerRef.current = null;
+                    onPointerDown={(e) => {
+                      isLongPressRef.current = false;
+                      handlePointerDown(setIdx, prefillData);
+                    }}
+                    onPointerUp={handlePointerCancel}
+                    onPointerLeave={handlePointerCancel}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (isLongPressRef.current) {
+                        isLongPressRef.current = false;
+                        return;
                       }
-                      if (!isLongPressRef.current) {
-                        if (isChecked) {
-                          // Se è già spuntato, il tap toglie la spunta
-                          onToggleSet(setIdx, ex.pause || 0, prefillData);
-                        } else {
-                          // Se non è spuntato, avvia il timer
-                          const dur = Math.max(0, parseInt(String(actualReps)) || ex.workSec || 60);
-                          onRunInlineTimer(setId, dur, ex.pause || 0, prefillData);
-                        }
+                      if (isChecked) {
+                        onToggleSet(setIdx, ex.pause || 0, prefillData);
+                      } else {
+                        const dur = Math.max(1, parseInt(String(actualReps)) || ex.workSec || 60);
+                        onRunInlineTimer(setId, dur, ex.pause || 0, prefillData);
                       }
                     }}
-                    onPointerLeave={handlePointerCancel}
                     className={`w-28 py-3.5 rounded-2xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
                       isChecked
                         ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-emerald-500/20'
@@ -482,7 +482,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                         : 'bg-zinc-800/80 text-zinc-200 border-zinc-700/60 hover:bg-zinc-700'
                     }`}
                   >
-                    {isTimerRunning ? `${timerRemaining}s` : isChecked ? <i className="fa-solid fa-check text-lg" /> : `${actualReps}s`}
+                    {isTimerRunning ? `${timerRemaining !== undefined ? timerRemaining : actualReps}s` : isChecked ? <i className="fa-solid fa-check text-lg" /> : `${actualReps}s`}
                   </button>
                 ) : (
                   <button

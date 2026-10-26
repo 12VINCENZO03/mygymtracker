@@ -615,7 +615,6 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
       clearTimeout(pressTimerRef.current);
       pressTimerRef.current = null;
     }
-    isLongPressRef.current = false;
   };
 
   return (
@@ -821,7 +820,7 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                     };
 
                     const timerRemaining = activeInlineTimerSec?.[setId];
-                    const isTimerRunning = timerRemaining !== undefined && timerRemaining > 0;
+                    const isTimerRunning = activeInlineTimerSec?.[setId] !== undefined || Boolean(state.activeInlineTimers?.[setId]);
 
                     return (
                       <div key={sub.id} className="bg-zinc-900/50 p-3.5 rounded-2xl border border-zinc-800/60 flex flex-col gap-2">
@@ -872,24 +871,25 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                             <button
                               type="button"
                               disabled={!isWorkoutActive}
-                              onPointerDown={() => handlePointerDown(sub.id, rIdx, sub.pause || 0, prefillData)}
-                              onPointerUp={() => {
-                                if (pressTimerRef.current) {
-                                  clearTimeout(pressTimerRef.current);
-                                  pressTimerRef.current = null;
+                              onPointerDown={(e) => {
+                                isLongPressRef.current = false;
+                                handlePointerDown(sub.id, rIdx, sub.pause || 0, prefillData);
+                              }}
+                              onPointerUp={handlePointerCancel}
+                              onPointerLeave={handlePointerCancel}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                if (isLongPressRef.current) {
+                                  isLongPressRef.current = false;
+                                  return;
                                 }
-                                if (!isLongPressRef.current) {
-                                  if (isChecked) {
-                                    // Se è già spuntato, il tap toglie la spunta
-                                    onToggleSubSet(sub.id, rIdx, sub.pause || 0, prefillData);
-                                  } else {
-                                    // Se non è spuntato, avvia il timer
-                                    const dur = Math.max(0, parseInt(String(actualReps)) || sub.workSec || 60);
-                                    onRunInlineTimer(setId, dur, sub.pause || 0, prefillData);
-                                  }
+                                if (isChecked) {
+                                  onToggleSubSet(sub.id, rIdx, sub.pause || 0, prefillData);
+                                } else {
+                                  const dur = Math.max(1, parseInt(String(actualReps)) || sub.workSec || 60);
+                                  onRunInlineTimer(setId, dur, sub.pause || 0, prefillData);
                                 }
                               }}
-                              onPointerLeave={handlePointerCancel}
                               className={`flex-1 py-3 rounded-xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
                                 isChecked
                                   ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-emerald-500/20'
@@ -898,7 +898,7 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                                   : 'bg-zinc-800/80 text-zinc-200 border-zinc-700/60 hover:bg-zinc-700'
                               }`}
                             >
-                              {isTimerRunning ? `${timerRemaining}s` : isChecked ? <i className="fa-solid fa-check text-lg" /> : `${actualReps}s`}
+                              {isTimerRunning ? `${timerRemaining !== undefined ? timerRemaining : actualReps}s` : isChecked ? <i className="fa-solid fa-check text-lg" /> : `${actualReps}s`}
                             </button>
                           ) : (
                             <button
@@ -1120,7 +1120,7 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                     };
 
                     const timerRemaining = activeInlineTimerSec?.[setId];
-                    const isTimerRunning = timerRemaining !== undefined && timerRemaining > 0;
+                    const isTimerRunning = activeInlineTimerSec?.[setId] !== undefined || Boolean(state.activeInlineTimers?.[setId]);
 
                     let emomClass = '';
                     if (isEmom) {
@@ -1143,24 +1143,25 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                             <button
                               type="button"
                               disabled={!isWorkoutActive}
-                              onPointerDown={() => handlePointerDown(sub.id, rIdx, sub.pause || 0, prefillData)}
-                              onPointerUp={() => {
-                                if (pressTimerRef.current) {
-                                  clearTimeout(pressTimerRef.current);
-                                  pressTimerRef.current = null;
+                              onPointerDown={(e) => {
+                                isLongPressRef.current = false;
+                                handlePointerDown(sub.id, rIdx, sub.pause || 0, prefillData);
+                              }}
+                              onPointerUp={handlePointerCancel}
+                              onPointerLeave={handlePointerCancel}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                if (isLongPressRef.current) {
+                                  isLongPressRef.current = false;
+                                  return;
                                 }
-                                if (!isLongPressRef.current) {
-                                  if (isChecked) {
-                                    // Se è già spuntato, il tap toglie la spunta
-                                    onToggleSubSet(sub.id, rIdx, sub.pause || 0, prefillData);
-                                  } else {
-                                    // Se non è spuntato, avvia il timer
-                                    const dur = Math.max(0, parseInt(String(actualReps)) || sub.workSec || 60);
-                                    onRunInlineTimer(setId, dur, sub.pause || 0, prefillData);
-                                  }
+                                if (isChecked) {
+                                  onToggleSubSet(sub.id, rIdx, sub.pause || 0, prefillData);
+                                } else {
+                                  const dur = Math.max(1, parseInt(String(actualReps)) || sub.workSec || 60);
+                                  onRunInlineTimer(setId, dur, sub.pause || 0, prefillData);
                                 }
                               }}
-                              onPointerLeave={handlePointerCancel}
                               className={`w-28 py-3.5 rounded-2xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
                                 isChecked
                                   ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-emerald-500/20'
@@ -1169,7 +1170,7 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                                   : 'bg-zinc-800/80 text-zinc-200 border-zinc-700/60 hover:bg-zinc-700'
                               }`}
                             >
-                              {isTimerRunning ? `${timerRemaining}s` : isChecked ? <i className="fa-solid fa-check text-lg" /> : `${actualReps}s`}
+                              {isTimerRunning ? `${timerRemaining !== undefined ? timerRemaining : actualReps}s` : isChecked ? <i className="fa-solid fa-check text-lg" /> : `${actualReps}s`}
                             </button>
                           ) : (
                             <button
