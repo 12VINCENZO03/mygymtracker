@@ -5,12 +5,108 @@ interface HistoryModalProps {
   isOpen: boolean;
   historyV2: WorkoutSessionV2[];
   onClose: () => void;
+  onDeleteSession: (id: string) => void;
 }
+
+const SwipeableSessionCard: React.FC<{
+  session: WorkoutSessionV2;
+  onClick: () => void;
+  onDelete: (id: string) => void;
+  getTotalSets: (s: WorkoutSessionV2) => number;
+}> = ({ session, onClick, onDelete, getTotalSets }) => {
+  const [offsetX, setOffsetX] = React.useState(0);
+  const startX = React.useRef(0);
+  const currentX = React.useRef(0);
+  const isDragging = React.useRef(false);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    startX.current = e.touches[0].clientX;
+    isDragging.current = true;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging.current) return;
+    const delta = e.touches[0].clientX - startX.current;
+    if (delta < 0) {
+      currentX.current = Math.max(delta, -90); // Limite di scorrimento
+      setOffsetX(currentX.current);
+    } else {
+      currentX.current = 0;
+      setOffsetX(0);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    isDragging.current = false;
+    if (currentX.current < -45) {
+      setOffsetX(-80); // Scatta aperto
+    } else {
+      setOffsetX(0); // Scatta chiuso
+    }
+  };
+
+  return (
+    <div className="relative w-full overflow-hidden rounded-2xl mb-3">
+      {/* Cestino in background */}
+      <div className="absolute inset-0 bg-rose-600 flex items-center justify-end px-5 rounded-2xl">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(session.id);
+          }}
+          className="w-10 h-10 flex items-center justify-center text-white outline-none active:scale-95 transition-transform"
+        >
+          <i className="fa-solid fa-trash text-lg" />
+        </button>
+      </div>
+
+      {/* Scheda in foreground con supporto Touch */}
+      <div
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onClick={(e) => {
+          if (offsetX < 0) {
+            e.stopPropagation();
+            setOffsetX(0); // Chiude il cestino se si tocca la scheda
+          } else {
+            onClick(); // Apre il dettaglio
+          }
+        }}
+        style={{
+          transform: `translateX(${offsetX}px)`,
+          transition: isDragging.current ? 'none' : 'transform 0.2s cubic-bezier(0.32, 0.72, 0, 1)'
+        }}
+        className="bg-zinc-900/70 border border-zinc-800/80 rounded-2xl p-4 flex justify-between items-center cursor-pointer relative z-10 w-full"
+      >
+        <div className="truncate pr-3">
+          <h4 className="text-white font-extrabold text-sm truncate max-w-[220px]">
+            {String(session.tabNameSnapshot || (session as any).tabName || 'Allenamento')}
+          </h4>
+          <div className="text-xs text-zinc-500 mt-1 flex items-center gap-3">
+            <span>
+              <i className="fa-regular fa-calendar mr-1 opacity-70" /> {String(session.date || '-')}
+            </span>
+            <span>
+              <i className="fa-regular fa-clock mr-1 opacity-70" /> {String(session.durationStr || '00:00')}
+            </span>
+            <span>
+              <i className="fa-solid fa-layer-group mr-1 opacity-70" /> {getTotalSets(session)} serie
+            </span>
+          </div>
+        </div>
+        <i className="fa-solid fa-chevron-right text-zinc-600 text-xs" />
+      </div>
+    </div>
+  );
+};
 
 export const HistoryModal: React.FC<HistoryModalProps> = ({
   isOpen,
   historyV2,
-  onClose
+  onClose,
+  onDeleteSession
 }) => {
   const [selectedSession, setSelectedSession] = useState<WorkoutSessionV2 | null>(null);
   const [visibleCount, setVisibleCount] = useState(30);
@@ -92,31 +188,17 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
           ) : (
             <>
               {displayedHistory.map((s) => (
-                <div
+                <SwipeableSessionCard
                   key={String(s.id || Math.random())}
+                  session={s}
                   onClick={() => setSelectedSession(s)}
-                  role="button"
-                  tabIndex={0}
-                  className="bg-zinc-900/70 border border-zinc-800/80 rounded-2xl p-4 flex justify-between items-center cursor-pointer hover:bg-zinc-800/80 transition"
-                >
-                  <div className="truncate pr-3">
-                    <h4 className="text-white font-extrabold text-sm truncate max-w-[220px]">
-                      {String(s.tabNameSnapshot || (s as any).tabName || 'Allenamento')}
-                    </h4>
-                    <div className="text-xs text-zinc-500 mt-1 flex items-center gap-3">
-                      <span>
-                        <i className="fa-regular fa-calendar mr-1 opacity-70" /> {String(s.date || '-')}
-                      </span>
-                      <span>
-                        <i className="fa-regular fa-clock mr-1 opacity-70" /> {String(s.durationStr || '00:00')}
-                      </span>
-                      <span>
-                        <i className="fa-solid fa-layer-group mr-1 opacity-70" /> {getTotalSets(s)} serie
-                      </span>
-                    </div>
-                  </div>
-                  <i className="fa-solid fa-chevron-right text-zinc-600 text-xs" />
-                </div>
+                  onDelete={(id) => {
+                    if (confirm('Eliminare definitivamente questo allenamento dalla cronologia?')) {
+                      onDeleteSession(id);
+                    }
+                  }}
+                  getTotalSets={getTotalSets}
+                />
               ))}
               {safeHistory.length > visibleCount && (
                 <button

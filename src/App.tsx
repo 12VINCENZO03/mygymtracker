@@ -1475,6 +1475,18 @@ export default function App() {
     }
   };
 
+  const handleDeleteSession = async (sessionId: string) => {
+    if (!state) return;
+    setState(prev => {
+      if (!prev) return null;
+      const nextSessions = (prev.sessionsV2 || []).filter(s => s.id !== sessionId);
+      const next = { ...prev, sessionsV2: nextSessions };
+      // Passiamo sessionsChanged = false per non riscrivere tutto, ma forniamo l'ID da eliminare dal DB
+      saveGymState(next, false, undefined, [sessionId]).catch(console.warn);
+      return next;
+    });
+  };
+
   if (!state) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-950 text-zinc-400 gap-3">
@@ -2536,6 +2548,7 @@ export default function App() {
         isOpen={isHistoryModalOpen}
         historyV2={state.sessionsV2 || []}
         onClose={() => setIsHistoryModalOpen(false)}
+        onDeleteSession={handleDeleteSession}
       />
 
       {/* Video Modal */}
