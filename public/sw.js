@@ -1,11 +1,12 @@
 // public/sw.js
-const CACHE_NAME = 'mygym-cache-v6';
+const CACHE_NAME = 'mygym-cache-v7';
 const ASSETS = [
   '/',
   '/index.html',
   '/timer-end.mp3',
   '/beep.mp3',
   '/manifest.json',
+  '/icon-180.png',
   '/icon-192.png',
   '/icon-512.png'
 ];
