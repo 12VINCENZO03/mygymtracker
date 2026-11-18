@@ -66,52 +66,58 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
 
   if (isEditMode) {
     return (
-      <div className="bg-zinc-900/60 rounded-3xl p-5 mb-5 shadow-sm border border-zinc-800/40 backdrop-blur-sm relative animate-in fade-in">
-        <div className="absolute -top-3 -right-2 bg-emerald-500 text-zinc-950 rounded-full flex items-center shadow-md border-2 border-zinc-950 overflow-hidden text-[10px] font-black z-10">
+      <div className="bg-zinc-900/60 rounded-3xl p-5 pt-7 mb-5 shadow-sm border border-zinc-800/40 backdrop-blur-sm relative animate-in fade-in">
+        <div className="absolute -top-4 right-2 flex items-center gap-2 z-10">
           <button
             type="button"
             disabled={isFirst}
             onClick={() => onMoveEx(-1)}
-            className="px-2 py-1 hover:bg-emerald-400 disabled:opacity-30 outline-none transition-colors"
+            aria-label={`Sposta ${ex.name || 'esercizio'} su`}
+            className="w-11 h-11 min-w-11 min-h-11 rounded-full bg-emerald-500 text-zinc-950 flex items-center justify-center shadow-md border-2 border-zinc-950 hover:bg-emerald-400 disabled:opacity-40 outline-none transition-colors"
           >
-            <i className="fa-solid fa-chevron-up" />
+            <i className="fa-solid fa-chevron-up text-xs" aria-hidden="true" />
           </button>
-          <div className="w-px h-3 bg-zinc-950/30" />
           <button
             type="button"
             disabled={isLast}
             onClick={() => onMoveEx(1)}
-            className="px-2 py-1 hover:bg-emerald-400 disabled:opacity-30 outline-none transition-colors"
+            aria-label={`Sposta ${ex.name || 'esercizio'} giù`}
+            className="w-11 h-11 min-w-11 min-h-11 rounded-full bg-emerald-500 text-zinc-950 flex items-center justify-center shadow-md border-2 border-zinc-950 hover:bg-emerald-400 disabled:opacity-40 outline-none transition-colors"
           >
-            <i className="fa-solid fa-chevron-down" />
+            <i className="fa-solid fa-chevron-down text-xs" aria-hidden="true" />
           </button>
         </div>
 
-        <div className="flex justify-between items-start gap-3 mb-3">
-          <select
-            value={ex.metricType}
-            onChange={(e) => onUpdateEx('metricType', e.target.value)}
-            className="bg-zinc-950 text-zinc-300 text-xs font-bold p-3 rounded-2xl outline-none border border-zinc-800/80 w-1/3 shrink-0 shadow-inner"
-          >
-            <option value="weight">Pesi</option>
-            <option value="bodyweight">C. Libero</option>
-            <option value="time">Tempo</option>
-            <option value="cardio">Cardio</option>
-          </select>
+        <div className="space-y-3 mb-3">
+          <div className="flex items-center gap-2">
+            <select
+              value={ex.metricType}
+              onChange={(e) => onUpdateEx('metricType', e.target.value)}
+              aria-label="Tipo metrica esercizio"
+              className="flex-1 min-h-11 bg-zinc-950 text-zinc-200 text-base font-bold px-3 py-2.5 rounded-2xl outline-none border border-zinc-800/80 shadow-inner"
+            >
+              <option value="weight">Pesi</option>
+              <option value="bodyweight">C. Libero</option>
+              <option value="time">Tempo</option>
+              <option value="cardio">Cardio</option>
+            </select>
+            <button
+              type="button"
+              onClick={onDeleteEx}
+              aria-label={`Elimina esercizio ${ex.name || ''}`}
+              className="w-11 h-11 min-w-11 min-h-11 flex items-center justify-center text-rose-400 bg-rose-950/30 border border-rose-900/30 rounded-2xl outline-none shrink-0 hover:bg-rose-900/50 active:scale-95 transition-all"
+            >
+              <i className="fa-solid fa-trash text-sm" aria-hidden="true" />
+            </button>
+          </div>
           <input
             type="text"
             value={ex.name}
             onChange={(e) => onUpdateEx('name', e.target.value)}
             placeholder="Nome Esercizio"
-            className="bg-zinc-950 text-white font-bold p-3 rounded-2xl w-full outline-none border border-zinc-800/80 text-sm shadow-inner focus:border-emerald-500 transition-colors"
+            aria-label="Nome esercizio"
+            className="bg-zinc-950 text-white font-bold px-3.5 py-2.5 min-h-11 rounded-2xl w-full outline-none border border-zinc-800/80 text-base shadow-inner focus:border-emerald-500 transition-colors"
           />
-          <button
-            type="button"
-            onClick={onDeleteEx}
-            className="text-rose-400 p-3 bg-rose-950/30 border border-rose-900/30 rounded-2xl outline-none shrink-0 hover:bg-rose-900/50 active:scale-95 transition-all"
-          >
-            <i className="fa-solid fa-trash text-sm" />
-          </button>
         </div>
 
         {ex.metricType !== 'cardio' && (
@@ -120,13 +126,14 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
             value={ex.link || ''}
             onChange={(e) => onUpdateEx('link', e.target.value)}
             placeholder="Link video esecuzione (YouTube / Google Drive)"
-            className="w-full bg-zinc-950 text-zinc-400 text-xs font-medium p-3 rounded-2xl mb-4 border border-zinc-800/80 outline-none shadow-inner focus:border-emerald-500 transition-colors"
+            aria-label="Link video esecuzione"
+            className="w-full min-h-11 bg-zinc-950 text-zinc-200 placeholder:text-zinc-400 text-base font-medium px-3.5 py-2.5 rounded-2xl mb-4 border border-zinc-800/80 outline-none shadow-inner focus:border-emerald-500 transition-colors"
           />
         )}
 
-        <div className="flex flex-wrap gap-2">
-          <div className="flex items-center bg-zinc-950 border border-zinc-800/80 rounded-2xl p-2 flex-1 min-w-[90px] shadow-inner">
-            <span className="text-[9px] text-zinc-500 font-extrabold uppercase ml-2 w-8 tracking-wider">Serie</span>
+        <div className="grid grid-cols-3 gap-2">
+          <div className="bg-zinc-950 border border-zinc-800/80 rounded-2xl p-2 shadow-inner text-center">
+            <span className="text-[11px] text-zinc-400 font-extrabold uppercase tracking-wider block">Serie</span>
             <input
               type="number"
               inputMode="decimal"
@@ -134,11 +141,12 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
               max={20}
               value={ex.sets}
               onChange={(e) => onUpdateEx('sets', Math.max(1, parseInt(e.target.value) || 1))}
-              className="bg-transparent text-white font-bold w-full text-center outline-none text-sm"
+              aria-label="Numero di serie"
+              className="bg-transparent text-white font-bold w-full text-center outline-none text-base min-h-11"
             />
           </div>
-          <div className="flex items-center bg-zinc-950 border border-zinc-800/80 rounded-2xl p-2 flex-1 min-w-[90px] shadow-inner">
-            <span className="text-[9px] text-zinc-500 font-extrabold uppercase ml-2 w-8 tracking-wider">
+          <div className="bg-zinc-950 border border-zinc-800/80 rounded-2xl p-2 shadow-inner text-center">
+            <span className="text-[11px] text-zinc-400 font-extrabold uppercase tracking-wider block">
               {ex.metricType === 'time' ? 'Sec' : 'Reps'}
             </span>
             <input
@@ -146,11 +154,12 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
               inputMode="decimal"
               value={ex.metricType === 'time' ? (ex.workSec || 60) : ex.reps}
               onChange={(e) => onUpdateEx(ex.metricType === 'time' ? 'workSec' : 'reps', e.target.value)}
-              className="bg-transparent text-white font-bold w-full text-center outline-none text-sm"
+              aria-label={ex.metricType === 'time' ? 'Secondi target' : 'Ripetizioni target'}
+              className="bg-transparent text-white font-bold w-full text-center outline-none text-base min-h-11"
             />
           </div>
-          <div className="flex items-center bg-zinc-950 border border-zinc-800/80 rounded-2xl p-2 flex-1 min-w-[90px] shadow-inner">
-            <span className="text-[9px] text-zinc-500 font-extrabold uppercase ml-2 w-10 tracking-wider">Pausa</span>
+          <div className="bg-zinc-950 border border-zinc-800/80 rounded-2xl p-2 shadow-inner text-center">
+            <span className="text-[11px] text-zinc-400 font-extrabold uppercase tracking-wider block">Pausa</span>
             <input
               type="number"
               inputMode="decimal"
@@ -158,7 +167,8 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
               min={0}
               value={ex.pause || 0}
               onChange={(e) => onUpdateEx('pause', Math.max(0, parseInt(e.target.value) || 0))}
-              className="bg-transparent text-white font-bold w-full text-center outline-none text-sm"
+              aria-label="Secondi di pausa"
+              className="bg-transparent text-white font-bold w-full text-center outline-none text-base min-h-11"
             />
           </div>
         </div>
@@ -166,7 +176,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
         {/* 🔴 NUOVO: Selezionatore Macchina Cardio */}
         {ex.metricType === 'cardio' && (
           <div className="mt-3 bg-zinc-950 p-3 rounded-2xl border border-zinc-800/80 shadow-inner">
-            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-2">
+            <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block mb-2">
               Tipo di Macchina (Imposta parametri di default)
             </label>
             <select
@@ -197,7 +207,8 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                 }
                 onUpdateEx('cardioFields', defaultFields);
               }}
-              className="bg-zinc-900 text-emerald-400 text-xs font-bold p-2.5 rounded-xl outline-none border border-zinc-700/50 w-full"
+              aria-label="Seleziona tipo di macchina cardio"
+              className="bg-zinc-900 text-emerald-400 text-base font-bold px-3 py-2.5 min-h-11 rounded-xl outline-none border border-zinc-700/50 w-full"
             >
               <option value="">Seleziona macchina...</option>
               <option value="corsa">Corsa / Tapis Roulant</option>
@@ -210,22 +221,23 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
         {/* SETUP COACH 2.0 (Collassabile) */}
         {regData && (
           <details className="group mt-4 pt-3 border-t border-zinc-800/80">
-            <summary className="list-none flex items-center justify-between cursor-pointer py-1.5 px-1 rounded-xl text-zinc-400 hover:text-emerald-400 select-none transition-colors">
-              <span className="flex items-center gap-2 text-zinc-300 group-open:text-emerald-400 font-extrabold text-[10px] uppercase tracking-wider">
-                <i className="fa-solid fa-sliders text-emerald-400" /> Impostazioni Avanzate Esercizio
+            <summary className="list-none flex items-center justify-between cursor-pointer min-h-11 py-2 px-1 rounded-xl text-zinc-300 hover:text-emerald-400 select-none transition-colors">
+              <span className="flex items-center gap-2 text-zinc-200 group-open:text-emerald-400 font-extrabold text-[11px] uppercase tracking-wider">
+                <i className="fa-solid fa-sliders text-emerald-400" aria-hidden="true" /> Impostazioni Avanzate Esercizio
               </span>
-              <i className="fa-solid fa-chevron-down text-[10px] text-zinc-500 transition-transform duration-200 group-open:rotate-180" />
+              <i className="fa-solid fa-chevron-down text-xs text-zinc-400 transition-transform duration-200 group-open:rotate-180" aria-hidden="true" />
             </summary>
 
             <div className="pt-2.5">
-              <div className="text-[10px] font-black text-emerald-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                <i className="fa-solid fa-robot" /> Setup Coach 2.0
+              <div className="text-[11px] font-black text-emerald-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <i className="fa-solid fa-robot" aria-hidden="true" /> Setup Coach 2.0
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <select
                   value={regData.equipment || ''}
                   onChange={(e) => onUpdateRegistry?.(ex.exerciseId!, 'equipment', e.target.value)}
-                  className="bg-zinc-950 text-zinc-300 text-[10px] font-bold p-2 rounded-xl border border-zinc-700/50 outline-none"
+                  aria-label="Attrezzatura esercizio"
+                  className="bg-zinc-950 text-zinc-200 text-base font-bold px-3 py-2.5 min-h-11 rounded-xl border border-zinc-700/50 outline-none"
                 >
                   <option value="">Attrezzatura...</option>
                   <option value="barbell">Bilanciere</option>
@@ -239,7 +251,8 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                 <select
                   value={regData.movementPattern || ''}
                   onChange={(e) => onUpdateRegistry?.(ex.exerciseId!, 'movementPattern', e.target.value)}
-                  className="bg-zinc-950 text-zinc-300 text-[10px] font-bold p-2 rounded-xl border border-zinc-700/50 outline-none"
+                  aria-label="Pattern di movimento"
+                  className="bg-zinc-950 text-zinc-200 text-base font-bold px-3 py-2.5 min-h-11 rounded-xl border border-zinc-700/50 outline-none"
                 >
                   <option value="">Pattern...</option>
                   <option value="horizontal_push">Spinta Orizzontale</option>
@@ -257,7 +270,8 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                 <select
                   value={regData.progressionModel || ''}
                   onChange={(e) => onUpdateRegistry?.(ex.exerciseId!, 'progressionModel', e.target.value)}
-                  className="bg-zinc-950 text-zinc-300 text-[10px] font-bold p-2 rounded-xl border border-zinc-700/50 outline-none"
+                  aria-label="Modello di progressione"
+                  className="bg-zinc-950 text-zinc-200 text-base font-bold px-3 py-2.5 min-h-11 rounded-xl border border-zinc-700/50 outline-none"
                 >
                   <option value="">Progressione...</option>
                   <option value="double_progression">Doppia Progressione</option>
@@ -265,8 +279,8 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                   <option value="fixed_volume">Volume Fisso</option>
                 </select>
 
-                <div className="flex items-center bg-zinc-950 border border-zinc-700/50 rounded-xl p-1 px-2">
-                  <span className="text-[9px] text-zinc-500 font-bold uppercase w-12">Incr.</span>
+                <div className="flex items-center bg-zinc-950 border border-zinc-700/50 rounded-xl px-3 min-h-11">
+                  <span className="text-[11px] text-zinc-400 font-bold uppercase w-14 shrink-0">Incr.</span>
                   <input
                     type="number"
                     step="0.25"
@@ -274,7 +288,8 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                     placeholder="kg/s"
                     value={regData.progressionIncrement || ''}
                     onChange={(e) => onUpdateRegistry?.(ex.exerciseId!, 'progressionIncrement', parseFloat(e.target.value) || 0)}
-                    className="bg-transparent text-white font-bold w-full text-right outline-none text-[10px]"
+                    aria-label="Incremento progressione"
+                    className="bg-transparent text-white font-bold w-full text-right outline-none text-base min-h-11"
                   />
                 </div>
               </div>
@@ -326,7 +341,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
       {/* Intestazione Esercizio e Video */}
       <div className="flex items-center justify-between gap-3 mb-5">
         <h3 className="text-lg sm:text-xl font-black text-white leading-tight truncate">
-          <span className="text-emerald-500 mr-2">{index + 1}.</span>
+          <span className="text-emerald-400 mr-2">{index + 1}.</span>
           {ex.name}
         </h3>
         {(ex.videoUrl || ex.link) && (
@@ -340,9 +355,10 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                 onOpenVideo((ex.videoUrl || ex.link)!);
               }
             }}
-            className="w-9 h-9 flex items-center justify-center rounded-full bg-zinc-900 text-emerald-400 hover:bg-zinc-800 transition-colors border border-zinc-700/60 shadow-sm shrink-0"
+            aria-label={`Apri video esecuzione ${ex.name}`}
+            className="w-11 h-11 min-w-11 min-h-11 flex items-center justify-center rounded-full bg-zinc-900 text-emerald-400 hover:bg-zinc-800 transition-colors border border-zinc-700/60 shadow-sm shrink-0"
           >
-            <i className="fa-solid fa-video text-xs" />
+            <i className="fa-solid fa-video text-sm" aria-hidden="true" />
           </a>
         )}
       </div>
@@ -362,11 +378,11 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
         >
           <div className="mt-0.5 shrink-0 text-sm opacity-90">
             {coachAdvice.badge === 'increase' ? (
-              <i className="fa-solid fa-arrow-trend-up text-emerald-400" />
+              <i className="fa-solid fa-arrow-trend-up text-emerald-400" aria-hidden="true" />
             ) : coachAdvice.badge === 'stall' ? (
-              <i className="fa-solid fa-triangle-exclamation text-amber-400" />
+              <i className="fa-solid fa-triangle-exclamation text-amber-400" aria-hidden="true" />
             ) : (
-              <i className="fa-solid fa-robot text-emerald-500" />
+              <i className="fa-solid fa-robot text-emerald-400" aria-hidden="true" />
             )}
           </div>
           <div className="leading-relaxed">
@@ -377,9 +393,9 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
 
       {!isWorkoutActive && coachAdvice?.fatigueAlert && (
         <div className="bg-indigo-950/40 border border-indigo-700/60 text-indigo-200 text-xs p-3.5 rounded-2xl mb-4 flex items-start gap-3 shadow-inner">
-          <i className="fa-solid fa-chart-line text-indigo-400 mt-0.5 text-sm shrink-0 opacity-90" />
+          <i className="fa-solid fa-chart-line text-indigo-400 mt-0.5 text-sm shrink-0 opacity-90" aria-hidden="true" />
           <div className="leading-relaxed">
-            <span className="font-extrabold uppercase text-[10px] tracking-wider text-indigo-400 block mb-0.5">
+            <span className="font-extrabold uppercase text-[11px] tracking-wider text-indigo-300 block mb-0.5">
               Tendenza Fatica Cronica (4-6 sett.)
             </span>
             {coachAdvice.fatigueAlert}
@@ -388,7 +404,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
       )}
 
       {/* Sets Rows */}
-      <div className="space-y-2.5">
+      <div className="space-y-3">
         {Array.from({ length: ex.sets }).map((_, setIdx) => {
           const setId = `${ex.id}-${setIdx}`;
           const isChecked = Boolean(state.checkedSets[setId]);
@@ -434,105 +450,131 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
             customFields: hist?.customFields || {}
           };
 
-          return (
-            <div key={setIdx} className="flex flex-col gap-1.5">
-              <div className="flex items-center gap-2.5">
-                <span className="text-[10px] font-black text-zinc-500 w-12 uppercase tracking-wider bg-zinc-950/80 border border-zinc-800/80 px-2 py-3.5 rounded-2xl text-center shadow-sm shrink-0">
-                  S{setIdx + 1}
-                </span>
-                {ex.metricType !== 'cardio' && (
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    disabled={!isWorkoutActive}
-                    value={displayWeight}
-                    onChange={(e) => onSaveSetWeight(setId, e.target.value)}
-                    placeholder={ex.metricType === 'bodyweight' ? '+kg' : 'kg'}
-                    className="bg-zinc-950/80 text-white w-16 py-3.5 rounded-2xl border border-zinc-800/80 text-center font-bold text-sm shadow-inner outline-none focus:border-emerald-500/50 disabled:opacity-50 transition-colors"
-                  />
-                )}
-                {isTimeType ? (
-                  <button
-                    type="button"
-                    disabled={!isWorkoutActive}
-                    onPointerDown={(e) => {
-                      isLongPressRef.current = false;
-                      handlePointerDown(setIdx, prefillData);
-                    }}
-                    onPointerUp={handlePointerCancel}
-                    onPointerLeave={handlePointerCancel}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (isLongPressRef.current) {
-                        isLongPressRef.current = false;
-                        return;
-                      }
-                      if (isChecked) {
-                        onToggleSet(setIdx, ex.pause || 0, prefillData);
-                      } else {
-                        const dur = Math.max(1, parseInt(String(actualReps)) || ex.workSec || 60);
-                        onRunInlineTimer(setId, dur, ex.pause || 0, prefillData);
-                      }
-                    }}
-                    className={`w-28 py-3.5 rounded-2xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
-                      isChecked
-                        ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-emerald-500/20'
-                        : isTimerRunning
-                        ? 'bg-emerald-600 text-zinc-950 border-emerald-400 animate-pulse'
-                        : 'bg-zinc-800/80 text-zinc-200 border-zinc-700/60 hover:bg-zinc-700'
-                    }`}
-                  >
-                    {isTimerRunning ? `${timerRemaining !== undefined ? timerRemaining : actualReps}s` : isChecked ? <i className="fa-solid fa-check text-lg" /> : `${actualReps}s`}
-                  </button>
+          const setActionButton = isTimeType ? (
+            <button
+              type="button"
+              disabled={!isWorkoutActive}
+              onPointerDown={() => {
+                isLongPressRef.current = false;
+                handlePointerDown(setIdx, prefillData);
+              }}
+              onPointerUp={handlePointerCancel}
+              onPointerLeave={handlePointerCancel}
+              onClick={(e) => {
+                e.preventDefault();
+                if (isLongPressRef.current) {
+                  isLongPressRef.current = false;
+                  return;
+                }
+                if (isChecked) {
+                  onToggleSet(setIdx, ex.pause || 0, prefillData);
+                } else {
+                  const dur = Math.max(1, parseInt(String(actualReps)) || ex.workSec || 60);
+                  onRunInlineTimer(setId, dur, ex.pause || 0, prefillData);
+                }
+              }}
+              aria-label={isChecked ? `Serie ${setIdx + 1} completata (${actualReps} secondi)` : `Avvia timer serie ${setIdx + 1} (${actualReps} secondi)`}
+              aria-pressed={isChecked}
+              className={`flex-1 min-h-11 py-3 px-3 rounded-2xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
+                isChecked
+                  ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-emerald-500/20'
+                  : isTimerRunning
+                  ? 'bg-emerald-600 text-zinc-950 border-emerald-400 animate-pulse'
+                  : 'bg-zinc-800/80 text-zinc-200 border-zinc-700/60 hover:bg-zinc-700'
+              }`}
+            >
+              {isTimerRunning ? `${timerRemaining !== undefined ? timerRemaining : actualReps}s` : isChecked ? <i className="fa-solid fa-check text-lg" aria-hidden="true" /> : `${actualReps}s`}
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={!isWorkoutActive}
+              onPointerDown={() => handlePointerDown(setIdx, prefillData)}
+              onPointerUp={() => handlePointerUp(setIdx, ex.pause || 0, prefillData, actualReps)}
+              onPointerLeave={handlePointerCancel}
+              aria-label={isChecked ? `Serie ${setIdx + 1} completata` : isCardio ? `Segna serie ${setIdx + 1} completata` : `Completa serie ${setIdx + 1} da ${actualReps} ripetizioni`}
+              aria-pressed={isChecked}
+              className={`flex-1 min-h-11 py-3 px-3 rounded-2xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
+                isChecked
+                  ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-emerald-500/20'
+                  : 'bg-zinc-800/80 text-zinc-200 border-zinc-700/60 hover:bg-zinc-700'
+              }`}
+            >
+              {isChecked ? (
+                (isCardio || actualReps === defaultTargetReps) ? (
+                  <i className="fa-solid fa-check text-lg" aria-hidden="true" />
                 ) : (
-                  <button
-                    type="button"
-                    disabled={!isWorkoutActive}
-                    onPointerDown={() => handlePointerDown(setIdx, prefillData)}
-                    onPointerUp={() => handlePointerUp(setIdx, ex.pause || 0, prefillData, actualReps)}
-                    onPointerLeave={handlePointerCancel}
-                    className={`w-28 py-3.5 rounded-2xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
-                      isChecked
-                        ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-emerald-500/20'
-                        : 'bg-zinc-800/80 text-zinc-200 border-zinc-700/60 hover:bg-zinc-700'
-                    }`}
-                  >
-                    {isChecked ? (
-                      (isCardio || actualReps === defaultTargetReps) ? (
-                        <i className="fa-solid fa-check text-lg" />
-                      ) : (
-                        `${actualReps} reps`
-                      )
-                    ) : (
-                      isCardio ? 'Fatto' : `${actualReps} reps`
-                    )}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  disabled={!isWorkoutActive}
-                  onClick={() => onOpenEffortModal(setId, isCardio)}
-                  className={`border text-[10px] font-extrabold flex-1 py-3.5 rounded-2xl outline-none uppercase tracking-wider shadow-sm transition-all active:scale-[0.98] ${
-                    currentEffort !== undefined && currentEffort !== ''
-                      ? 'text-zinc-100 border-zinc-500 bg-zinc-700'
-                      : displayEffort !== undefined && displayEffort !== ''
-                      ? 'text-emerald-400 border-dashed border-emerald-700/60 bg-emerald-950/20'
-                      : 'text-zinc-400 border-zinc-700/60 bg-zinc-900/50 hover:bg-zinc-800/80'
-                  }`}
-                >
-                  {displayEffort !== undefined && displayEffort !== ''
-                    ? displayEffort === '-1'
-                      ? 'CED'
-                      : `${isCardio ? 'RPE' : 'RIR'} ${displayEffort}`
-                    : isCardio ? 'RPE' : 'RIR'}
-                </button>
-              </div>
+                  `${actualReps} reps`
+                )
+              ) : (
+                isCardio ? 'Fatto' : `${actualReps} reps`
+              )}
+            </button>
+          );
+
+          const effortButton = (
+            <button
+              type="button"
+              disabled={!isWorkoutActive}
+              onClick={() => onOpenEffortModal(setId, isCardio)}
+              aria-label={`${isCardio ? 'Imposta RPE' : 'Imposta RIR'} serie ${setIdx + 1}`}
+              className={`border text-xs font-extrabold min-w-[96px] min-h-11 px-3 py-3 rounded-2xl outline-none uppercase tracking-wider shadow-sm transition-all active:scale-[0.98] shrink-0 ${
+                currentEffort !== undefined && currentEffort !== ''
+                  ? 'text-zinc-100 border-zinc-500 bg-zinc-700'
+                  : displayEffort !== undefined && displayEffort !== ''
+                  ? 'text-emerald-400 border-dashed border-emerald-700/60 bg-emerald-950/20'
+                  : 'text-zinc-300 border-zinc-700/60 bg-zinc-900/50 hover:bg-zinc-800/80'
+              }`}
+            >
+              {displayEffort !== undefined && displayEffort !== ''
+                ? displayEffort === '-1'
+                  ? 'CED'
+                  : `${isCardio ? 'RPE' : 'RIR'} ${displayEffort}`
+                : isCardio ? 'RPE' : 'RIR'}
+            </button>
+          );
+
+          return (
+            <div key={setIdx} className="flex flex-col gap-2">
+              {!isCardio ? (
+                <div className="bg-zinc-950/35 border border-zinc-800/60 rounded-2xl p-2 space-y-2">
+                  {/* Riga 1: Serie + Carico (input 16px ampio e anti-zoom iOS) */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black text-zinc-300 w-14 min-h-11 flex items-center justify-center uppercase tracking-wider bg-zinc-950/80 border border-zinc-800/80 rounded-2xl shadow-sm shrink-0">
+                      S{setIdx + 1}
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      disabled={!isWorkoutActive}
+                      value={displayWeight}
+                      onChange={(e) => onSaveSetWeight(setId, e.target.value)}
+                      placeholder={ex.metricType === 'bodyweight' ? 'Zavorra (+kg)' : 'Carico (kg)'}
+                      aria-label={`Carico serie ${setIdx + 1} in kg`}
+                      className="flex-1 min-w-0 min-h-11 bg-zinc-950/80 text-white px-3 py-2.5 rounded-2xl border border-zinc-800/80 text-center font-bold text-base placeholder:text-zinc-400 shadow-inner outline-none focus:border-emerald-500/50 disabled:opacity-50 transition-colors"
+                    />
+                  </div>
+                  {/* Riga 2: Completamento/Timer + RIR */}
+                  <div className="flex items-center gap-2">
+                    {setActionButton}
+                    {effortButton}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black text-zinc-300 w-12 min-h-11 flex items-center justify-center uppercase tracking-wider bg-zinc-950/80 border border-zinc-800/80 rounded-2xl shadow-sm shrink-0">
+                    S{setIdx + 1}
+                  </span>
+                  {setActionButton}
+                  {effortButton}
+                </div>
+              )}
 
               {isCardio && ex.cardioFields && ex.cardioFields.length > 0 && (
-                <div className="flex flex-wrap gap-2 pl-14 mt-1">
+                <div className="grid grid-cols-2 gap-2 mt-0.5">
                   {ex.cardioFields.map(cf => (
-                    <div key={cf.id} className="flex-1 min-w-[90px] bg-zinc-950/80 rounded-xl border border-zinc-800/60 p-2 flex items-center shadow-inner">
-                      <span className="text-[9px] text-zinc-500 uppercase font-bold w-1/2 truncate pr-1">{cf.label}</span>
+                    <div key={cf.id} className="bg-zinc-950/80 rounded-xl border border-zinc-800/60 p-2.5 shadow-inner">
+                      <span className="text-[11px] text-zinc-400 uppercase font-bold block mb-1 truncate">{cf.label}</span>
                       <input
                         type="text"
                         inputMode="decimal"
@@ -540,7 +582,8 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                         value={state.setCustomFields?.[setId]?.[cf.id] || ''}
                         onChange={(e) => onSaveCustomField(setId, cf.id, e.target.value)}
                         placeholder={hist?.customFields?.[cf.id] ? String(hist.customFields[cf.id]) : cf.unit}
-                        className="bg-transparent text-white text-xs font-bold w-1/2 outline-none text-right disabled:opacity-50"
+                        aria-label={`${cf.label} serie ${setIdx + 1}`}
+                        className="bg-transparent text-white text-base font-bold w-full outline-none min-h-11 placeholder:text-zinc-400 disabled:opacity-50"
                       />
                     </div>
                   ))}
@@ -556,15 +599,15 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
         <div className="mt-3 pt-2.5 border-t border-zinc-800/40 flex items-center justify-between">
           <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-xl bg-zinc-950/80 border border-zinc-800/80 text-[11px] font-bold shadow-sm max-w-full truncate">
             {coachAdvice.badge === 'increase' ? (
-              <i className="fa-solid fa-arrow-trend-up text-emerald-400 text-xs shrink-0" />
+              <i className="fa-solid fa-arrow-trend-up text-emerald-400 text-xs shrink-0" aria-hidden="true" />
             ) : coachAdvice.badge === 'stall' ? (
-              <i className="fa-solid fa-triangle-exclamation text-amber-400 text-xs shrink-0" />
+              <i className="fa-solid fa-triangle-exclamation text-amber-400 text-xs shrink-0" aria-hidden="true" />
             ) : coachAdvice.badge === 'deload' ? (
-              <i className="fa-solid fa-battery-half text-amber-400 text-xs shrink-0" />
+              <i className="fa-solid fa-battery-half text-amber-400 text-xs shrink-0" aria-hidden="true" />
             ) : coachAdvice.badge === 'decrease' ? (
-              <i className="fa-solid fa-arrow-trend-down text-rose-400 text-xs shrink-0" />
+              <i className="fa-solid fa-arrow-trend-down text-rose-400 text-xs shrink-0" aria-hidden="true" />
             ) : (
-              <i className="fa-solid fa-bullseye text-emerald-400 text-xs shrink-0" />
+              <i className="fa-solid fa-bullseye text-emerald-400 text-xs shrink-0" aria-hidden="true" />
             )}
             <span
               className={`truncate ${

@@ -31,6 +31,8 @@ import { extractBiaFromPdf, ExtractedBiaData } from './utils/pdfExtractor';
 import { computeStreakFromSessions } from './utils/domain';
 import { safeSetInterval, safeClearInterval } from './utils/workerTimer';
 import { validateSetData } from './utils/validation';
+import { useSupabaseAuth } from './hooks/useSupabaseAuth';
+import { useCloudSync } from './hooks/useCloudSync';
 
 import { Header } from './components/Header';
 import { SideMenu } from './components/SideMenu';
@@ -45,6 +47,7 @@ import { PRModal } from './components/PRModal';
 import { SyncModal } from './components/SyncModal';
 import { HistoryModal } from './components/HistoryModal';
 import { VideoModal } from './components/VideoModal';
+import { CloudConflictModal } from './components/CloudConflictModal';
 
 const sanitizeNumericInput = (val: string | number): string => {
   if (val === undefined || val === null) return '';
@@ -61,6 +64,14 @@ const sanitizeNumericInput = (val: string | number): string => {
 export default function App() {
   const [state, setState] = useState<AppState | null>(null);
   const stateRef = useRef<AppState | null>(null); // 🔴 NUOVO: Riferimento silenzioso per la memoria
+  const {
+    user: authUser,
+    isAuthAvailable,
+    isAuthLoading,
+    signIn: handleAuthSignIn,
+    signUp: handleAuthSignUp,
+    signOut: handleAuthSignOut
+  } = useSupabaseAuth();
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
   const [videoModalUrl, setVideoModalUrl] = useState<string | null>(null);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
@@ -156,6 +167,29 @@ export default function App() {
       wakeLockRef.current = null;
     }
   }, []);
+
+  const handleApplyCloudState = useCallback(async (nextState: AppState, deletedSessionIds?: string[]) => {
+    await saveGymState(nextState, true, undefined, deletedSessionIds);
+    stateRef.current = nextState;
+    setState(nextState);
+  }, []);
+
+  const {
+    syncStatus: cloudSyncStatus,
+    syncError: cloudSyncError,
+    lastCloudSavedAt,
+    conflict: cloudConflict,
+    isResolvingConflict: isResolvingCloudConflict,
+    syncNow: handleCloudSyncNow,
+    downloadFromCloud: handleDownloadFromCloud,
+    resolveConflict: handleResolveCloudConflict
+  } = useCloudSync({
+    user: authUser,
+    isAuthLoading,
+    state,
+    stateRef,
+    onApplyState: handleApplyCloudState
+  });
 
   useEffect(() => {
     loadGymState().then((loaded) => {
@@ -1489,8 +1523,8 @@ export default function App() {
 
   if (!state) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-950 text-zinc-400 gap-3">
-        <i className="fa-solid fa-dumbbell text-3xl text-emerald-500 animate-bounce" />
+      <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-950 text-zinc-300 gap-3">
+        <i className="fa-solid fa-dumbbell text-3xl text-emerald-500 animate-bounce" aria-hidden="true" />
         <p className="text-xs font-bold uppercase tracking-wider">Caricamento MyGym Tracker...</p>
       </div>
     );
@@ -1640,7 +1674,7 @@ export default function App() {
             {state.isEditMode && (
               <div className="bg-emerald-950/20 text-emerald-400 p-4 rounded-3xl flex justify-between items-center border border-emerald-900/30 mb-2 shadow-sm">
                 <div className="flex items-center gap-2.5">
-                  <i className="fa-solid fa-pen-to-square text-lg" />
+                  <i className="fa-solid fa-pen-to-square text-lg" aria-hidden="true" />
                   <span className="text-xs font-black uppercase tracking-wider">Modalità Modifica Attiva</span>
                 </div>
                 <button
@@ -1660,7 +1694,7 @@ export default function App() {
                       return next;
                     });
                   }}
-                  className="bg-emerald-500 text-zinc-950 px-4 py-2 rounded-xl text-xs font-bold outline-none active:scale-95 transition-transform"
+                  className="min-h-11 bg-emerald-500 text-zinc-950 px-4 py-2.5 rounded-xl text-xs font-bold outline-none active:scale-95 transition-transform"
                 >
                   Fatto ✓
                 </button>
@@ -1686,13 +1720,14 @@ export default function App() {
                           };
                         });
                       }}
-                      className={`text-xs font-bold px-3 py-1.5 rounded-2xl border flex items-center gap-1.5 transition-all ${
+                      aria-pressed={Boolean(state.favoriteTabs[currentTab.id])}
+                      className={`min-h-11 text-xs font-bold px-3.5 py-2.5 rounded-2xl border flex items-center gap-1.5 transition-all ${
                         state.favoriteTabs[currentTab.id]
                           ? 'bg-amber-950/30 text-amber-400 border-amber-900/50 shadow-sm'
-                          : 'bg-zinc-900 text-zinc-400 border-zinc-800'
+                          : 'bg-zinc-900 text-zinc-300 border-zinc-800'
                       }`}
                     >
-                      <i className={`fa-${state.favoriteTabs[currentTab.id] ? 'solid' : 'regular'} fa-star`} />
+                      <i className={`fa-${state.favoriteTabs[currentTab.id] ? 'solid' : 'regular'} fa-star`} aria-hidden="true" />
                       {state.favoriteTabs[currentTab.id] ? 'Scheda Preferita' : 'Imposta come Preferita'}
                     </button>
                   </div>
@@ -1710,17 +1745,18 @@ export default function App() {
                       });
                     }}
                     placeholder="Sottotitolo (es. Spalle & Braccia, Gambe Focus)"
-                    className="w-full bg-zinc-900/80 text-zinc-200 text-xs font-bold rounded-2xl p-4 outline-none border border-zinc-800/80 focus:border-emerald-500 shadow-inner"
+                    aria-label="Sottotitolo scheda"
+                    className="w-full min-h-11 bg-zinc-900/80 text-zinc-100 placeholder:text-zinc-400 text-base font-bold rounded-2xl p-4 outline-none border border-zinc-800/80 focus:border-emerald-500 shadow-inner"
                   />
                 </div>
               ) : isWorkoutActive ? (
                 <div className="flex justify-between items-center bg-emerald-950/20 border border-emerald-900/40 p-4 rounded-3xl shadow-sm backdrop-blur-sm">
                   <div>
-                    <h2 className="text-emerald-500/70 font-bold uppercase tracking-wider text-[10px]">
+                    <h2 className="text-emerald-400 font-bold uppercase tracking-wider text-[11px]">
                       {currentTab.subtitle || 'Sessione Workout'}
                     </h2>
                     <div className="text-emerald-400 font-black text-sm flex items-center gap-2 mt-0.5">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" aria-hidden="true" />
                       Sessione in corso
                       <span className="ml-2 font-mono bg-emerald-900/40 px-2 py-0.5 rounded-md text-emerald-300 border border-emerald-800/60 text-xs shadow-sm">
                         {Math.floor(workoutLiveSec / 60)
@@ -1733,9 +1769,9 @@ export default function App() {
                   </div>
                 </div>
               ) : (
-                <div className="flex justify-between items-center bg-zinc-900/50 p-4 rounded-3xl border border-zinc-800/50 shadow-sm backdrop-blur-sm">
+                <div className="flex justify-between items-center bg-zinc-900/50 p-4 rounded-3xl border border-zinc-800/50 shadow-sm backdrop-blur-sm gap-3">
                   <div>
-                    <h2 className="text-zinc-500 font-bold uppercase tracking-wider text-[10px]">
+                    <h2 className="text-zinc-400 font-bold uppercase tracking-wider text-[11px]">
                       {currentTab.subtitle || 'Pronto per iniziare?'}
                     </h2>
                     <div className="text-white font-extrabold text-sm">{currentTab.name}</div>
@@ -1743,9 +1779,9 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => handleStartWorkout(currentTab.id)}
-                    className="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 px-6 py-3 rounded-2xl font-bold transition-all flex items-center gap-2 outline-none text-xs shadow-md active:scale-95"
+                    className="min-h-11 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 px-6 py-3 rounded-2xl font-bold transition-all flex items-center gap-2 outline-none text-xs shadow-md active:scale-95 shrink-0"
                   >
-                    <i className="fa-solid fa-play" /> Inizia
+                    <i className="fa-solid fa-play" aria-hidden="true" /> Inizia
                   </button>
                 </div>
               )}
@@ -2259,9 +2295,9 @@ export default function App() {
                       return next;
                     });
                   }}
-                  className="flex-1 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-100 py-4 rounded-3xl font-bold border border-zinc-800/80 flex items-center justify-center gap-2 text-xs transition-all shadow-sm active:scale-95"
+                  className="flex-1 min-h-11 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-100 py-4 rounded-3xl font-bold border border-zinc-800/80 flex items-center justify-center gap-2 text-xs transition-all shadow-sm active:scale-95"
                 >
-                  <i className="fa-solid fa-plus text-emerald-400" /> Aggiungi Singolo
+                  <i className="fa-solid fa-plus text-emerald-400" aria-hidden="true" /> Aggiungi Singolo
                 </button>
                 <button
                   type="button"
@@ -2287,9 +2323,9 @@ export default function App() {
                       return next;
                     });
                   }}
-                  className="flex-1 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-100 py-4 rounded-3xl font-bold border border-zinc-800/80 flex items-center justify-center gap-2 text-xs transition-all shadow-sm active:scale-95"
+                  className="flex-1 min-h-11 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-100 py-4 rounded-3xl font-bold border border-zinc-800/80 flex items-center justify-center gap-2 text-xs transition-all shadow-sm active:scale-95"
                 >
-                  <i className="fa-solid fa-plus text-amber-400" /> Aggiungi Circuito
+                  <i className="fa-solid fa-plus text-amber-400" aria-hidden="true" /> Aggiungi Circuito
                 </button>
               </div>
             )}
@@ -2301,37 +2337,37 @@ export default function App() {
                   type="button"
                   disabled={isSaving}
                   onClick={() => handleStopWorkout(currentTab.id)}
-                  className={`w-full py-4 rounded-3xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg active:scale-[0.98] ${
+                  className={`w-full min-h-11 py-4 rounded-3xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg active:scale-[0.98] ${
                     isSaving
-                      ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
+                      ? 'bg-zinc-800 text-zinc-400 cursor-not-allowed'
                       : 'bg-emerald-500 hover:bg-emerald-400 text-zinc-950'
                   }`}
                 >
                   {isSaving ? (
                     <>
-                      <i className="fa-solid fa-spinner fa-spin" /> Salvataggio in corso...
+                      <i className="fa-solid fa-spinner fa-spin" aria-hidden="true" /> Salvataggio in corso...
                     </>
                   ) : (
                     <>
-                      <i className="fa-solid fa-flag-checkered" /> Termina Allenamento
+                      <i className="fa-solid fa-flag-checkered" aria-hidden="true" /> Termina Allenamento
                     </>
                   )}
                 </button>
                 <button
                   type="button"
                   onClick={() => handleResetSession(currentTab.id)}
-                  className="text-zinc-500 hover:text-zinc-300 text-xs font-semibold py-3 transition-colors flex items-center gap-1.5 mt-2"
+                  className="min-h-11 text-zinc-400 hover:text-zinc-200 text-xs font-semibold px-4 py-3 transition-colors flex items-center gap-1.5 mt-2"
                 >
-                  <i className="fa-solid fa-rotate-left" /> Ricomincia sessione di oggi
+                  <i className="fa-solid fa-rotate-left" aria-hidden="true" /> Ricomincia sessione di oggi
                 </button>
               </div>
             )}
 
             {currentTab.exercises.length === 0 && !state.isEditMode && (
-              <div className="text-zinc-500 text-center py-16 text-xs">
+              <div className="text-zinc-400 text-center py-16 text-xs">
                 Questa scheda è vuota.
                 <br />
-                Apri il menu e attiva <b className="text-zinc-300">Modifica</b> per aggiungere esercizi.
+                Apri il menu e attiva <b className="text-zinc-200">Modifica</b> per aggiungere esercizi.
               </div>
             )}
           </div>
@@ -2398,6 +2434,17 @@ export default function App() {
         onOpenHistoryModal={() => setIsHistoryModalOpen(true)}
         onOpenPRModal={() => setIsPRModalOpen(true)}
         onOpenSyncModal={() => setIsSyncModalOpen(true)}
+        authUser={authUser}
+        isAuthAvailable={isAuthAvailable}
+        isAuthLoading={isAuthLoading}
+        onSignIn={handleAuthSignIn}
+        onSignUp={handleAuthSignUp}
+        onSignOut={handleAuthSignOut}
+        cloudSyncStatus={cloudSyncStatus}
+        cloudSyncError={cloudSyncError}
+        lastCloudSavedAt={lastCloudSavedAt}
+        onSyncNow={handleCloudSyncNow}
+        onDownloadFromCloud={handleDownloadFromCloud}
       />
 
       {/* Effort Modal (RIR / RPE) */}
@@ -2553,6 +2600,14 @@ export default function App() {
 
       {/* Video Modal */}
       <VideoModal url={videoModalUrl} onClose={() => setVideoModalUrl(null)} />
+
+      {/* Cloud Conflict Resolution Modal */}
+      <CloudConflictModal
+        conflict={cloudConflict}
+        isResolving={isResolvingCloudConflict}
+        error={cloudSyncError}
+        onResolve={handleResolveCloudConflict}
+      />
     </div>
   );
 }

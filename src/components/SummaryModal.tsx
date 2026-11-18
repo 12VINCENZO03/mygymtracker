@@ -391,37 +391,39 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({
         {/* Intestazione */}
         <div className="text-center mb-4">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 mb-2 border border-emerald-500/30">
-            <i className="fa-solid fa-ranking-star text-xl" />
+            <i className="fa-solid fa-ranking-star text-xl" aria-hidden="true" />
           </div>
           <h3 className="text-white font-black text-xl">Allenamento Completato!</h3>
-          <p className="text-xs text-zinc-400 mt-1">
+          <p className="text-xs text-zinc-300 mt-1">
             {newSnapshot.tabNameSnapshot} • Durata: {newSnapshot.durationStr} • Serie: {totalSetsCount}
           </p>
         </div>
 
         {/* Segmented Control: Record vs Diagnosi Coach */}
-        <div className="flex bg-zinc-950 p-1 rounded-2xl border border-zinc-800 mb-3.5 text-xs font-bold">
+        <div className="flex bg-zinc-950 p-1 rounded-2xl border border-zinc-800 mb-3.5 text-xs font-bold gap-2">
           <button
             type="button"
             onClick={() => setActiveTab('records')}
-            className={`flex-1 py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+            aria-pressed={activeTab === 'records'}
+            className={`flex-1 min-h-11 py-2 px-2 rounded-xl transition-all flex items-center justify-center gap-1.5 outline-none ${
               activeTab === 'records'
                 ? 'bg-emerald-500 text-zinc-950 font-black shadow-sm'
-                : 'text-zinc-400 hover:text-white'
+                : 'text-zinc-300 hover:text-white'
             }`}
           >
-            <i className="fa-solid fa-trophy text-[11px]" /> Record & Progressi ({comparisonItems.length})
+            <i className="fa-solid fa-trophy text-[11px]" aria-hidden="true" /> Record & Progressi ({comparisonItems.length})
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('diagnostics')}
-            className={`flex-1 py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+            aria-pressed={activeTab === 'diagnostics'}
+            className={`flex-1 min-h-11 py-2 px-2 rounded-xl transition-all flex items-center justify-center gap-1.5 outline-none ${
               activeTab === 'diagnostics'
                 ? 'bg-emerald-500 text-zinc-950 font-black shadow-sm'
-                : 'text-zinc-400 hover:text-white'
+                : 'text-zinc-300 hover:text-white'
             }`}
           >
-            <i className="fa-solid fa-brain text-[11px]" /> Diagnosi Fisiologica ({detailedDiagnostics.length})
+            <i className="fa-solid fa-brain text-[11px]" aria-hidden="true" /> Diagnosi Fisiologica ({detailedDiagnostics.length})
           </button>
         </div>
 
@@ -456,24 +458,24 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({
                 >
                   <div className="mt-0.5 shrink-0 text-base">
                     {isPr ? (
-                      <i className="fa-solid fa-trophy text-amber-400" />
+                      <i className="fa-solid fa-trophy text-amber-400" aria-hidden="true" />
                     ) : isNeural ? (
-                      <i className="fa-solid fa-brain text-amber-400" />
+                      <i className="fa-solid fa-brain text-amber-400" aria-hidden="true" />
                     ) : isEmom ? (
-                      <i className="fa-solid fa-stopwatch text-amber-400" />
+                      <i className="fa-solid fa-stopwatch text-amber-400" aria-hidden="true" />
                     ) : isReps ? (
-                      <i className="fa-solid fa-repeat text-emerald-400" />
+                      <i className="fa-solid fa-repeat text-emerald-400" aria-hidden="true" />
                     ) : isTut ? (
-                      <i className="fa-solid fa-hourglass-half text-emerald-400" />
+                      <i className="fa-solid fa-hourglass-half text-emerald-400" aria-hidden="true" />
                     ) : isWorse ? (
-                      <i className="fa-solid fa-arrow-trend-down text-rose-400" />
+                      <i className="fa-solid fa-arrow-trend-down text-rose-400" aria-hidden="true" />
                     ) : (
-                      <i className="fa-solid fa-check text-emerald-400" />
+                      <i className="fa-solid fa-check text-emerald-400" aria-hidden="true" />
                     )}
                   </div>
                   <div className="flex-1">
                     <div className="font-extrabold text-xs text-white tracking-wide">{item.title}</div>
-                    <div className="text-[11px] text-zinc-400 mt-1 leading-relaxed">
+                    <div className="text-xs text-zinc-300 mt-1 leading-relaxed">
                       {item.description}
                     </div>
                   </div>
@@ -488,7 +490,7 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-extrabold text-xs text-white truncate">{diag.name}</span>
-                  <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${
+                  <span className={`text-[11px] font-black uppercase px-2 py-0.5 rounded-md ${
                     diag.badge === 'increase'
                       ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                       : diag.badge === 'stall'
@@ -501,23 +503,23 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({
                   </span>
                 </div>
 
-                <div className="text-[11px] text-zinc-300 leading-relaxed bg-zinc-950/60 p-2.5 rounded-xl border border-zinc-900">
-                  <span className="text-[10px] uppercase font-bold text-zinc-500 block mb-0.5">Diagnosi Fisiologica</span>
+                <div className="text-xs text-zinc-300 leading-relaxed bg-zinc-950/60 p-2.5 rounded-xl border border-zinc-900">
+                  <span className="text-[11px] uppercase font-bold text-zinc-400 block mb-0.5">Diagnosi Fisiologica</span>
                   {diag.diagnosis}
                 </div>
 
                 {diag.action && (
-                  <div className="text-[11px] text-emerald-300 font-medium leading-relaxed bg-emerald-950/20 p-2.5 rounded-xl border border-emerald-900/30 flex items-start gap-2">
-                    <i className="fa-solid fa-bullseye text-emerald-400 text-xs mt-0.5 shrink-0" />
+                  <div className="text-xs text-emerald-300 font-medium leading-relaxed bg-emerald-950/20 p-2.5 rounded-xl border border-emerald-900/30 flex items-start gap-2">
+                    <i className="fa-solid fa-bullseye text-emerald-400 text-xs mt-0.5 shrink-0" aria-hidden="true" />
                     <div>
-                      <span className="text-[10px] uppercase font-bold text-emerald-400 block mb-0.5">Azione Prescritta</span>
+                      <span className="text-[11px] uppercase font-bold text-emerald-400 block mb-0.5">Azione Prescritta</span>
                       {diag.action}
                     </div>
                   </div>
                 )}
 
                 {diag.fatigueAlert && (
-                  <div className="text-[10px] text-amber-300 bg-amber-950/30 p-2 rounded-xl border border-amber-900/40">
+                  <div className="text-[11px] text-amber-300 bg-amber-950/30 p-2 rounded-xl border border-amber-900/40">
                     <b className="text-amber-400">Allerta Fatica:</b> {diag.fatigueAlert}
                   </div>
                 )}
@@ -529,9 +531,9 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({
         <button
           type="button"
           onClick={onClose}
-          className="w-full bg-emerald-500 hover:bg-emerald-400 text-zinc-950 py-3.5 rounded-2xl font-black transition flex items-center justify-center gap-2 outline-none shadow-sm mt-4 text-sm active:scale-[0.98]"
+          className="w-full min-h-11 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 py-3.5 rounded-2xl font-black transition flex items-center justify-center gap-2 outline-none shadow-sm mt-4 text-sm active:scale-[0.98]"
         >
-          <i className="fa-solid fa-check" /> Chiudi e Riposa
+          <i className="fa-solid fa-check" aria-hidden="true" /> Chiudi e Riposa
         </button>
       </div>
     </>

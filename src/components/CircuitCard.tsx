@@ -109,34 +109,36 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
 
   if (isEditMode) {
     return (
-      <div className="bg-zinc-900/60 rounded-3xl p-5 mb-5 shadow-sm border border-zinc-800/40 backdrop-blur-sm relative animate-in fade-in">
+      <div className="bg-zinc-900/60 rounded-3xl p-5 pt-7 mb-5 shadow-sm border border-zinc-800/40 backdrop-blur-sm relative animate-in fade-in">
         {/* Reorder Circuit */}
-        <div className="absolute -top-3 -right-2 bg-emerald-500 text-zinc-950 rounded-full flex items-center shadow-md border-2 border-zinc-950 overflow-hidden text-[10px] font-black z-10">
+        <div className="absolute -top-4 right-2 flex items-center gap-2 z-10">
           <button
             type="button"
             disabled={isFirst}
             onClick={() => onMoveCircuit(-1)}
-            className="px-2 py-1 hover:bg-emerald-400 disabled:opacity-30 outline-none transition-colors"
+            aria-label={`Sposta circuito ${circuit.name || ''} su`}
+            className="w-11 h-11 min-w-11 min-h-11 rounded-full bg-emerald-500 text-zinc-950 flex items-center justify-center shadow-md border-2 border-zinc-950 hover:bg-emerald-400 disabled:opacity-40 outline-none transition-colors"
           >
-            <i className="fa-solid fa-chevron-up" />
+            <i className="fa-solid fa-chevron-up text-xs" aria-hidden="true" />
           </button>
-          <div className="w-px h-3 bg-zinc-950/30" />
           <button
             type="button"
             disabled={isLast}
             onClick={() => onMoveCircuit(1)}
-            className="px-2 py-1 hover:bg-emerald-400 disabled:opacity-30 outline-none transition-colors"
+            aria-label={`Sposta circuito ${circuit.name || ''} giù`}
+            className="w-11 h-11 min-w-11 min-h-11 rounded-full bg-emerald-500 text-zinc-950 flex items-center justify-center shadow-md border-2 border-zinc-950 hover:bg-emerald-400 disabled:opacity-40 outline-none transition-colors"
           >
-            <i className="fa-solid fa-chevron-down" />
+            <i className="fa-solid fa-chevron-down text-xs" aria-hidden="true" />
           </button>
         </div>
 
         <div className="mb-4 flex flex-col gap-3">
-          <div className="flex justify-between items-center gap-3">
+          <div className="flex justify-between items-center gap-2">
             <select
               value={circuit.structureType}
               onChange={(e) => onUpdateCircuit('structureType', e.target.value)}
-              className="bg-emerald-950/20 text-emerald-400 text-xs font-black uppercase tracking-wider p-3 rounded-2xl outline-none border border-emerald-900/50 shadow-inner"
+              aria-label="Tipo di struttura circuito"
+              className="flex-1 min-h-11 bg-emerald-950/20 text-emerald-400 text-base font-black uppercase tracking-wider px-3 py-2.5 rounded-2xl outline-none border border-emerald-900/50 shadow-inner"
             >
               <option value="classic">⚙️ Circuito Classico</option>
               <option value="emom">⏱️ EMOM</option>
@@ -145,9 +147,10 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
             <button
               type="button"
               onClick={onDeleteCircuit}
-              className="text-rose-400 p-3 bg-rose-950/30 border border-rose-900/30 rounded-2xl outline-none hover:bg-rose-900/50 active:scale-95 transition-all shadow-sm"
+              aria-label={`Elimina circuito ${circuit.name || ''}`}
+              className="w-11 h-11 min-w-11 min-h-11 flex items-center justify-center text-rose-400 bg-rose-950/30 border border-rose-900/30 rounded-2xl outline-none hover:bg-rose-900/50 active:scale-95 transition-all shadow-sm shrink-0"
             >
-              <i className="fa-solid fa-trash text-sm" />
+              <i className="fa-solid fa-trash text-sm" aria-hidden="true" />
             </button>
           </div>
           <input
@@ -155,28 +158,30 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
             value={circuit.name}
             onChange={(e) => onUpdateCircuit('name', e.target.value)}
             placeholder="Nome Circuito"
-            className="bg-zinc-950 text-white font-extrabold p-3.5 rounded-2xl w-full outline-none text-sm border border-zinc-800/80 shadow-inner focus:border-emerald-500 transition-colors"
+            aria-label="Nome circuito"
+            className="bg-zinc-950 text-white font-extrabold px-3.5 py-2.5 min-h-11 rounded-2xl w-full outline-none text-base border border-zinc-800/80 shadow-inner focus:border-emerald-500 transition-colors"
           />
         </div>
 
         {/* Structure Parameters */}
-        <div className="flex flex-wrap gap-2 mb-5">
+        <div className="grid grid-cols-2 gap-2.5 mb-5">
           {!isEmom && !isAmrap && (
             <>
-              <div className="flex items-center bg-zinc-950 border border-zinc-800/80 rounded-2xl p-2 flex-1 min-w-[90px] shadow-inner">
-                <span className="text-[9px] text-zinc-500 font-extrabold uppercase ml-2 w-8 tracking-wider">Giri</span>
+              <div className="bg-zinc-950 border border-zinc-800/80 rounded-2xl p-2.5 shadow-inner text-center">
+                <span className="text-[11px] text-zinc-400 font-extrabold uppercase tracking-wider block">Giri</span>
                 <input
                   type="number"
                   min={1}
                   max={20}
                   value={circuit.rounds !== undefined ? circuit.rounds : 3}
                   onChange={(e) => onUpdateCircuit('rounds', parseInt(e.target.value) || 0)}
-                  className="bg-transparent text-white font-bold w-full text-center outline-none text-sm"
+                  aria-label="Numero di giri"
+                  className="bg-transparent text-white font-bold w-full text-center outline-none text-base min-h-11"
                 />
               </div>
-              <div className="flex items-center bg-zinc-950 border border-zinc-800/80 rounded-2xl p-2 flex-[2] min-w-[140px] shadow-inner">
-                <span className="text-[9px] text-zinc-500 font-extrabold uppercase ml-2 w-14 tracking-wider">Recupero</span>
-                <div className="flex items-center w-full gap-2 justify-end">
+              <div className="bg-zinc-950 border border-zinc-800/80 rounded-2xl p-2.5 shadow-inner flex flex-col justify-between">
+                <span className="text-[11px] text-zinc-400 font-extrabold uppercase tracking-wider block text-center">Recupero</span>
+                <div className="flex items-center w-full gap-2 justify-center">
                   <button
                     type="button"
                     onClick={() => {
@@ -187,7 +192,9 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                         onUpdateCircuit('pause', circuit.previousPause !== undefined ? circuit.previousPause : 90);
                       }
                     }}
-                    className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase transition-colors ${circuit.pause !== 0 ? 'bg-emerald-500 text-zinc-950' : 'bg-zinc-800 text-zinc-400'}`}
+                    aria-pressed={circuit.pause !== 0}
+                    aria-label="Attiva o disattiva recupero tra i giri"
+                    className={`min-h-11 min-w-11 px-3 py-2 rounded-xl text-xs font-black uppercase transition-colors ${circuit.pause !== 0 ? 'bg-emerald-500 text-zinc-950' : 'bg-zinc-800 text-zinc-300'}`}
                   >
                     {circuit.pause !== 0 ? 'Sì' : 'No'}
                   </button>
@@ -198,7 +205,8 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                       min={0}
                       value={circuit.pause !== undefined ? circuit.pause : 90}
                       onChange={(e) => onUpdateCircuit('pause', Math.max(0, parseInt(e.target.value) || 0))}
-                      className="bg-transparent text-white font-bold w-12 text-center outline-none text-sm"
+                      aria-label="Secondi recupero tra i giri"
+                      className="bg-zinc-900 border border-zinc-700/60 rounded-xl text-white font-bold w-16 min-h-11 text-center outline-none text-base"
                     />
                   )}
                 </div>
@@ -208,24 +216,26 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
 
           {isEmom && (
             <>
-              <div className="flex items-center bg-zinc-950 border border-zinc-800/80 rounded-2xl p-2 flex-1 min-w-[100px] shadow-inner">
-                <span className="text-[9px] text-zinc-500 font-extrabold uppercase ml-2 w-16 tracking-wider">Min. Totali</span>
+              <div className="bg-zinc-950 border border-zinc-800/80 rounded-2xl p-2.5 shadow-inner text-center">
+                <span className="text-[11px] text-zinc-400 font-extrabold uppercase tracking-wider block">Min. Totali</span>
                 <input
                   type="number"
                   min={1}
                   value={circuit.emomTotalMin !== undefined ? circuit.emomTotalMin : 10}
                   onChange={(e) => onUpdateCircuit('emomTotalMin', parseInt(e.target.value, 10) || 0)}
-                  className="bg-transparent text-white font-bold w-full text-center outline-none text-sm"
+                  aria-label="Minuti totali EMOM"
+                  className="bg-transparent text-white font-bold w-full text-center outline-none text-base min-h-11"
                 />
               </div>
-              <div className="flex items-center bg-zinc-950 border border-zinc-800/80 rounded-2xl p-2 flex-1 min-w-[100px] shadow-inner">
-                <span className="text-[9px] text-zinc-500 font-extrabold uppercase ml-2 w-16 tracking-wider">Sec/Giro</span>
+              <div className="bg-zinc-950 border border-zinc-800/80 rounded-2xl p-2.5 shadow-inner text-center">
+                <span className="text-[11px] text-zinc-400 font-extrabold uppercase tracking-wider block">Sec/Giro</span>
                 <input
                   type="number"
                   min={5}
                   value={circuit.emomIntervalSec !== undefined ? circuit.emomIntervalSec : 60}
                   onChange={(e) => onUpdateCircuit('emomIntervalSec', parseInt(e.target.value, 10) || 0)}
-                  className="bg-transparent text-white font-bold w-full text-center outline-none text-sm"
+                  aria-label="Secondi per giro EMOM"
+                  className="bg-transparent text-white font-bold w-full text-center outline-none text-base min-h-11"
                 />
               </div>
             </>
@@ -233,25 +243,27 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
 
           {isAmrap && (
             <>
-              <div className="flex items-center bg-zinc-950 border border-zinc-800/80 rounded-2xl p-2 flex-1 min-w-[100px] shadow-inner">
-                <span className="text-[9px] text-zinc-500 font-extrabold uppercase ml-2 w-16 tracking-wider">Min. Totali</span>
+              <div className="bg-zinc-950 border border-zinc-800/80 rounded-2xl p-2.5 shadow-inner text-center">
+                <span className="text-[11px] text-zinc-400 font-extrabold uppercase tracking-wider block">Min. Totali</span>
                 <input
                   type="number"
                   min={1}
                   value={circuit.amrapTotalMin !== undefined ? circuit.amrapTotalMin : 10}
                   onChange={(e) => onUpdateCircuit('amrapTotalMin', parseInt(e.target.value, 10) || 0)}
-                  className="bg-transparent text-white font-bold w-full text-center outline-none text-sm"
+                  aria-label="Minuti totali AMRAP"
+                  className="bg-transparent text-white font-bold w-full text-center outline-none text-base min-h-11"
                 />
               </div>
-              <div className="flex items-center bg-zinc-950 border border-zinc-800/80 rounded-2xl p-2 flex-1 min-w-[100px] shadow-inner">
-                <span className="text-[9px] text-zinc-500 font-extrabold uppercase ml-2 w-16 tracking-wider">Target Giri</span>
+              <div className="bg-zinc-950 border border-zinc-800/80 rounded-2xl p-2.5 shadow-inner text-center">
+                <span className="text-[11px] text-zinc-400 font-extrabold uppercase tracking-wider block">Target Giri</span>
                 <input
                   type="number"
                   min={0}
                   value={circuit.rounds !== undefined ? circuit.rounds : 0}
                   onChange={(e) => onUpdateCircuit('rounds', parseInt(e.target.value, 10) || 0)}
                   placeholder="Opzionale"
-                  className="bg-transparent text-white font-bold w-full text-center outline-none text-sm"
+                  aria-label="Target giri AMRAP"
+                  className="bg-transparent text-white font-bold w-full text-center outline-none text-base min-h-11"
                 />
               </div>
             </>
@@ -266,42 +278,48 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
 
             if (sub.metricType === 'rest') {
               return (
-                <div key={sub.id} className="bg-zinc-950 p-3.5 rounded-2xl border border-zinc-800/80 flex items-center justify-between gap-3 shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <i className="fa-regular fa-clock text-zinc-500 text-sm" />
-                    <span className="text-xs font-bold text-zinc-300">Pausa:</span>
-                    <input
-                      type="number"
-                      min={0}
-                      value={sub.restSeconds || 30}
-                      onChange={(e) => onUpdateSubEx(sub.id, 'restSeconds', Math.max(0, parseInt(e.target.value) || 0))}
-                      className="bg-zinc-900 text-white font-bold w-16 p-2 rounded-xl text-center border border-zinc-700/50 text-xs shadow-inner focus:border-emerald-500 outline-none transition-colors"
-                    />
-                    <span className="text-xs text-zinc-500 font-medium">sec</span>
+                <div key={sub.id} className="bg-zinc-950 p-3.5 rounded-2xl border border-zinc-800/80 flex flex-col gap-3 shadow-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <i className="fa-regular fa-clock text-zinc-400 text-sm" aria-hidden="true" />
+                      <span className="text-xs font-bold text-zinc-200">Pausa:</span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={sub.restSeconds || 30}
+                        onChange={(e) => onUpdateSubEx(sub.id, 'restSeconds', Math.max(0, parseInt(e.target.value) || 0))}
+                        aria-label="Secondi di pausa intermedia"
+                        className="bg-zinc-900 text-white font-bold w-20 px-2 py-2 min-h-11 rounded-xl text-center border border-zinc-700/50 text-base shadow-inner focus:border-emerald-500 outline-none transition-colors"
+                      />
+                      <span className="text-xs text-zinc-400 font-medium">sec</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center justify-end gap-2">
                     <button
                       type="button"
                       disabled={isFirstSub}
                       onClick={() => onMoveSubEx(sub.id, -1)}
-                      className="w-8 h-8 rounded-xl bg-zinc-900 text-zinc-400 disabled:opacity-30 active:scale-95 transition-all"
+                      aria-label="Sposta pausa su"
+                      className="w-11 h-11 min-w-11 min-h-11 rounded-xl bg-zinc-900 text-zinc-300 flex items-center justify-center disabled:opacity-30 active:scale-95 transition-all"
                     >
-                      <i className="fa-solid fa-chevron-up text-[10px]" />
+                      <i className="fa-solid fa-chevron-up text-xs" aria-hidden="true" />
                     </button>
                     <button
                       type="button"
                       disabled={isLastSub}
                       onClick={() => onMoveSubEx(sub.id, 1)}
-                      className="w-8 h-8 rounded-xl bg-zinc-900 text-zinc-400 disabled:opacity-30 active:scale-95 transition-all"
+                      aria-label="Sposta pausa giù"
+                      className="w-11 h-11 min-w-11 min-h-11 rounded-xl bg-zinc-900 text-zinc-300 flex items-center justify-center disabled:opacity-30 active:scale-95 transition-all"
                     >
-                      <i className="fa-solid fa-chevron-down text-[10px]" />
+                      <i className="fa-solid fa-chevron-down text-xs" aria-hidden="true" />
                     </button>
                     <button
                       type="button"
                       onClick={() => onDeleteSubEx(sub.id)}
-                      className="w-8 h-8 rounded-xl bg-rose-950/40 text-rose-400 active:scale-95 transition-all"
+                      aria-label="Elimina pausa intermedia"
+                      className="w-11 h-11 min-w-11 min-h-11 rounded-xl bg-rose-950/40 text-rose-400 flex items-center justify-center active:scale-95 transition-all"
                     >
-                      <i className="fa-solid fa-trash text-[10px]" />
+                      <i className="fa-solid fa-trash text-xs" aria-hidden="true" />
                     </button>
                   </div>
                 </div>
@@ -310,88 +328,106 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
 
             return (
               <div key={sub.id} className="bg-zinc-950 p-4 rounded-2xl border border-zinc-800/80 space-y-3 shadow-sm">
-                <div className="flex justify-between items-center gap-3">
-                  <span className="text-xs font-black text-emerald-400 bg-emerald-500/10 px-2.5 py-1.5 rounded-lg border border-emerald-500/20">
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-xs font-black text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20">
                     {String.fromCharCode(65 + sIdx)}
                   </span>
-                  <input
-                    type="text"
-                    value={sub.name}
-                    onChange={(e) => onUpdateSubEx(sub.id, 'name', e.target.value)}
-                    placeholder="Nome Esercizio"
-                    className="bg-zinc-900 text-white font-bold p-3 rounded-2xl text-xs w-full border border-zinc-700/50 outline-none shadow-inner focus:border-emerald-500 transition-colors"
-                  />
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-2 shrink-0">
                     <button
                       type="button"
                       disabled={isFirstSub}
                       onClick={() => onMoveSubEx(sub.id, -1)}
-                      className="w-8 h-8 rounded-xl bg-zinc-900 text-zinc-400 disabled:opacity-30 active:scale-95 transition-all"
+                      aria-label={`Sposta esercizio ${sub.name || String.fromCharCode(65 + sIdx)} su`}
+                      className="w-11 h-11 min-w-11 min-h-11 rounded-xl bg-zinc-900 text-zinc-300 flex items-center justify-center disabled:opacity-30 active:scale-95 transition-all"
                     >
-                      <i className="fa-solid fa-chevron-up text-[10px]" />
+                      <i className="fa-solid fa-chevron-up text-xs" aria-hidden="true" />
                     </button>
                     <button
                       type="button"
                       disabled={isLastSub}
                       onClick={() => onMoveSubEx(sub.id, 1)}
-                      className="w-8 h-8 rounded-xl bg-zinc-900 text-zinc-400 disabled:opacity-30 active:scale-95 transition-all"
+                      aria-label={`Sposta esercizio ${sub.name || String.fromCharCode(65 + sIdx)} giù`}
+                      className="w-11 h-11 min-w-11 min-h-11 rounded-xl bg-zinc-900 text-zinc-300 flex items-center justify-center disabled:opacity-30 active:scale-95 transition-all"
                     >
-                      <i className="fa-solid fa-chevron-down text-[10px]" />
+                      <i className="fa-solid fa-chevron-down text-xs" aria-hidden="true" />
                     </button>
                     <button
                       type="button"
                       onClick={() => onDeleteSubEx(sub.id)}
-                      className="w-8 h-8 rounded-xl bg-rose-950/40 text-rose-400 active:scale-95 transition-all"
+                      aria-label={`Elimina esercizio ${sub.name || String.fromCharCode(65 + sIdx)}`}
+                      className="w-11 h-11 min-w-11 min-h-11 rounded-xl bg-rose-950/40 text-rose-400 flex items-center justify-center active:scale-95 transition-all"
                     >
-                      <i className="fa-solid fa-trash text-[10px]" />
+                      <i className="fa-solid fa-trash text-xs" aria-hidden="true" />
                     </button>
                   </div>
                 </div>
+
+                <input
+                  type="text"
+                  value={sub.name}
+                  onChange={(e) => onUpdateSubEx(sub.id, 'name', e.target.value)}
+                  placeholder="Nome Esercizio"
+                  aria-label="Nome sotto-esercizio"
+                  className="bg-zinc-900 text-white font-bold px-3.5 py-2.5 min-h-11 rounded-2xl text-base w-full border border-zinc-700/50 outline-none shadow-inner focus:border-emerald-500 transition-colors"
+                />
                 
-                <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-2">
                   <select
                     value={sub.metricType}
                     onChange={(e) => onUpdateSubEx(sub.id, 'metricType', e.target.value)}
-                    className="bg-zinc-900 text-zinc-300 text-[10px] font-bold p-2.5 rounded-2xl border border-zinc-700/50 shadow-inner outline-none focus:border-emerald-500 transition-colors"
+                    aria-label="Tipo metrica sotto-esercizio"
+                    className="w-full min-h-11 bg-zinc-900 text-zinc-200 text-base font-bold px-3 py-2.5 rounded-2xl border border-zinc-700/50 shadow-inner outline-none focus:border-emerald-500 transition-colors"
                   >
                     <option value="weight">Pesi</option>
                     <option value="bodyweight">C. Libero</option>
                     <option value="time">A Tempo</option>
                     <option value="cardio">Cardio</option>
                   </select>
-                  {sub.metricType === 'cardio' ? (
-                    <div className="bg-zinc-900 text-zinc-500 text-[10px] font-bold p-2.5 rounded-2xl border border-zinc-800 text-center flex items-center justify-center">
-                      Cardio
+                  <div className="grid grid-cols-2 gap-2">
+                    {sub.metricType === 'cardio' ? (
+                      <div className="bg-zinc-900 text-zinc-400 text-xs font-bold p-2.5 min-h-11 rounded-2xl border border-zinc-800 text-center flex items-center justify-center">
+                        Cardio
+                      </div>
+                    ) : (
+                      <div className="bg-zinc-900 border border-zinc-700/50 rounded-2xl p-2 shadow-inner text-center">
+                        <span className="text-[11px] text-zinc-400 font-extrabold uppercase block">
+                          {sub.metricType === 'time' ? 'Sec' : 'Reps'}
+                        </span>
+                        <input
+                          type="text"
+                          value={sub.metricType === 'time' ? (sub.workSec || 30) : (sub.reps || '10')}
+                          onChange={(e) =>
+                            onUpdateSubEx(
+                              sub.id,
+                              sub.metricType === 'time' ? 'workSec' : 'reps',
+                              e.target.value
+                            )
+                          }
+                          placeholder={sub.metricType === 'time' ? 'Sec' : 'Reps'}
+                          aria-label={sub.metricType === 'time' ? 'Secondi target' : 'Ripetizioni target'}
+                          className="bg-transparent text-white text-base font-bold w-full text-center outline-none min-h-11"
+                        />
+                      </div>
+                    )}
+                    <div className="bg-zinc-900 border border-zinc-700/50 rounded-2xl p-2 shadow-inner text-center">
+                      <span className="text-[11px] text-zinc-400 font-extrabold uppercase block">Pausa (s)</span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={sub.pause || 0}
+                        onChange={(e) => onUpdateSubEx(sub.id, 'pause', Math.max(0, parseInt(e.target.value) || 0))}
+                        placeholder="Pausa s"
+                        aria-label="Secondi di pausa sotto-esercizio"
+                        className="bg-transparent text-white text-base font-bold w-full text-center outline-none min-h-11"
+                      />
                     </div>
-                  ) : (
-                    <input
-                      type="text"
-                      value={sub.metricType === 'time' ? (sub.workSec || 30) : (sub.reps || '10')}
-                      onChange={(e) =>
-                        onUpdateSubEx(
-                          sub.id,
-                          sub.metricType === 'time' ? 'workSec' : 'reps',
-                          e.target.value
-                        )
-                      }
-                      placeholder={sub.metricType === 'time' ? 'Sec' : 'Reps'}
-                      className="bg-zinc-900 text-white text-xs font-bold p-2.5 rounded-2xl border border-zinc-700/50 text-center shadow-inner outline-none focus:border-emerald-500 transition-colors"
-                    />
-                  )}
-                  <input
-                    type="number"
-                    min={0}
-                    value={sub.pause || 0}
-                    onChange={(e) => onUpdateSubEx(sub.id, 'pause', Math.max(0, parseInt(e.target.value) || 0))}
-                    placeholder="Pausa s"
-                    className="bg-zinc-900 text-white text-xs font-bold p-2.5 rounded-2xl border border-zinc-700/50 text-center shadow-inner outline-none focus:border-emerald-500 transition-colors"
-                  />
+                  </div>
                 </div>
 
                 {/* 🔴 Selezionatore Macchina Cardio per Sub-Esercizio */}
                 {sub.metricType === 'cardio' && (
                   <div className="bg-zinc-900/60 p-3 rounded-2xl border border-zinc-800/80 shadow-inner">
-                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1.5">
+                    <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block mb-1.5">
                       Tipo di Macchina (Parametri di default)
                     </label>
                     <select
@@ -421,7 +457,8 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                         }
                         onUpdateSubEx(sub.id, 'cardioFields', defaultFields);
                       }}
-                      className="bg-zinc-950 text-emerald-400 text-xs font-bold p-2.5 rounded-xl outline-none border border-zinc-700/50 w-full"
+                      aria-label="Seleziona tipo di macchina cardio"
+                      className="bg-zinc-950 text-emerald-400 text-base font-bold px-3 py-2.5 min-h-11 rounded-xl outline-none border border-zinc-700/50 w-full"
                     >
                       <option value="">Seleziona macchina...</option>
                       <option value="corsa">Corsa / Tapis Roulant</option>
@@ -437,7 +474,8 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                     value={sub.link || ''}
                     onChange={(e) => onUpdateSubEx(sub.id, 'link', e.target.value)}
                     placeholder="Link video esecuzione (YouTube / Google Drive)"
-                    className="w-full bg-zinc-900 text-zinc-400 text-xs font-medium p-3 rounded-2xl border border-zinc-700/50 outline-none shadow-inner focus:border-emerald-500 transition-colors"
+                    aria-label="Link video esecuzione sotto-esercizio"
+                    className="w-full min-h-11 bg-zinc-900 text-zinc-200 placeholder:text-zinc-400 text-base font-medium px-3.5 py-2.5 rounded-2xl border border-zinc-700/50 outline-none shadow-inner focus:border-emerald-500 transition-colors"
                   />
                 )}
               </div>
@@ -448,16 +486,16 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
             <button
               type="button"
               onClick={onAddSubEx}
-              className="flex-1 py-3.5 bg-zinc-800 hover:bg-zinc-700 text-emerald-400 rounded-2xl font-bold border border-zinc-700 text-xs transition-all active:scale-[0.98] shadow-sm"
+              className="flex-1 min-h-11 py-3.5 bg-zinc-800 hover:bg-zinc-700 text-emerald-400 rounded-2xl font-bold border border-zinc-700 text-xs transition-all active:scale-[0.98] shadow-sm flex items-center justify-center gap-1.5"
             >
-              <i className="fa-solid fa-plus mr-1" /> Aggiungi Esercizio
+              <i className="fa-solid fa-plus" aria-hidden="true" /> Aggiungi Esercizio
             </button>
             <button
               type="button"
               onClick={onAddRestBlock}
-              className="flex-1 py-3.5 bg-zinc-800/60 hover:bg-zinc-800 text-zinc-400 rounded-2xl font-bold border border-zinc-700/50 text-xs transition-all active:scale-[0.98] shadow-sm"
+              className="flex-1 min-h-11 py-3.5 bg-zinc-800/60 hover:bg-zinc-800 text-zinc-200 rounded-2xl font-bold border border-zinc-700/50 text-xs transition-all active:scale-[0.98] shadow-sm flex items-center justify-center gap-1.5"
             >
-              <i className="fa-regular fa-clock mr-1" /> + Pausa Intermedia
+              <i className="fa-regular fa-clock" aria-hidden="true" /> + Pausa Intermedia
             </button>
           </div>
         </div>
@@ -632,7 +670,7 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
       <div className="flex justify-between items-start mb-4 pl-2">
         <div>
           <div className="flex items-center gap-2 mb-1.5">
-            <span className="text-[10px] uppercase font-black px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 tracking-wider">
+            <span className="text-[11px] uppercase font-black px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 tracking-wider">
               {isEmom
                 ? `EMOM ${circuit.emomTotalMin || 10}' (Ogni ${circuit.emomIntervalSec || 60}s)`
                 : isAmrap
@@ -641,10 +679,10 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
             </span>
           </div>
           <h3 className="text-lg font-black text-white leading-tight flex items-baseline gap-1.5">
-            <span className="text-emerald-500 font-black opacity-90">{index}.</span>
+            <span className="text-emerald-400 font-black opacity-90">{index}.</span>
             {circuit.name}
             {!isEmom && !isAmrap && circuit.pause === 0 && (
-              <span className="ml-2 text-[9px] bg-rose-500/20 text-rose-400 border border-rose-500/30 px-1.5 py-0.5 rounded uppercase tracking-wider font-black translate-y-[-2px] shrink-0">
+              <span className="ml-2 text-[11px] bg-rose-500/20 text-rose-300 border border-rose-500/30 px-1.5 py-0.5 rounded uppercase tracking-wider font-black translate-y-[-1px] shrink-0">
                 NO REC
               </span>
             )}
@@ -655,9 +693,9 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
       {/* Circuit Ecosystem Coach Advice - Vista Analitica (Solo fuori dal Workout) */}
       {!isWorkoutActive && circuitCoachAdvice && circuitCoachAdvice.message && !isEditMode && (
         <div className="mx-2 mb-4 bg-indigo-950/40 border border-indigo-700/60 text-indigo-200 text-xs p-3.5 rounded-2xl flex items-start gap-3 shadow-inner">
-          <i className="fa-solid fa-bolt text-indigo-400 mt-0.5 text-sm shrink-0 opacity-90" />
+          <i className="fa-solid fa-bolt text-indigo-400 mt-0.5 text-sm shrink-0 opacity-90" aria-hidden="true" />
           <div className="leading-relaxed">
-            <span className="font-extrabold uppercase text-[10px] tracking-wider text-indigo-400 block mb-0.5">
+            <span className="font-extrabold uppercase text-[11px] tracking-wider text-indigo-300 block mb-0.5">
               {circuitCoachAdvice.title}
             </span>
             {circuitCoachAdvice.message}
@@ -667,14 +705,14 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
 
       {/* AMRAP or EMOM Timers */}
       {isAmrap && (
-        <div className="bg-zinc-950 p-4 rounded-3xl border border-zinc-800/80 mb-5 flex items-center justify-between shadow-inner ml-2">
+        <div className="bg-zinc-950 p-4 rounded-3xl border border-zinc-800/80 mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-inner ml-2">
           <div>
-            <div className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Timer AMRAP</div>
+            <div className="text-[11px] uppercase font-bold text-zinc-400 tracking-wider">Timer AMRAP</div>
             <div className="text-3xl font-black text-amber-400 font-mono tracking-wider tabular-nums mt-0.5 drop-shadow-[0_0_12px_rgba(251,191,36,0.25)]">
               {isMasterTimerRunning ? formatTime(masterTimerRemainingSec) : `${circuit.amrapTotalMin || 10}:00`}
             </div>
             {Boolean(circuit.rounds && circuit.rounds > 0) && (
-              <div className="text-[10px] text-zinc-400 mt-1 font-bold tracking-wide">
+              <div className="text-[11px] text-zinc-300 mt-1 font-bold tracking-wide">
                 Target: {circuit.rounds} giri (Pace: {formatTime(Math.floor(((circuit.amrapTotalMin || 10) * 60) / (circuit.rounds || 1)))} / giro)
               </div>
             )}
@@ -690,7 +728,8 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                 const pacingSec = targetRounds > 0 ? Math.floor((totalMins * 60) / targetRounds) : undefined;
                 onStartAmrapTimer(totalMins, pacingSec);
               }}
-              className={`px-4 py-3 rounded-2xl font-black text-xs transition-all active:scale-95 shadow-sm ${
+              aria-pressed={isMasterTimerRunning}
+              className={`min-h-11 px-4 py-3 rounded-2xl font-black text-xs transition-all active:scale-95 shadow-sm flex-1 sm:flex-none ${
                 isMasterTimerRunning
                   ? 'bg-rose-500 text-white shadow-rose-500/20'
                   : 'bg-emerald-500 text-zinc-950 hover:bg-emerald-400 shadow-emerald-500/20'
@@ -707,9 +746,9 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                 }
                 handleAddAmrapRound();
               }}
-              className="bg-zinc-800 hover:bg-zinc-700 active:bg-emerald-500 active:text-zinc-950 text-emerald-400 px-4 py-3 rounded-2xl font-black text-xs border border-zinc-700 active:scale-90 transition-all duration-150 shadow-sm flex items-center gap-1.5"
+              className="min-h-11 bg-zinc-800 hover:bg-zinc-700 active:bg-emerald-500 active:text-zinc-950 text-emerald-400 px-4 py-3 rounded-2xl font-black text-xs border border-zinc-700 active:scale-90 transition-all duration-150 shadow-sm flex items-center justify-center gap-1.5 flex-1 sm:flex-none"
             >
-              <i className="fa-solid fa-plus text-[10px]" />
+              <i className="fa-solid fa-plus text-[11px]" aria-hidden="true" />
               1 Giro ({amrapRoundsCount})
             </button>
           </div>
@@ -717,9 +756,9 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
       )}
 
       {isEmom && (
-        <div className="bg-zinc-950 p-4 rounded-3xl border border-zinc-800/80 mb-5 flex items-center justify-between shadow-inner ml-2">
+        <div className="bg-zinc-950 p-4 rounded-3xl border border-zinc-800/80 mb-5 flex items-center justify-between gap-3 shadow-inner ml-2">
           <div>
-            <div className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">
+            <div className="text-[11px] uppercase font-bold text-zinc-400 tracking-wider">
               Giro {activeEmomRound >= 0 ? activeEmomRound + 1 : 1} / {totalRounds}
             </div>
             <div className="text-2xl font-black text-emerald-400 font-mono tracking-tight mt-0.5">
@@ -730,7 +769,8 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
             type="button"
             disabled={!isWorkoutActive}
             onClick={() => onStartEmomTimer(circuit.emomTotalMin || 10, circuit.emomIntervalSec || 60)}
-            className={`px-5 py-3 rounded-2xl font-black text-xs transition-all active:scale-95 shadow-sm ${
+            aria-pressed={isMasterTimerRunning}
+            className={`min-h-11 px-5 py-3 rounded-2xl font-black text-xs transition-all active:scale-95 shadow-sm ${
               isMasterTimerRunning
                 ? 'bg-rose-500 text-white shadow-rose-500/20'
                 : 'bg-emerald-500 text-zinc-950 hover:bg-emerald-400 shadow-emerald-500/20'
@@ -764,7 +804,7 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
               >
                 <div className="flex items-center justify-between border-b border-zinc-800/60 pb-2.5">
                   <span className="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-                    <i className="fa-solid fa-arrows-spin" />
+                    <i className="fa-solid fa-arrows-spin" aria-hidden="true" />
                     Giro {rIdx + 1} {isAmrap ? (rIdx < amrapInfo.completedRounds ? '(Completato)' : '(In corso)') : `/ ${totalRounds}`}
                   </span>
                 </div>
@@ -825,11 +865,11 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                     return (
                       <div key={sub.id} className="bg-zinc-900/50 p-3.5 rounded-2xl border border-zinc-800/60 flex flex-col gap-2">
                         <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <div className="w-5 h-5 flex items-center justify-center bg-emerald-950/60 border border-emerald-900/50 rounded text-emerald-400 font-bold text-[10px] shrink-0">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-6 h-6 flex items-center justify-center bg-emerald-950/60 border border-emerald-900/50 rounded text-emerald-400 font-bold text-[11px] shrink-0">
                               {letter}
                             </div>
-                            <span className="font-extrabold text-xs text-white">{sub.name}</span>
+                            <span className="font-extrabold text-xs text-white truncate">{sub.name}</span>
                           </div>
                           {(sub.videoUrl || sub.link) && (
                             <a
@@ -842,17 +882,18 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                                   onOpenVideo((sub.videoUrl || sub.link)!);
                                 }
                               }}
-                              className="w-7 h-7 flex items-center justify-center rounded-full bg-zinc-900 text-emerald-400 hover:bg-zinc-800 transition-colors border border-zinc-700/60 shadow-sm shrink-0"
+                              aria-label={`Apri video esecuzione ${sub.name}`}
+                              className="w-11 h-11 min-w-11 min-h-11 flex items-center justify-center rounded-full bg-zinc-900 text-emerald-400 hover:bg-zinc-800 transition-colors border border-zinc-700/60 shadow-sm shrink-0"
                             >
-                              <i className="fa-solid fa-video text-[9px]" />
+                              <i className="fa-solid fa-video text-sm" aria-hidden="true" />
                             </a>
                           )}
                         </div>
 
                         {sub.metricType !== 'cardio' && (
-                          <div className="flex items-center bg-zinc-950/80 rounded-xl p-1 border border-zinc-800/60">
-                            <div className="px-2 text-zinc-500 text-[10px]">
-                              <i className="fa-solid fa-weight-hanging" />
+                          <div className="flex items-center bg-zinc-950/80 rounded-xl px-2 border border-zinc-800/60 min-h-11">
+                            <div className="px-2 text-zinc-400 text-xs">
+                              <i className="fa-solid fa-weight-hanging" aria-hidden="true" />
                             </div>
                             <input
                               type="text"
@@ -861,17 +902,18 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                               value={displayWeight}
                               onChange={(e) => onSaveSetWeight(setId, e.target.value)}
                               placeholder={histSet?.weight ? String(histSet.weight) : "Carico (kg)"}
-                              className="bg-transparent text-white w-full py-1 outline-none font-bold text-xs disabled:opacity-50"
+                              aria-label={`Carico ${sub.name} giro ${rIdx + 1}`}
+                              className="bg-transparent text-white w-full py-2 min-h-11 outline-none font-bold text-base placeholder:text-zinc-400 disabled:opacity-50"
                             />
                           </div>
                         )}
 
-                        <div className="flex items-center gap-2.5">
+                        <div className="flex items-center gap-2">
                           {isTimeType ? (
                             <button
                               type="button"
                               disabled={!isWorkoutActive}
-                              onPointerDown={(e) => {
+                              onPointerDown={() => {
                                 isLongPressRef.current = false;
                                 handlePointerDown(sub.id, rIdx, sub.pause || 0, prefillData);
                               }}
@@ -890,7 +932,9 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                                   onRunInlineTimer(setId, dur, sub.pause || 0, prefillData);
                                 }
                               }}
-                              className={`flex-1 py-3 rounded-xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
+                              aria-label={isChecked ? `${sub.name} giro ${rIdx + 1} completato` : `Avvia timer ${sub.name} giro ${rIdx + 1} (${actualReps}s)`}
+                              aria-pressed={isChecked}
+                              className={`flex-1 min-h-11 py-3 px-3 rounded-xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
                                 isChecked
                                   ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-emerald-500/20'
                                   : isTimerRunning
@@ -898,7 +942,7 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                                   : 'bg-zinc-800/80 text-zinc-200 border-zinc-700/60 hover:bg-zinc-700'
                               }`}
                             >
-                              {isTimerRunning ? `${timerRemaining !== undefined ? timerRemaining : actualReps}s` : isChecked ? <i className="fa-solid fa-check text-lg" /> : `${actualReps}s`}
+                              {isTimerRunning ? `${timerRemaining !== undefined ? timerRemaining : actualReps}s` : isChecked ? <i className="fa-solid fa-check text-lg" aria-hidden="true" /> : `${actualReps}s`}
                             </button>
                           ) : (
                             <button
@@ -907,7 +951,9 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                               onPointerDown={() => handlePointerDown(sub.id, rIdx, sub.pause || 0, prefillData)}
                               onPointerUp={() => handlePointerUp(sub.id, rIdx, sub.pause || 0, prefillData, actualReps)}
                               onPointerLeave={handlePointerCancel}
-                              className={`flex-1 py-3 rounded-xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
+                              aria-label={isChecked ? `${sub.name} giro ${rIdx + 1} completato` : `Completa ${sub.name} giro ${rIdx + 1}`}
+                              aria-pressed={isChecked}
+                              className={`flex-1 min-h-11 py-3 px-3 rounded-xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
                                 isChecked
                                   ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-emerald-500/20'
                                   : 'bg-zinc-800/80 text-zinc-200 border-zinc-700/60 hover:bg-zinc-700'
@@ -915,7 +961,7 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                             >
                               {isChecked ? (
                                 (isCardio || actualReps === defaultTargetReps) ? (
-                                  <i className="fa-solid fa-check text-lg" />
+                                  <i className="fa-solid fa-check text-lg" aria-hidden="true" />
                                 ) : (
                                   `${actualReps} reps`
                                 )
@@ -928,12 +974,13 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                             type="button"
                             disabled={!isWorkoutActive}
                             onClick={() => onOpenEffortModal(setId, isCardio)}
-                            className={`border text-[10px] font-extrabold w-20 py-3 rounded-xl outline-none uppercase tracking-wider shadow-sm transition-all active:scale-[0.98] ${
+                            aria-label={`${isCardio ? 'Imposta RPE' : 'Imposta RIR'} ${sub.name} giro ${rIdx + 1}`}
+                            className={`border text-xs font-extrabold min-w-[88px] min-h-11 px-3 py-3 rounded-xl outline-none uppercase tracking-wider shadow-sm transition-all active:scale-[0.98] shrink-0 ${
                               currentEffort !== undefined && currentEffort !== ''
                                 ? 'text-zinc-100 border-zinc-500 bg-zinc-700'
                                 : displayEffort !== undefined && displayEffort !== ''
                                 ? 'text-emerald-400 border-dashed border-emerald-700/60 bg-emerald-950/20'
-                                : 'text-zinc-400 border-zinc-700/60 bg-zinc-900/50 hover:bg-zinc-800/80'
+                                : 'text-zinc-300 border-zinc-700/60 bg-zinc-900/50 hover:bg-zinc-800/80'
                             }`}
                           >
                             {displayEffort !== undefined && displayEffort !== ''
@@ -945,10 +992,10 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                         </div>
 
                         {isCardio && sub.cardioFields && sub.cardioFields.length > 0 && (
-                          <div className="flex flex-wrap gap-2 mt-1">
+                          <div className="grid grid-cols-2 gap-2 mt-1">
                             {sub.cardioFields.map(cf => (
-                              <div key={cf.id} className="flex-1 min-w-[80px] bg-zinc-950/80 rounded-xl border border-zinc-800/60 p-2 flex items-center shadow-inner">
-                                <span className="text-[9px] text-zinc-500 uppercase font-bold w-1/2 truncate pr-1">{cf.label}</span>
+                              <div key={cf.id} className="bg-zinc-950/80 rounded-xl border border-zinc-800/60 p-2.5 shadow-inner">
+                                <span className="text-[11px] text-zinc-400 uppercase font-bold block mb-0.5 truncate">{cf.label}</span>
                                 <input
                                   type="text"
                                   inputMode="decimal"
@@ -956,7 +1003,8 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                                   value={state.setCustomFields?.[setId]?.[cf.id] || ''}
                                   onChange={(e) => onSaveCustomField?.(setId, cf.id, e.target.value)}
                                   placeholder={histSet?.customFields?.[cf.id] ? String(histSet.customFields[cf.id]) : cf.unit}
-                                  className="bg-transparent text-white text-xs font-bold w-1/2 outline-none text-right disabled:opacity-50"
+                                  aria-label={`${cf.label} ${sub.name} giro ${rIdx + 1}`}
+                                  className="bg-transparent text-white text-base font-bold w-full outline-none min-h-11 placeholder:text-zinc-400 disabled:opacity-50"
                                 />
                               </div>
                             ))}
@@ -984,11 +1032,11 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
               <div key={sub.id} className="bg-zinc-950/50 p-4 rounded-3xl border border-zinc-800/60 shadow-sm">
               {/* Intestazione Esercizio Interno */}
               <div className="flex items-center justify-between gap-2 mb-3">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 min-w-0">
                   <div className="w-6 h-6 flex items-center justify-center bg-emerald-950/60 border border-emerald-900/50 rounded-md text-emerald-400 font-bold text-xs shrink-0">
                     {letter}
                   </div>
-                  <h4 className="font-bold text-zinc-100 text-sm leading-tight">
+                  <h4 className="font-bold text-zinc-100 text-sm leading-tight truncate">
                     {sub.name}
                   </h4>
                 </div>
@@ -1003,9 +1051,10 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                         onOpenVideo((sub.videoUrl || sub.link)!);
                       }
                     }}
-                    className="w-8 h-8 flex items-center justify-center rounded-full bg-zinc-900 text-emerald-400 hover:bg-zinc-800 transition-colors border border-zinc-700/60 shadow-sm shrink-0"
+                    aria-label={`Apri video esecuzione ${sub.name}`}
+                    className="w-11 h-11 min-w-11 min-h-11 flex items-center justify-center rounded-full bg-zinc-900 text-emerald-400 hover:bg-zinc-800 transition-colors border border-zinc-700/60 shadow-sm shrink-0"
                   >
-                    <i className="fa-solid fa-video text-[10px]" />
+                    <i className="fa-solid fa-video text-sm" aria-hidden="true" />
                   </a>
                 )}
               </div>
@@ -1014,15 +1063,15 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                 {coachAdvice && (coachAdvice.compactText || coachAdvice.message) && (
                   isWorkoutActive ? (
                     <div className="mb-3 flex items-center justify-between">
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-zinc-950/80 border border-zinc-800 text-[10px] font-bold shadow-sm max-w-full truncate">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-zinc-950/80 border border-zinc-800 text-[11px] font-bold shadow-sm max-w-full truncate">
                         {coachAdvice.badge === 'increase' ? (
-                          <i className="fa-solid fa-arrow-trend-up text-emerald-400 text-[11px] shrink-0" />
+                          <i className="fa-solid fa-arrow-trend-up text-emerald-400 text-[11px] shrink-0" aria-hidden="true" />
                         ) : coachAdvice.badge === 'stall' ? (
-                          <i className="fa-solid fa-triangle-exclamation text-amber-400 text-[11px] shrink-0" />
+                          <i className="fa-solid fa-triangle-exclamation text-amber-400 text-[11px] shrink-0" aria-hidden="true" />
                         ) : coachAdvice.badge === 'decrease' ? (
-                          <i className="fa-solid fa-arrow-trend-down text-rose-400 text-[11px] shrink-0" />
+                          <i className="fa-solid fa-arrow-trend-down text-rose-400 text-[11px] shrink-0" aria-hidden="true" />
                         ) : (
-                          <i className="fa-solid fa-bullseye text-emerald-400 text-[11px] shrink-0" />
+                          <i className="fa-solid fa-bullseye text-emerald-400 text-[11px] shrink-0" aria-hidden="true" />
                         )}
                         <span className={coachAdvice.badge === 'increase' ? 'text-emerald-400 font-black truncate' : 'text-zinc-300 font-black truncate'}>
                           {coachAdvice.compactText || coachAdvice.title}
@@ -1043,11 +1092,11 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                     >
                       <div className="mt-0.5 shrink-0 opacity-90">
                         {coachAdvice.badge === 'increase' ? (
-                          <i className="fa-solid fa-arrow-trend-up text-emerald-400" />
+                          <i className="fa-solid fa-arrow-trend-up text-emerald-400" aria-hidden="true" />
                         ) : coachAdvice.badge === 'stall' ? (
-                          <i className="fa-solid fa-triangle-exclamation text-amber-400" />
+                          <i className="fa-solid fa-triangle-exclamation text-amber-400" aria-hidden="true" />
                         ) : (
-                          <i className="fa-solid fa-robot text-emerald-500" />
+                          <i className="fa-solid fa-robot text-emerald-400" aria-hidden="true" />
                         )}
                       </div>
                       <div className="leading-relaxed">
@@ -1059,9 +1108,9 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
 
                 {/* Weight Input */}
                 {sub.metricType !== 'cardio' && (
-                  <div className="flex items-center bg-zinc-950/80 rounded-2xl p-1.5 mb-3 border border-zinc-800/60 shadow-inner focus-within:border-emerald-500/50 transition-colors">
-                    <div className="px-3 text-zinc-500 text-xs">
-                      <i className="fa-solid fa-weight-hanging" />
+                  <div className="flex items-center bg-zinc-950/80 rounded-2xl px-2 mb-3 border border-zinc-800/60 shadow-inner focus-within:border-emerald-500/50 transition-colors min-h-11">
+                    <div className="px-2.5 text-zinc-400 text-xs">
+                      <i className="fa-solid fa-weight-hanging" aria-hidden="true" />
                     </div>
                     <input
                       type="text"
@@ -1070,7 +1119,8 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                       value={currentWeight}
                       onChange={(e) => onSaveWeight(sub.id, e.target.value)}
                       placeholder="Carico (kg)"
-                      className="bg-transparent text-white w-full py-1.5 outline-none font-bold text-xs disabled:opacity-50"
+                      aria-label={`Carico predefinito ${sub.name}`}
+                      className="bg-transparent text-white w-full py-2 min-h-11 outline-none font-bold text-base placeholder:text-zinc-400 disabled:opacity-50"
                     />
                   </div>
                 )}
@@ -1135,15 +1185,15 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
 
                     return (
                       <div key={rIdx} className="flex flex-col gap-1.5">
-                        <div className={`flex items-center gap-2.5 transition-all duration-300 ${emomClass}`}>
-                          <span className="text-[10px] font-black text-zinc-500 w-12 uppercase bg-zinc-950/80 border border-zinc-800/80 px-2 py-3.5 rounded-2xl text-center shadow-sm shrink-0">
+                        <div className={`flex items-center gap-2 transition-all duration-300 ${emomClass}`}>
+                          <span className="text-xs font-black text-zinc-300 w-12 min-h-11 flex items-center justify-center uppercase bg-zinc-950/80 border border-zinc-800/80 rounded-2xl shadow-sm shrink-0">
                             G{rIdx + 1}
                           </span>
                           {isTimeType ? (
                             <button
                               type="button"
                               disabled={!isWorkoutActive}
-                              onPointerDown={(e) => {
+                              onPointerDown={() => {
                                 isLongPressRef.current = false;
                                 handlePointerDown(sub.id, rIdx, sub.pause || 0, prefillData);
                               }}
@@ -1162,7 +1212,9 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                                   onRunInlineTimer(setId, dur, sub.pause || 0, prefillData);
                                 }
                               }}
-                              className={`w-28 py-3.5 rounded-2xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
+                              aria-label={isChecked ? `${sub.name} giro ${rIdx + 1} completato` : `Avvia timer ${sub.name} giro ${rIdx + 1}`}
+                              aria-pressed={isChecked}
+                              className={`flex-1 min-h-11 py-3 px-2 rounded-2xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
                                 isChecked
                                   ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-emerald-500/20'
                                   : isTimerRunning
@@ -1170,7 +1222,7 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                                   : 'bg-zinc-800/80 text-zinc-200 border-zinc-700/60 hover:bg-zinc-700'
                               }`}
                             >
-                              {isTimerRunning ? `${timerRemaining !== undefined ? timerRemaining : actualReps}s` : isChecked ? <i className="fa-solid fa-check text-lg" /> : `${actualReps}s`}
+                              {isTimerRunning ? `${timerRemaining !== undefined ? timerRemaining : actualReps}s` : isChecked ? <i className="fa-solid fa-check text-lg" aria-hidden="true" /> : `${actualReps}s`}
                             </button>
                           ) : (
                             <button
@@ -1179,7 +1231,9 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                               onPointerDown={() => handlePointerDown(sub.id, rIdx, sub.pause || 0, prefillData)}
                               onPointerUp={() => handlePointerUp(sub.id, rIdx, sub.pause || 0, prefillData, actualReps)}
                               onPointerLeave={handlePointerCancel}
-                              className={`w-28 py-3.5 rounded-2xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
+                              aria-label={isChecked ? `${sub.name} giro ${rIdx + 1} completato` : `Completa ${sub.name} giro ${rIdx + 1}`}
+                              aria-pressed={isChecked}
+                              className={`flex-1 min-h-11 py-3 px-2 rounded-2xl border text-sm font-black transition-all flex items-center justify-center outline-none shadow-sm select-none active:scale-[0.98] ${
                                 isChecked
                                   ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-emerald-500/20'
                                   : 'bg-zinc-800/80 text-zinc-200 border-zinc-700/60 hover:bg-zinc-700'
@@ -1187,7 +1241,7 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                             >
                               {isChecked ? (
                                 (isCardio || actualReps === defaultTargetReps) ? (
-                                  <i className="fa-solid fa-check text-lg" />
+                                  <i className="fa-solid fa-check text-lg" aria-hidden="true" />
                                 ) : (
                                   `${actualReps} reps`
                                 )
@@ -1200,12 +1254,13 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                             type="button"
                             disabled={!isWorkoutActive}
                             onClick={() => onOpenEffortModal(setId, isCardio)}
-                            className={`border text-[10px] font-extrabold flex-1 py-3.5 rounded-2xl outline-none uppercase tracking-wider shadow-sm transition-all active:scale-[0.98] ${
+                            aria-label={`${isCardio ? 'Imposta RPE' : 'Imposta RIR'} ${sub.name} giro ${rIdx + 1}`}
+                            className={`border text-xs font-extrabold min-w-[84px] min-h-11 px-3 py-3 rounded-2xl outline-none uppercase tracking-wider shadow-sm transition-all active:scale-[0.98] shrink-0 ${
                               currentEffort !== undefined && currentEffort !== ''
                                 ? 'text-zinc-100 border-zinc-500 bg-zinc-700'
                                 : displayEffort !== undefined && displayEffort !== ''
                                 ? 'text-emerald-400 border-dashed border-emerald-700/60 bg-emerald-950/20'
-                                : 'text-zinc-400 border-zinc-700/60 bg-zinc-900/50 hover:bg-zinc-800/80'
+                                : 'text-zinc-300 border-zinc-700/60 bg-zinc-900/50 hover:bg-zinc-800/80'
                             }`}
                           >
                             {displayEffort !== undefined && displayEffort !== ''
@@ -1217,10 +1272,10 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                         </div>
 
                         {isCardio && sub.cardioFields && sub.cardioFields.length > 0 && (
-                          <div className="flex flex-wrap gap-2 pl-[4.5rem] pr-12 mt-1">
+                          <div className="grid grid-cols-2 gap-2 mt-1">
                             {sub.cardioFields.map(cf => (
-                              <div key={cf.id} className="flex-1 min-w-[80px] bg-zinc-950/80 rounded-xl border border-zinc-800/60 p-2 flex items-center shadow-inner">
-                                <span className="text-[9px] text-zinc-500 uppercase font-bold w-1/2 truncate pr-1">{cf.label}</span>
+                              <div key={cf.id} className="bg-zinc-950/80 rounded-xl border border-zinc-800/60 p-2.5 shadow-inner">
+                                <span className="text-[11px] text-zinc-400 uppercase font-bold block mb-0.5 truncate">{cf.label}</span>
                                 <input
                                   type="text"
                                   inputMode="decimal"
@@ -1228,7 +1283,8 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                                   value={state.setCustomFields?.[setId]?.[cf.id] || ''}
                                   onChange={(e) => onSaveCustomField?.(setId, cf.id, e.target.value)}
                                   placeholder={histSet?.customFields?.[cf.id] ? String(histSet.customFields[cf.id]) : cf.unit}
-                                  className="bg-transparent text-white text-xs font-bold w-1/2 outline-none text-right disabled:opacity-50"
+                                  aria-label={`${cf.label} ${sub.name} giro ${rIdx + 1}`}
+                                  className="bg-transparent text-white text-base font-bold w-full outline-none min-h-11 placeholder:text-zinc-400 disabled:opacity-50"
                                 />
                               </div>
                             ))}
@@ -1257,13 +1313,14 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
                 type="button"
                 disabled={!isWorkoutActive}
                 onClick={() => onStartRoundRest(pauseSec, rIdx)}
-                className={`flex-1 py-3 px-3 rounded-2xl text-[11px] font-bold transition-all flex items-center justify-center gap-1.5 border outline-none active:scale-[0.98] shadow-sm ${
+                aria-pressed={isDone}
+                className={`flex-1 min-h-11 py-3 px-3 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border outline-none active:scale-[0.98] shadow-sm ${
                   isDone
                     ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/50'
-                    : 'bg-zinc-950 text-zinc-400 border-zinc-800 hover:bg-zinc-800'
+                    : 'bg-zinc-950 text-zinc-300 border-zinc-800 hover:bg-zinc-800'
                 }`}
               >
-                <i className="fa-regular fa-clock" />
+                <i className="fa-regular fa-clock" aria-hidden="true" />
                 {isDone
                   ? `Giro ${rIdx + 1} ✓`
                   : pauseSec === 0
@@ -1280,11 +1337,11 @@ export const CircuitCard: React.FC<CircuitCardProps> = ({
         <div className="mt-3 pt-2.5 border-t border-zinc-800/40 flex items-center justify-between">
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-zinc-950/80 border border-zinc-800 text-[11px] font-bold shadow-sm max-w-full truncate">
             {circuitCoachAdvice.badge === 'increase' ? (
-              <i className="fa-solid fa-arrow-trend-up text-emerald-400 text-xs shrink-0" />
+              <i className="fa-solid fa-arrow-trend-up text-emerald-400 text-xs shrink-0" aria-hidden="true" />
             ) : circuitCoachAdvice.badge === 'decrease' ? (
-              <i className="fa-solid fa-arrow-trend-down text-rose-400 text-xs shrink-0" />
+              <i className="fa-solid fa-arrow-trend-down text-rose-400 text-xs shrink-0" aria-hidden="true" />
             ) : (
-              <i className="fa-solid fa-bolt text-indigo-400 text-xs shrink-0" />
+              <i className="fa-solid fa-bolt text-indigo-400 text-xs shrink-0" aria-hidden="true" />
             )}
             <span className={circuitCoachAdvice.badge === 'increase' ? 'text-emerald-400 font-black truncate' : 'text-zinc-300 font-black truncate'}>
               {circuitCoachAdvice.compactText || circuitCoachAdvice.title}

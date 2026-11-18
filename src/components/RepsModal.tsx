@@ -49,7 +49,7 @@ export const RepsModal: React.FC<RepsModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div>
-            <span className="text-[10px] font-black uppercase text-emerald-400 tracking-wider">
+            <span className="text-[11px] font-black uppercase text-emerald-400 tracking-wider">
               {exerciseName || 'Esercizio'} • Serie {setIndex + 1}
             </span>
             <h3 className="text-white font-black text-base">Ripetizioni Effettive</h3>
@@ -57,9 +57,10 @@ export const RepsModal: React.FC<RepsModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center text-xs"
+            aria-label="Chiudi finestra ripetizioni"
+            className="w-11 h-11 min-w-11 min-h-11 rounded-full bg-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center text-sm"
           >
-            <i className="fa-solid fa-xmark" />
+            <i className="fa-solid fa-xmark" aria-hidden="true" />
           </button>
         </div>
 
@@ -69,9 +70,10 @@ export const RepsModal: React.FC<RepsModalProps> = ({
             type="button"
             onClick={() => handleAdjust(-1)}
             disabled={reps <= 0}
+            aria-label="Diminuisci ripetizioni"
             className="w-12 h-12 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-black text-xl flex items-center justify-center border border-zinc-700/60 active:scale-95 disabled:opacity-30 disabled:pointer-events-none transition-all"
           >
-            <i className="fa-solid fa-minus text-sm" />
+            <i className="fa-solid fa-minus text-sm" aria-hidden="true" />
           </button>
 
           <div className="flex flex-col items-center">
@@ -82,10 +84,11 @@ export const RepsModal: React.FC<RepsModalProps> = ({
               value={reps === 0 ? '' : reps}
               onChange={handleManualChange}
               placeholder="0"
+              aria-label="Numero di ripetizioni eseguite"
               autoFocus
               className="w-24 text-center bg-transparent text-white font-black text-4xl outline-none focus:text-emerald-400 transition-colors"
             />
-            <span className="text-[10px] font-bold uppercase text-zinc-500 tracking-wider mt-0.5">
+            <span className="text-[11px] font-bold uppercase text-zinc-400 tracking-wider mt-0.5">
               reps eseguite
             </span>
           </div>
@@ -93,9 +96,10 @@ export const RepsModal: React.FC<RepsModalProps> = ({
           <button
             type="button"
             onClick={() => handleAdjust(1)}
+            aria-label="Aumenta ripetizioni"
             className="w-12 h-12 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-black text-xl flex items-center justify-center border border-zinc-700/60 active:scale-95 transition-all"
           >
-            <i className="fa-solid fa-plus text-sm" />
+            <i className="fa-solid fa-plus text-sm" aria-hidden="true" />
           </button>
         </div>
 
@@ -104,28 +108,28 @@ export const RepsModal: React.FC<RepsModalProps> = ({
           <button
             type="button"
             onClick={() => handleAdjust(-2)}
-            className="py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-300 font-black text-xs hover:border-zinc-700 hover:bg-zinc-900 active:scale-95 transition-all"
+            className="min-h-11 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-300 font-black text-xs hover:border-zinc-700 hover:bg-zinc-900 active:scale-95 transition-all"
           >
             -2
           </button>
           <button
             type="button"
             onClick={() => handleAdjust(-1)}
-            className="py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-300 font-black text-xs hover:border-zinc-700 hover:bg-zinc-900 active:scale-95 transition-all"
+            className="min-h-11 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-300 font-black text-xs hover:border-zinc-700 hover:bg-zinc-900 active:scale-95 transition-all"
           >
             -1
           </button>
           <button
             type="button"
             onClick={() => handleAdjust(1)}
-            className="py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-emerald-400 font-black text-xs hover:border-emerald-600/40 hover:bg-emerald-950/20 active:scale-95 transition-all"
+            className="min-h-11 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-emerald-400 font-black text-xs hover:border-emerald-600/40 hover:bg-emerald-950/20 active:scale-95 transition-all"
           >
             +1
           </button>
           <button
             type="button"
             onClick={() => handleAdjust(2)}
-            className="py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-emerald-400 font-black text-xs hover:border-emerald-600/40 hover:bg-emerald-950/20 active:scale-95 transition-all"
+            className="min-h-11 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-emerald-400 font-black text-xs hover:border-emerald-600/40 hover:bg-emerald-950/20 active:scale-95 transition-all"
           >
             +2
           </button>
@@ -135,9 +139,9 @@ export const RepsModal: React.FC<RepsModalProps> = ({
         <button
           type="button"
           onClick={() => onConfirm(reps)}
-          className="w-full bg-emerald-500 hover:bg-emerald-400 text-zinc-950 py-3.5 rounded-2xl font-black text-sm transition flex items-center justify-center gap-2 shadow-sm active:scale-[0.98]"
+          className="w-full min-h-11 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 py-3.5 rounded-2xl font-black text-sm transition flex items-center justify-center gap-2 shadow-sm active:scale-[0.98]"
         >
-          <i className="fa-solid fa-check" /> Conferma Ripetizioni
+          <i className="fa-solid fa-check" aria-hidden="true" /> Conferma Ripetizioni
         </button>
       </div>
     </>

@@ -48,16 +48,17 @@ const SwipeableSessionCard: React.FC<{
   return (
     <div className="relative w-full overflow-hidden rounded-2xl mb-3">
       {/* Cestino in background */}
-      <div className="absolute inset-0 bg-rose-600 flex items-center justify-end px-5 rounded-2xl">
+      <div className="absolute inset-0 bg-rose-600 flex items-center justify-end px-4 rounded-2xl">
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
             onDelete(session.id);
           }}
-          className="w-10 h-10 flex items-center justify-center text-white outline-none active:scale-95 transition-transform"
+          aria-label={`Elimina sessione ${String(session.tabNameSnapshot || (session as any).tabName || 'Allenamento')}`}
+          className="w-11 h-11 min-w-11 min-h-11 flex items-center justify-center text-white outline-none active:scale-95 transition-transform rounded-xl"
         >
-          <i className="fa-solid fa-trash text-lg" />
+          <i className="fa-solid fa-trash text-lg" aria-hidden="true" />
         </button>
       </div>
 
@@ -78,25 +79,25 @@ const SwipeableSessionCard: React.FC<{
           transform: `translateX(${offsetX}px)`,
           transition: isDragging.current ? 'none' : 'transform 0.2s cubic-bezier(0.32, 0.72, 0, 1)'
         }}
-        className="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-4 flex justify-between items-center cursor-pointer relative z-10 w-full"
+        className="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-4 flex justify-between items-center cursor-pointer relative z-10 w-full min-h-11"
       >
         <div className="truncate pr-3">
           <h4 className="text-white font-extrabold text-sm truncate max-w-[220px]">
             {String(session.tabNameSnapshot || (session as any).tabName || 'Allenamento')}
           </h4>
-          <div className="text-xs text-zinc-500 mt-1 flex items-center gap-3">
+          <div className="text-xs text-zinc-400 mt-1 flex items-center gap-3">
             <span>
-              <i className="fa-regular fa-calendar mr-1 opacity-70" /> {String(session.date || '-')}
+              <i className="fa-regular fa-calendar mr-1 opacity-80" aria-hidden="true" /> {String(session.date || '-')}
             </span>
             <span>
-              <i className="fa-regular fa-clock mr-1 opacity-70" /> {String(session.durationStr || '00:00')}
+              <i className="fa-regular fa-clock mr-1 opacity-80" aria-hidden="true" /> {String(session.durationStr || '00:00')}
             </span>
             <span>
-              <i className="fa-solid fa-layer-group mr-1 opacity-70" /> {getTotalSets(session)} serie
+              <i className="fa-solid fa-layer-group mr-1 opacity-80" aria-hidden="true" /> {getTotalSets(session)} serie
             </span>
           </div>
         </div>
-        <i className="fa-solid fa-chevron-right text-zinc-600 text-xs" />
+        <i className="fa-solid fa-chevron-right text-zinc-400 text-xs" aria-hidden="true" />
       </div>
     </div>
   );
@@ -151,19 +152,22 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
     <div className="fixed inset-0 bg-zinc-950 z-[100] flex flex-col animate-in fade-in">
       {/* Header */}
       <div className="header-safe-top p-4 px-5 flex justify-between items-center bg-zinc-950 border-b border-zinc-800/60 sticky top-0 z-10">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           {selectedSession && (
             <button
               type="button"
               onClick={() => setSelectedSession(null)}
-              className="w-8 h-8 rounded-full bg-zinc-900 flex items-center justify-center text-zinc-300 hover:text-white"
+              aria-label="Torna alla lista cronologia"
+              className="w-11 h-11 min-w-11 min-h-11 rounded-full bg-zinc-900 flex items-center justify-center text-zinc-200 hover:text-white shrink-0 outline-none"
             >
-              <i className="fa-solid fa-arrow-left text-xs" />
+              <i className="fa-solid fa-arrow-left text-sm" aria-hidden="true" />
             </button>
           )}
-          <h2 className="text-white font-extrabold text-base flex items-center gap-2">
-            <i className="fa-solid fa-clock-rotate-left text-emerald-500" />
-            {selectedSession ? String(selectedSession.tabNameSnapshot || 'Dettaglio') : 'Cronologia Allenamenti'}
+          <h2 className="text-white font-extrabold text-base flex items-center gap-2 truncate">
+            <i className="fa-solid fa-clock-rotate-left text-emerald-500 shrink-0" aria-hidden="true" />
+            <span className="truncate">
+              {selectedSession ? String(selectedSession.tabNameSnapshot || 'Dettaglio') : 'Cronologia Allenamenti'}
+            </span>
           </h2>
         </div>
         <button
@@ -172,9 +176,10 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
             setSelectedSession(null);
             onClose();
           }}
-          className="w-9 h-9 bg-zinc-900 rounded-full flex items-center justify-center text-zinc-400 hover:text-white outline-none"
+          aria-label="Chiudi cronologia allenamenti"
+          className="w-11 h-11 min-w-11 min-h-11 bg-zinc-900 rounded-full flex items-center justify-center text-zinc-300 hover:text-white outline-none shrink-0"
         >
-          <i className="fa-solid fa-xmark text-sm" />
+          <i className="fa-solid fa-xmark text-base" aria-hidden="true" />
         </button>
       </div>
 
@@ -182,7 +187,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
       <div className="flex-1 overflow-y-auto p-4 space-y-3 hide-scrollbar max-w-xl mx-auto w-full">
         {!selectedSession ? (
           safeHistory.length === 0 ? (
-            <div className="text-zinc-500 text-center py-16 text-xs">
+            <div className="text-zinc-400 text-center py-16 text-xs">
               Nessun allenamento completato ancora.
             </div>
           ) : (
@@ -204,7 +209,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setVisibleCount((prev) => prev + 30)}
-                  className="w-full bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-300 text-xs font-bold py-3.5 rounded-2xl transition active:scale-[0.99] shadow-sm"
+                  className="w-full min-h-11 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-200 text-xs font-bold py-3.5 rounded-2xl transition active:scale-[0.99] shadow-sm"
                 >
                   Carica altri ({Math.min(30, safeHistory.length - visibleCount)} di {safeHistory.length - visibleCount} rimanenti)
                 </button>
@@ -216,15 +221,15 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
             {/* Header di dettaglio sessione */}
             <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl flex justify-around">
               <div className="text-center">
-                <div className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Durata</div>
+                <div className="text-[11px] text-zinc-400 uppercase font-bold tracking-wider">Durata</div>
                 <div className="text-base font-extrabold text-white mt-0.5">{String(selectedSession.durationStr || '-')}</div>
               </div>
               <div className="text-center">
-                <div className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Serie Totali</div>
+                <div className="text-[11px] text-zinc-400 uppercase font-bold tracking-wider">Serie Totali</div>
                 <div className="text-base font-extrabold text-white mt-0.5">{getTotalSets(selectedSession)}</div>
               </div>
               <div className="text-center">
-                <div className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Data</div>
+                <div className="text-[11px] text-zinc-400 uppercase font-bold tracking-wider">Data</div>
                 <div className="text-base font-extrabold text-emerald-400 mt-0.5">{String(selectedSession.date || '-')}</div>
               </div>
             </div>
@@ -253,35 +258,35 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
 
                         return (
                           <div key={sIdx} className="p-3 flex justify-between items-center text-xs">
-                            <span className="font-bold text-zinc-500">Serie {String(idxLabel)}</span>
+                            <span className="font-bold text-zinc-400">Serie {String(idxLabel)}</span>
                             <div className="flex items-center gap-2">
                               {repsVal !== undefined && repsVal !== null && repsVal !== '' && (
                                 <span className="text-white font-semibold">
-                                  {String(repsVal)} <span className="text-zinc-500 text-[10px]">reps</span>
+                                  {String(repsVal)} <span className="text-zinc-400 text-[11px]">reps</span>
                                 </span>
                               )}
                               {durVal !== undefined && durVal !== null && durVal !== '' && (
                                 <span className="text-white font-semibold">
-                                  {String(durVal)} <span className="text-zinc-500 text-[10px]">sec</span>
+                                  {String(durVal)} <span className="text-zinc-400 text-[11px]">sec</span>
                                 </span>
                               )}
                               {weightVal !== undefined && weightVal !== null && weightVal !== '' && (
                                 <>
-                                  <span className="text-zinc-700">|</span>
+                                  <span className="text-zinc-400" aria-hidden="true">|</span>
                                   <span className="text-white font-semibold">
-                                    {String(weightVal)} <span className="text-zinc-500 text-[10px]">kg</span>
+                                    {String(weightVal)} <span className="text-zinc-400 text-[11px]">kg</span>
                                   </span>
                                 </>
                               )}
                               {set.isCed ? (
-                                <span className="bg-rose-900/80 text-rose-300 px-2 py-0.5 rounded text-[10px] font-bold">CED</span>
+                                <span className="bg-rose-900/80 text-rose-200 px-2 py-0.5 rounded text-[11px] font-bold">CED</span>
                               ) : rirVal !== undefined && rirVal !== null && rirVal !== '' ? (
-                                <span className="bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded text-[10px] font-bold">
+                                <span className="bg-zinc-800 text-zinc-200 px-2 py-0.5 rounded text-[11px] font-bold">
                                   RIR {String(rirVal)}
                                 </span>
                               ) : null}
                               {rpeVal !== undefined && rpeVal !== null && rpeVal !== '' && (
-                                <span className="bg-emerald-900/60 text-emerald-300 px-2 py-0.5 rounded text-[10px] font-bold">
+                                <span className="bg-emerald-900/60 text-emerald-300 px-2 py-0.5 rounded text-[11px] font-bold">
                                   RPE {String(rpeVal)}
                                 </span>
                               )}
@@ -301,7 +306,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                   <div key={bIdx} className="bg-zinc-900/50 border border-zinc-800/80 rounded-2xl p-4">
                     <div className="flex items-center gap-2 mb-3">
                       <h5 className="text-sm font-extrabold text-emerald-400">{circName}</h5>
-                      <span className="text-[10px] uppercase font-bold bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded">
+                      <span className="text-[11px] uppercase font-bold bg-zinc-800 text-zinc-200 px-2 py-0.5 rounded">
                         {circStructure}
                       </span>
                     </div>
@@ -312,7 +317,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
 
                         return (
                           <div key={roundIdxLabel || rIdx} className="bg-zinc-950 rounded-xl border border-zinc-800 overflow-hidden">
-                            <div className="bg-zinc-900/80 px-3 py-1.5 text-xs font-bold text-zinc-400 border-b border-zinc-800">
+                            <div className="bg-zinc-900/80 px-3 py-1.5 text-xs font-bold text-zinc-300 border-b border-zinc-800">
                               Giro {String(roundIdxLabel)}
                             </div>
                             <div className="divide-y divide-zinc-800">
@@ -330,18 +335,18 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                                     <div className="flex items-center gap-2">
                                       {repsVal !== undefined && repsVal !== null && repsVal !== '' && (
                                         <span className="text-white">
-                                          {String(repsVal)} <span className="text-zinc-500 text-[10px]">reps</span>
+                                          {String(repsVal)} <span className="text-zinc-400 text-[11px]">reps</span>
                                         </span>
                                       )}
                                       {weightVal !== undefined && weightVal !== null && weightVal !== '' && (
                                         <span className="text-white">
-                                          {String(weightVal)} <span className="text-zinc-500 text-[10px]">kg</span>
+                                          {String(weightVal)} <span className="text-zinc-400 text-[11px]">kg</span>
                                         </span>
                                       )}
                                       {firstSet?.isCed ? (
-                                        <span className="bg-rose-900/80 text-rose-300 px-1.5 py-0.5 rounded text-[10px]">CED</span>
+                                        <span className="bg-rose-900/80 text-rose-200 px-1.5 py-0.5 rounded text-[11px]">CED</span>
                                       ) : rirVal !== undefined && rirVal !== null && rirVal !== '' ? (
-                                        <span className="bg-zinc-800 text-zinc-300 px-1.5 py-0.5 rounded text-[10px]">
+                                        <span className="bg-zinc-800 text-zinc-200 px-1.5 py-0.5 rounded text-[11px]">
                                           RIR {String(rirVal)}
                                         </span>
                                       ) : null}

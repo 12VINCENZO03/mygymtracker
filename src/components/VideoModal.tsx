@@ -24,15 +24,16 @@ export const VideoModal: React.FC<VideoModalProps> = ({ url, onClose }) => {
     <div onClick={onClose} className="fixed inset-0 bg-black/90 z-[100] flex flex-col items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
       <div onClick={(e) => e.stopPropagation()} className="w-full max-w-2xl bg-zinc-900 rounded-3xl overflow-hidden shadow-2xl relative border border-zinc-800">
         <div className="flex justify-between items-center p-4 bg-zinc-950/60 border-b border-zinc-800/50">
-          <h3 className="text-white font-extrabold text-xs flex items-center gap-2">
-            <i className="fa-solid fa-video text-emerald-500" /> Esecuzione Tecnica
+          <h3 className="text-white font-extrabold text-sm flex items-center gap-2">
+            <i className="fa-solid fa-video text-emerald-500" aria-hidden="true" /> Esecuzione Tecnica
           </h3>
           <button
             type="button"
             onClick={onClose}
-            className="text-zinc-400 hover:text-white bg-zinc-800 w-8 h-8 flex items-center justify-center rounded-full transition outline-none"
+            aria-label="Chiudi video esecuzione"
+            className="text-zinc-400 hover:text-white bg-zinc-800 w-11 h-11 min-w-11 min-h-11 flex items-center justify-center rounded-full transition outline-none"
           >
-            <i className="fa-solid fa-xmark text-xs" />
+            <i className="fa-solid fa-xmark text-sm" aria-hidden="true" />
           </button>
         </div>
         <div className="w-full aspect-video bg-black relative">

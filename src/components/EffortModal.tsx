@@ -105,35 +105,37 @@ export const EffortModal: React.FC<EffortModalProps> = ({
             <h3 className="text-white font-extrabold text-sm leading-tight">
               {isRpe ? 'Sforzo Percepito (RPE)' : 'Ripetizioni di Riserva (RIR)'}
             </h3>
-            <p className="text-[10px] text-zinc-400">
+            <p className="text-[11px] text-zinc-400">
               {isRpe ? 'Scala 1-10: 1-4 Leggero • 5-7 Medio • 8-10 Duro' : 'Ripetizioni che potevi ancora fare'}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-7 h-7 rounded-full bg-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center text-xs"
+            aria-label="Chiudi finestra selezione sforzo"
+            className="w-11 h-11 min-w-11 min-h-11 rounded-full bg-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center text-sm"
           >
-            <i className="fa-solid fa-xmark" />
+            <i className="fa-solid fa-xmark" aria-hidden="true" />
           </button>
         </div>
 
         {/* Non-Cardio: RIR Single Horizontal Row (5 Buttons) */}
         {!isRpe ? (
-          <div className="flex gap-1.5 w-full">
+          <div className="flex gap-2 w-full">
             {rirOptions.map((opt) => {
               const selected = isRirSelected(opt.value);
               return (
                 <button
                   key={opt.value}
                   type="button"
+                  aria-pressed={selected}
                   onClick={() => onSelect(opt.value)}
-                  className={`flex-1 py-2.5 px-1 rounded-xl border flex flex-col items-center justify-center transition active:scale-95 outline-none min-h-[52px] ${
+                  className={`flex-1 py-2.5 px-1 rounded-xl border flex flex-col items-center justify-center transition active:scale-95 outline-none min-h-[52px] min-w-11 ${
                     selected ? opt.activeClass : opt.bgClass
                   }`}
                 >
                   <span className="text-sm font-black tracking-tight">{opt.label}</span>
-                  <span className={`text-[9px] font-bold uppercase tracking-wider mt-0.5 ${selected ? 'opacity-90' : 'opacity-70'}`}>
+                  <span className={`text-[11px] font-bold tracking-tight mt-0.5 ${selected ? 'opacity-95' : 'opacity-85'}`}>
                     {opt.sublabel}
                   </span>
                 </button>
@@ -142,7 +144,7 @@ export const EffortModal: React.FC<EffortModalProps> = ({
           </div>
         ) : (
           /* Cardio: RPE 2 Rows of 5 Buttons */
-          <div className="grid grid-cols-5 gap-1.5 w-full">
+          <div className="grid grid-cols-5 gap-2 w-full">
             {rpeOptions.map((opt) => {
               const selected = currentValue === opt.value;
               const style = getRpeStyle(opt.tier, selected);
@@ -150,8 +152,9 @@ export const EffortModal: React.FC<EffortModalProps> = ({
                 <button
                   key={opt.value}
                   type="button"
+                  aria-pressed={selected}
                   onClick={() => onSelect(opt.value)}
-                  className={`py-2 rounded-xl border flex flex-col items-center justify-center transition active:scale-95 outline-none min-h-[44px] ${style}`}
+                  className={`py-2 rounded-xl border flex flex-col items-center justify-center transition active:scale-95 outline-none min-h-11 min-w-11 ${style}`}
                 >
                   <span className="text-xs font-black">{opt.label}</span>
                 </button>
@@ -163,7 +166,7 @@ export const EffortModal: React.FC<EffortModalProps> = ({
         <button
           type="button"
           onClick={onClose}
-          className="w-full text-zinc-400 hover:text-zinc-200 py-1.5 mt-2 font-bold text-[11px] transition outline-none text-center"
+          className="w-full min-h-11 text-zinc-400 hover:text-zinc-200 py-2.5 mt-2 font-bold text-xs transition outline-none text-center"
         >
           Chiudi
         </button>

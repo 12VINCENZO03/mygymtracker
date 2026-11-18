@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
+import type { User } from '@supabase/supabase-js';
 import { AppState, BodyGoal } from '../types/gym';
 import { calculateAllVolumeStatsV2, calculateVolumeFromSessionV2 } from '../utils/coach';
 import { getWorkoutDatesSet } from '../utils/domain';
 import { getTodayStr } from '../utils/storage';
+import type { AuthActionResult } from '../hooks/useSupabaseAuth';
+import { CloudSyncStatus, formatCloudTimeShort } from '../utils/cloudSync';
 
 interface SideMenuProps {
   isOpen: boolean;
@@ -17,6 +20,17 @@ interface SideMenuProps {
   onOpenHistoryModal: () => void;
   onOpenPRModal: () => void;
   onOpenSyncModal: () => void;
+  authUser: User | null;
+  isAuthAvailable: boolean;
+  isAuthLoading: boolean;
+  onSignIn: (email: string, password: string) => Promise<AuthActionResult>;
+  onSignUp: (email: string, password: string) => Promise<AuthActionResult>;
+  onSignOut: () => Promise<AuthActionResult>;
+  cloudSyncStatus: CloudSyncStatus;
+  cloudSyncError: string | null;
+  lastCloudSavedAt: number | string | null;
+  onSyncNow: () => Promise<void>;
+  onDownloadFromCloud: () => Promise<{ ok: boolean; error?: string }>;
 }
 
 export const SideMenu: React.FC<SideMenuProps> = ({
@@ -31,13 +45,77 @@ export const SideMenu: React.FC<SideMenuProps> = ({
   onUploadPdf,
   onOpenHistoryModal,
   onOpenPRModal,
-  onOpenSyncModal
+  onOpenSyncModal,
+  authUser,
+  isAuthAvailable,
+  isAuthLoading,
+  onSignIn,
+  onSignUp,
+  onSignOut,
+  cloudSyncStatus,
+  cloudSyncError,
+  lastCloudSavedAt,
+  onSyncNow,
+  onDownloadFromCloud
 }) => {
   const [profileOpen, setProfileOpen] = useState(true);
   const [progressOpen, setProgressOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const [biaHistoryOpen, setBiaHistoryOpen] = useState(false);
   const [trendTab, setTrendTab] = useState<'weights' | 'cardio'>('weights');
+
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [showAuthPassword, setShowAuthPassword] = useState(false);
+  const [authSubmitting, setAuthSubmitting] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authInfo, setAuthInfo] = useState<string | null>(null);
+  const [confirmCloudDownload, setConfirmCloudDownload] = useState(false);
+  const [cloudActionMsg, setCloudActionMsg] = useState<{ text: string; isError?: boolean } | null>(null);
+
+  const handleAuthSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (authSubmitting) return;
+    setAuthError(null);
+    setAuthInfo(null);
+    setAuthSubmitting(true);
+
+    try {
+      const result =
+        authMode === 'login'
+          ? await onSignIn(authEmail, authPassword)
+          : await onSignUp(authEmail, authPassword);
+
+      if (!result.ok) {
+        setAuthError(result.error || 'Operazione non riuscita.');
+      } else {
+        setAuthPassword('');
+        if (result.info) {
+          setAuthInfo(result.info);
+        }
+      }
+    } finally {
+      setAuthSubmitting(false);
+    }
+  };
+
+  const handleAuthLogout = async () => {
+    if (authSubmitting) return;
+    setAuthError(null);
+    setAuthInfo(null);
+    setAuthSubmitting(true);
+
+    try {
+      const result = await onSignOut();
+      if (!result.ok) {
+        setAuthError(result.error || 'Impossibile uscire al momento.');
+      }
+    } finally {
+      setAuthSubmitting(false);
+    }
+  };
 
   // 🔴 CANONICAL V2: Statistiche derivate direttamente dallo storico immutabile con memoizzazione anti-lag
   const stats = React.useMemo(() => calculateAllVolumeStatsV2(state.sessionsV2 || []), [state.sessionsV2]);
@@ -72,7 +150,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
     backupBanner = (
       <div className="bg-amber-950/30 border border-amber-900/50 p-3 rounded-2xl">
         <div className="text-amber-400 font-bold text-xs flex items-center gap-1.5">
-          <i className="fa-solid fa-triangle-exclamation" /> Backup Consigliato
+          <i className="fa-solid fa-triangle-exclamation" aria-hidden="true" /> Backup Consigliato
         </div>
         <p className="text-[11px] text-zinc-400 mt-1">Non hai ancora esportato una copia dei tuoi dati.</p>
       </div>
@@ -85,7 +163,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
       backupBanner = (
         <div className="bg-amber-950/30 border border-amber-900/50 p-3 rounded-2xl">
           <div className="text-amber-400 font-bold text-xs flex items-center gap-1.5">
-            <i className="fa-solid fa-clock" /> Backup Datato ({diffDays}g fa)
+            <i className="fa-solid fa-clock" aria-hidden="true" /> Backup Datato ({diffDays}g fa)
           </div>
           <p className="text-[11px] text-zinc-400 mt-1">Salva una copia aggiornata per sicurezza.</p>
         </div>
@@ -104,61 +182,63 @@ export const SideMenu: React.FC<SideMenuProps> = ({
         {/* Drawer Header */}
         <div className="header-safe-top p-5 flex justify-between items-center shrink-0 bg-zinc-950/90 backdrop-blur-md z-10 border-b border-zinc-800/40">
           <h2 className="text-white font-extrabold text-base tracking-tight flex items-center gap-2">
-            <i className="fa-solid fa-dumbbell text-emerald-500" />
-            MyGym <span className="bg-emerald-500 text-zinc-950 px-2 py-0.5 rounded-md text-[10px] ml-1">v2.1</span>
+            <i className="fa-solid fa-dumbbell text-emerald-500" aria-hidden="true" />
+            MyGym <span className="bg-emerald-500 text-zinc-950 px-2 py-0.5 rounded-md text-[11px] ml-1">v2.1</span>
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 flex items-center justify-center rounded-full bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white transition outline-none"
+            aria-label="Chiudi menu laterale"
+            className="w-11 h-11 min-w-11 min-h-11 flex items-center justify-center rounded-full bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white transition outline-none"
           >
-            <i className="fa-solid fa-xmark text-sm" />
+            <i className="fa-solid fa-xmark text-base" aria-hidden="true" />
           </button>
         </div>
 
         {/* Drawer Body */}
         <div className="flex-1 overflow-y-auto hide-scrollbar p-5 space-y-4 pb-12">
           {/* Edit Mode Toggle Card */}
-          <div
+          <button
+            type="button"
             onClick={onToggleEditMode}
-            role="button"
-            tabIndex={0}
-            className="bg-zinc-900/60 rounded-2xl p-4 flex justify-between items-center cursor-pointer border border-zinc-800/60 hover:bg-zinc-800/80 transition shadow-sm"
+            aria-pressed={state.isEditMode}
+            className="w-full min-h-11 bg-zinc-900/60 rounded-2xl p-4 flex justify-between items-center cursor-pointer border border-zinc-800/60 hover:bg-zinc-800/80 transition shadow-sm text-left outline-none"
           >
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
-                <i className="fa-solid fa-pen-to-square text-emerald-400 text-xs" />
+                <i className="fa-solid fa-pen-to-square text-emerald-400 text-xs" aria-hidden="true" />
               </div>
               <span className="text-xs font-bold text-zinc-200 tracking-wide">Modalità Modifica</span>
             </div>
             <div className="flex items-center gap-2.5">
-              <span className={`text-[10px] font-black uppercase tracking-wider ${state.isEditMode ? 'text-emerald-400' : 'text-zinc-500'}`}>
+              <span className={`text-[11px] font-black uppercase tracking-wider ${state.isEditMode ? 'text-emerald-400' : 'text-zinc-400'}`}>
                 {state.isEditMode ? 'ATTIVA' : 'OFF'}
               </span>
-              <div className={`w-8 h-4.5 rounded-full p-0.5 transition-colors ${state.isEditMode ? 'bg-emerald-500' : 'bg-zinc-700'}`}>
+              <div className={`w-8 h-4.5 rounded-full p-0.5 transition-colors ${state.isEditMode ? 'bg-emerald-500' : 'bg-zinc-700'}`} aria-hidden="true">
                 <div className={`w-3.5 h-3.5 rounded-full bg-white transition-transform ${state.isEditMode ? 'translate-x-3.5' : 'translate-x-0'}`} />
               </div>
             </div>
-          </div>
+          </button>
 
           {/* Accordion 1: Profilo Utente & BIA */}
           <div className="bg-zinc-900/60 rounded-3xl overflow-hidden border border-zinc-800/50">
             <button
               type="button"
               onClick={() => setProfileOpen(!profileOpen)}
-              className="w-full p-4 flex justify-between items-center hover:bg-zinc-800/40 transition text-left outline-none"
+              aria-expanded={profileOpen}
+              className="w-full min-h-11 p-4 flex justify-between items-center hover:bg-zinc-800/40 transition text-left outline-none"
             >
               <span className="text-xs font-extrabold text-zinc-200 tracking-wide flex items-center gap-2.5">
-                <i className="fa-solid fa-user text-emerald-400 text-sm" />
+                <i className="fa-solid fa-user text-emerald-400 text-sm" aria-hidden="true" />
                 Profilo Utente & BIA
               </span>
-              <i className={`fa-solid fa-chevron-down text-xs text-zinc-500 transition-transform ${profileOpen ? 'rotate-180' : ''}`} />
+              <i className={`fa-solid fa-chevron-down text-xs text-zinc-400 transition-transform ${profileOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
             </button>
 
             {profileOpen && (
               <div className="p-4 pt-0 space-y-4">
                 <div>
-                  <label className="text-[10px] font-bold text-zinc-400 block mb-1 uppercase tracking-wider">
+                  <label className="text-[11px] font-bold text-zinc-400 block mb-1 uppercase tracking-wider">
                     Il tuo Nome
                   </label>
                   <input
@@ -166,12 +246,13 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                     value={state.profileName}
                     onChange={(e) => onUpdateProfileName(e.target.value)}
                     placeholder="es. Vincenzo"
-                    className="w-full bg-zinc-950 text-white font-bold p-3 rounded-xl outline-none border border-zinc-800 text-xs focus:border-emerald-500"
+                    aria-label="Il tuo Nome"
+                    className="w-full min-h-11 bg-zinc-950 text-white font-bold px-3 py-2.5 rounded-xl outline-none border border-zinc-800 text-base focus:border-emerald-500"
                   />
                 </div>
 
                 <div className="pt-2 border-t border-zinc-800/50">
-                  <label className="text-[10px] font-bold text-zinc-400 block mb-2 uppercase tracking-wider">
+                  <label className="text-[11px] font-bold text-zinc-400 block mb-2 uppercase tracking-wider">
                     Obiettivo & Coach
                   </label>
                   <div className="flex gap-2 mb-3">
@@ -182,10 +263,11 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                           key={goal}
                           type="button"
                           onClick={() => onSetBodyGoal(isSel ? null : goal)}
-                          className={`flex-1 p-2 rounded-xl text-[11px] font-black uppercase transition border ${
+                          aria-pressed={isSel}
+                          className={`flex-1 min-h-11 p-2 rounded-xl text-[11px] font-black uppercase transition border ${
                             isSel
                               ? 'bg-emerald-500 border-emerald-500 text-zinc-950'
-                              : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white'
+                              : 'bg-zinc-950 border-zinc-800 text-zinc-300 hover:text-white'
                           }`}
                         >
                           {goal}
@@ -194,22 +276,28 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                     })}
                   </div>
 
-                  <div className="flex justify-between items-center bg-zinc-950 border border-zinc-800 p-3 rounded-xl">
-                    <span className="text-[11px] font-bold text-zinc-300 flex items-center gap-2">
-                      <i className="fa-solid fa-battery-quarter text-amber-500" /> Settimana di scarico
+                  <div className="flex justify-between items-center bg-zinc-950 border border-zinc-800 px-3 py-1 rounded-xl min-h-11">
+                    <span className="text-xs font-bold text-zinc-200 flex items-center gap-2">
+                      <i className="fa-solid fa-battery-quarter text-amber-400" aria-hidden="true" /> Settimana di scarico
                     </span>
                     <button
                       type="button"
                       onClick={onToggleDeload}
-                      className={`w-10 h-5 rounded-full relative transition p-0.5 ${
-                        state.deloadActive ? 'bg-amber-500' : 'bg-zinc-800'
-                      }`}
+                      aria-pressed={state.deloadActive}
+                      aria-label="Attiva settimana di scarico"
+                      className="min-w-11 min-h-11 flex items-center justify-end outline-none"
                     >
-                      <div
-                        className={`w-4 h-4 rounded-full bg-white transition-transform ${
-                          state.deloadActive ? 'translate-x-5' : 'translate-x-0'
+                      <span
+                        className={`w-10 h-5 rounded-full relative transition p-0.5 flex items-center ${
+                          state.deloadActive ? 'bg-amber-500' : 'bg-zinc-700'
                         }`}
-                      />
+                      >
+                        <span
+                          className={`w-4 h-4 rounded-full bg-white transition-transform ${
+                            state.deloadActive ? 'translate-x-5' : 'translate-x-0'
+                          }`}
+                        />
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -217,13 +305,13 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                 {/* BIA Metrics */}
                 <div className="pt-2 border-t border-zinc-800/50">
                   <div className="flex justify-between items-center mb-2">
-                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                    <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
                       Composizione Corporea (BIA)
                     </label>
                   </div>
 
-                  <label className="w-full bg-zinc-950 border border-zinc-800 hover:bg-zinc-800 text-zinc-300 p-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition mb-3">
-                    <i className="fa-solid fa-file-pdf text-rose-500" />
+                  <label className="w-full min-h-11 bg-zinc-950 border border-zinc-800 hover:bg-zinc-800 text-zinc-200 p-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition mb-3">
+                    <i className="fa-solid fa-file-pdf text-rose-400" aria-hidden="true" />
                     <span>Importa Referto PDF</span>
                     <input
                       type="file"
@@ -238,69 +326,73 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                   </label>
 
                   <div className="grid grid-cols-2 gap-2 mb-2">
-                    <div className="bg-zinc-950 border border-zinc-800 p-2 rounded-xl flex items-center">
-                      <span className="text-[9px] text-zinc-500 font-bold uppercase w-12 pl-1">Peso</span>
+                    <div className="bg-zinc-950 border border-zinc-800 p-2.5 rounded-xl">
+                      <span className="text-[11px] text-zinc-400 font-bold uppercase block mb-0.5">Peso (kg)</span>
                       <input
                         type="number"
                         step="0.1"
                         value={state.bodyMetrics.weight}
                         onChange={(e) => onUpdateBodyMetrics({ weight: e.target.value })}
                         placeholder="kg"
-                        className="bg-transparent text-white font-bold w-full text-right outline-none text-xs"
+                        aria-label="Peso corporeo in kg"
+                        className="bg-transparent text-white font-bold w-full outline-none text-base min-h-11"
                       />
                     </div>
-                    <div className="bg-zinc-950 border border-zinc-800 p-2 rounded-xl flex items-center">
-                      <span className="text-[9px] text-zinc-500 font-bold uppercase w-12 pl-1">Alt.</span>
+                    <div className="bg-zinc-950 border border-zinc-800 p-2.5 rounded-xl">
+                      <span className="text-[11px] text-zinc-400 font-bold uppercase block mb-0.5">Alt. (cm)</span>
                       <input
                         type="number"
                         value={state.bodyMetrics.height}
                         onChange={(e) => onUpdateBodyMetrics({ height: e.target.value })}
                         placeholder="cm"
-                        className="bg-transparent text-white font-bold w-full text-right outline-none text-xs"
+                        aria-label="Altezza in cm"
+                        className="bg-transparent text-white font-bold w-full outline-none text-base min-h-11"
                       />
                     </div>
-                    <div className="bg-zinc-950 border border-zinc-800 p-2 rounded-xl flex items-center">
-                      <span className="text-[9px] text-zinc-500 font-bold uppercase w-12 pl-1 leading-tight">FM %</span>
+                    <div className="bg-zinc-950 border border-zinc-800 p-2.5 rounded-xl">
+                      <span className="text-[11px] text-zinc-400 font-bold uppercase block mb-0.5">FM %</span>
                       <input
                         type="number"
                         step="0.1"
                         value={state.bodyMetrics.fm}
                         onChange={(e) => onUpdateBodyMetrics({ fm: e.target.value })}
                         placeholder="%"
-                        className="bg-transparent text-white font-bold w-full text-right outline-none text-xs"
+                        aria-label="Massa grassa in percentuale"
+                        className="bg-transparent text-white font-bold w-full outline-none text-base min-h-11"
                       />
                     </div>
-                    <div className="bg-zinc-950 border border-zinc-800 p-2 rounded-xl flex items-center">
-                      <span className="text-[9px] text-zinc-500 font-bold uppercase w-12 pl-1 leading-tight">MM kg</span>
+                    <div className="bg-zinc-950 border border-zinc-800 p-2.5 rounded-xl">
+                      <span className="text-[11px] text-zinc-400 font-bold uppercase block mb-0.5">MM kg</span>
                       <input
                         type="number"
                         step="0.1"
                         value={state.bodyMetrics.ffm}
                         onChange={(e) => onUpdateBodyMetrics({ ffm: e.target.value })}
                         placeholder="kg"
-                        className="bg-transparent text-white font-bold w-full text-right outline-none text-xs"
+                        aria-label="Massa magra in kg"
+                        className="bg-transparent text-white font-bold w-full outline-none text-base min-h-11"
                       />
                     </div>
                   </div>
 
                   <div className="flex justify-between items-center bg-zinc-950 p-2.5 rounded-xl border border-zinc-800">
-                    <span className="text-[10px] text-zinc-500 font-bold uppercase">BMI Calcolato</span>
+                    <span className="text-[11px] text-zinc-400 font-bold uppercase">BMI Calcolato</span>
                     <span className="text-xs font-black text-emerald-400">{bmi}</span>
                   </div>
 
                   {/* GRAFICO TREND BIA - Stile Apple Health SVG Nativo */}
                   {state.bodyMetricsHistory.length >= 2 && (
                     <div className="bg-zinc-900 p-4 rounded-2xl border border-zinc-800 space-y-3 mt-3 mb-1">
-                      <div className="flex justify-between items-center text-[10px] font-extrabold uppercase tracking-wider text-zinc-400">
+                      <div className="flex justify-between items-center text-[11px] font-extrabold uppercase tracking-wider text-zinc-400">
                         <span className="flex items-center gap-1.5 text-emerald-400">
-                          <i className="fa-solid fa-chart-line" /> Trend Composizione Corporea
+                          <i className="fa-solid fa-chart-line" aria-hidden="true" /> Trend Composizione Corporea
                         </span>
                         <span>{state.bodyMetricsHistory.length} Rilevazioni</span>
                       </div>
 
                       {/* SVG Nativo reattivo */}
                       <div className="w-full h-36 relative">
-                        <svg className="w-full h-full overflow-visible" viewBox="0 0 300 120">
+                        <svg className="w-full h-full overflow-visible" viewBox="0 0 300 120" aria-hidden="true">
                           {/* Linee guida di sfondo */}
                           <line x1="0" y1="0" x2="300" y2="0" stroke="#27272a" strokeWidth="1" strokeDasharray="3" />
                           <line x1="0" y1="60" x2="300" y2="60" stroke="#27272a" strokeWidth="1" strokeDasharray="3" />
@@ -343,12 +435,12 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                       </div>
 
                       {/* Legenda minima */}
-                      <div className="flex justify-between items-center text-[10px] text-zinc-500 pt-1 border-t border-zinc-800/60 font-bold">
+                      <div className="flex justify-between items-center text-[11px] text-zinc-400 pt-1 border-t border-zinc-800/60 font-bold">
                         <span className="flex items-center gap-1 text-emerald-400">
-                          <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Massa Magra (FFM)
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" aria-hidden="true" /> Massa Magra (FFM)
                         </span>
-                        <span className="flex items-center gap-1 text-zinc-400">
-                          <span className="w-2 h-2 rounded-full bg-zinc-500 inline-block" /> Peso Totale
+                        <span className="flex items-center gap-1 text-zinc-300">
+                          <span className="w-2 h-2 rounded-full bg-zinc-400 inline-block" aria-hidden="true" /> Peso Totale
                         </span>
                       </div>
                     </div>
@@ -359,18 +451,19 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                     <button
                       type="button"
                       onClick={() => setBiaHistoryOpen(!biaHistoryOpen)}
-                      className="w-full p-2.5 flex justify-between items-center hover:bg-zinc-900 transition text-left outline-none"
+                      aria-expanded={biaHistoryOpen}
+                      className="w-full min-h-11 px-3 py-2.5 flex justify-between items-center hover:bg-zinc-900 transition text-left outline-none"
                     >
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-300">
                         Storico BIA ({state.bodyMetricsHistory.length})
                       </span>
-                      <i className={`fa-solid fa-chevron-down text-[10px] text-zinc-500 transition-transform ${biaHistoryOpen ? 'rotate-180' : ''}`} />
+                      <i className={`fa-solid fa-chevron-down text-xs text-zinc-400 transition-transform ${biaHistoryOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
                     </button>
 
                     {biaHistoryOpen && (
                       <div className="p-3 pt-0 space-y-2 max-h-48 overflow-y-auto hide-scrollbar">
                         {state.bodyMetricsHistory.length === 0 ? (
-                          <div className="text-[11px] text-zinc-500 italic py-2">Nessun referto archiviato.</div>
+                          <div className="text-[11px] text-zinc-400 italic py-2">Nessun referto archiviato.</div>
                         ) : (
                           state.bodyMetricsHistory.map((hEntry, hIdx) => {
                             const prev = hIdx < state.bodyMetricsHistory.length - 1 ? state.bodyMetricsHistory[hIdx + 1] : null;
@@ -380,7 +473,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
 
                             return (
                               <div key={hIdx} className="flex justify-between items-center py-1.5 border-b border-zinc-900 last:border-0 text-xs">
-                                <span className="font-bold text-zinc-400 text-[11px]">{hEntry.date}</span>
+                                <span className="font-bold text-zinc-300 text-[11px]">{hEntry.date}</span>
                                 <div className="text-right text-[11px] space-x-2">
                                   {hEntry.weight && (
                                     <span className="text-white">
@@ -392,7 +485,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                                       )}
                                     </span>
                                   )}
-                                  {hEntry.fm && <span className="text-zinc-400">FM: {hEntry.fm}%</span>}
+                                  {hEntry.fm && <span className="text-zinc-300">FM: {hEntry.fm}%</span>}
                                   {hEntry.ffm && <span className="text-emerald-400">MM: {hEntry.ffm}kg</span>}
                                 </div>
                               </div>
@@ -412,49 +505,52 @@ export const SideMenu: React.FC<SideMenuProps> = ({
             <button
               type="button"
               onClick={() => setProgressOpen(!progressOpen)}
-              className="w-full p-4 flex justify-between items-center hover:bg-zinc-800/40 transition text-left outline-none"
+              aria-expanded={progressOpen}
+              className="w-full min-h-11 p-4 flex justify-between items-center hover:bg-zinc-800/40 transition text-left outline-none"
             >
               <span className="text-xs font-extrabold text-zinc-200 tracking-wide flex items-center gap-2.5">
-                <i className="fa-solid fa-chart-simple text-emerald-400 text-sm" />
+                <i className="fa-solid fa-chart-simple text-emerald-400 text-sm" aria-hidden="true" />
                 Progressi & Cronologia
               </span>
-              <i className={`fa-solid fa-chevron-down text-xs text-zinc-500 transition-transform ${progressOpen ? 'rotate-180' : ''}`} />
+              <i className={`fa-solid fa-chevron-down text-xs text-zinc-400 transition-transform ${progressOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
             </button>
 
             {progressOpen && (
               <div className="p-4 pt-0 space-y-4">
                 {/* Trend Separati: Pesi & Tonnellaggio vs Cardio & Distanza */}
                 <div className="bg-zinc-950 p-3.5 rounded-2xl border border-zinc-800/60 space-y-3">
-                  <div className="flex justify-between items-center text-[10px] font-extrabold uppercase tracking-wider text-zinc-400">
+                  <div className="flex justify-between items-center text-[11px] font-extrabold uppercase tracking-wider text-zinc-400">
                     <span className="flex items-center gap-1.5 text-emerald-400">
-                      <i className="fa-solid fa-arrow-trend-up" /> Trend Prestazioni
+                      <i className="fa-solid fa-arrow-trend-up" aria-hidden="true" /> Trend Prestazioni
                     </span>
-                    <span className="text-zinc-500">Ultime {Math.min(10, state.sessionsV2?.length || 0)} sessioni</span>
+                    <span className="text-zinc-400">Ultime {Math.min(10, state.sessionsV2?.length || 0)} sessioni</span>
                   </div>
 
                   {/* Toggle Selettore Grafica: Pesi vs Cardio */}
-                  <div className="flex bg-zinc-900 p-1 rounded-xl border border-zinc-800 text-[10px] font-black">
+                  <div className="flex bg-zinc-900 p-1 rounded-xl border border-zinc-800 text-xs font-black gap-2">
                     <button
                       type="button"
                       onClick={() => setTrendTab('weights')}
-                      className={`flex-1 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                      aria-pressed={trendTab === 'weights'}
+                      className={`flex-1 min-h-11 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
                         trendTab === 'weights'
                           ? 'bg-emerald-500 text-zinc-950 shadow-sm'
-                          : 'text-zinc-400 hover:text-white'
+                          : 'text-zinc-300 hover:text-white'
                       }`}
                     >
-                      <i className="fa-solid fa-dumbbell" /> Pesi (kg)
+                      <i className="fa-solid fa-dumbbell" aria-hidden="true" /> Pesi (kg)
                     </button>
                     <button
                       type="button"
                       onClick={() => setTrendTab('cardio')}
-                      className={`flex-1 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                      aria-pressed={trendTab === 'cardio'}
+                      className={`flex-1 min-h-11 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
                         trendTab === 'cardio'
                           ? 'bg-amber-500 text-zinc-950 shadow-sm'
-                          : 'text-zinc-400 hover:text-white'
+                          : 'text-zinc-300 hover:text-white'
                       }`}
                     >
-                      <i className="fa-solid fa-person-running" /> Cardio (km/min)
+                      <i className="fa-solid fa-person-running" aria-hidden="true" /> Cardio (km/m)
                     </button>
                   </div>
 
@@ -464,7 +560,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                     
                     if (recentSessions.length < 2) {
                       return (
-                        <div className="text-zinc-500 text-center py-5 text-[11px] italic bg-zinc-900/40 rounded-xl border border-zinc-800/40">
+                        <div className="text-zinc-400 text-center py-5 text-[11px] italic bg-zinc-900/40 rounded-xl border border-zinc-800/40">
                           Esegui almeno 2 allenamenti per vedere il trend
                         </div>
                       );
@@ -491,7 +587,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                     const hasData = values.some(v => v > 0);
                     if (!hasData) {
                       return (
-                        <div className="text-zinc-500 text-center py-5 text-[11px] italic bg-zinc-900/40 rounded-xl border border-zinc-800/40">
+                        <div className="text-zinc-400 text-center py-5 text-[11px] italic bg-zinc-900/40 rounded-xl border border-zinc-800/40">
                           {isWeights ? 'Nessun carico pesi registrato' : 'Nessuna sessione cardio registrata'}
                         </div>
                       );
@@ -522,7 +618,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                     return (
                       <>
                         <div className="w-full h-28 relative">
-                          <svg className="w-full h-full overflow-visible" viewBox="0 0 300 100">
+                          <svg className="w-full h-full overflow-visible" viewBox="0 0 300 100" aria-hidden="true">
                             {/* Griglia di sfondo tratteggiata */}
                             <line x1="10" y1="15" x2="290" y2="15" stroke="#27272a" strokeWidth="1" strokeDasharray="3" />
                             <line x1="10" y1="52" x2="290" y2="52" stroke="#27272a" strokeWidth="1" strokeDasharray="3" />
@@ -562,8 +658,8 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                                     <text
                                       x={x}
                                       y={y - 8}
-                                      fill={isLast ? circleActive : '#a1a1aa'}
-                                      fontSize="9"
+                                      fill={isLast ? circleActive : '#d4d4d8'}
+                                      fontSize="11"
                                       fontWeight="bold"
                                       textAnchor={isFirst ? 'start' : 'end'}
                                     >
@@ -576,7 +672,7 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                           </svg>
                         </div>
 
-                        <div className="flex justify-between items-center text-[10px] text-zinc-500 pt-1 border-t border-zinc-900 font-bold">
+                        <div className="flex justify-between items-center text-[11px] text-zinc-400 pt-1 border-t border-zinc-900 font-bold">
                           <span>Inizio: {firstSession.date}</span>
                           <span className={diff >= 0 ? (isWeights ? 'text-emerald-400' : 'text-amber-400') : 'text-rose-400'}>
                             {diff >= 0 ? `+${isWeights ? (diff / 1000).toFixed(1) + 'k kg' : diff.toFixed(1) + (lastSession.cardioKm > 0 ? ' km' : ' min')}` : `${isWeights ? (diff / 1000).toFixed(1) + 'k kg' : diff.toFixed(1) + (lastSession.cardioKm > 0 ? ' km' : ' min')}`}
@@ -590,86 +686,86 @@ export const SideMenu: React.FC<SideMenuProps> = ({
 
                 {/* Confronto Mensile Differenziato (Pesi vs Cardio) */}
                 <div className="bg-zinc-950 p-3 rounded-2xl border border-zinc-800/60 space-y-2">
-                  <div className="flex justify-between items-center text-[10px] font-extrabold uppercase tracking-wider text-zinc-400">
+                  <div className="flex justify-between items-center text-[11px] font-extrabold uppercase tracking-wider text-zinc-400">
                     <span className="flex items-center gap-1 text-emerald-400">
-                      <i className="fa-solid fa-chart-column" /> Confronto Mensile (Pesi vs Cardio)
+                      <i className="fa-solid fa-chart-column" aria-hidden="true" /> Confronto Mensile (Pesi vs Cardio)
                     </span>
                   </div>
                   
                   <div className="grid grid-cols-2 gap-3 pt-1">
                     {/* Colonna Pesi */}
                     <div className="bg-zinc-900/60 p-2.5 rounded-xl border border-zinc-800/40">
-                      <div className="text-[10px] font-bold text-emerald-400 mb-2 flex items-center justify-between">
+                      <div className="text-[11px] font-bold text-emerald-400 mb-3 flex items-center justify-between gap-1">
                         <span>🏋️ Pesi</span>
-                        <span className="text-[9px] text-zinc-400">{(stats.month.tonnage / 1000).toFixed(1)}k kg</span>
+                        <span className="text-[11px] text-zinc-300">{(stats.month.tonnage / 1000).toFixed(1)}k</span>
                       </div>
-                      <div className="flex items-end gap-2 h-20">
+                      <div className="flex items-end gap-2 h-20 pt-2">
                         <div className="flex-1 flex flex-col items-center justify-end gap-1 h-full">
                           <div
                             className="w-full bg-zinc-800 rounded-t-md relative flex flex-col justify-end"
                             style={{ height: `${hPrev}%` }}
                           >
-                            <span className="text-[8px] text-zinc-400 font-bold text-center w-full absolute -top-3.5">
+                            <span className="text-[11px] text-zinc-300 font-bold text-center w-full absolute -top-4">
                               {(stats.lastMonth.tonnage / 1000).toFixed(1)}k
                             </span>
                           </div>
-                          <span className="text-[9px] text-zinc-500 font-medium">Scorso</span>
+                          <span className="text-[11px] text-zinc-400 font-medium">Scorso</span>
                         </div>
                         <div className="flex-1 flex flex-col items-center justify-end gap-1 h-full">
                           <div
                             className="w-full bg-emerald-500 rounded-t-md relative flex flex-col justify-end"
                             style={{ height: `${hCur}%` }}
                           >
-                            <span className="text-[8px] text-emerald-300 font-bold text-center w-full absolute -top-3.5">
+                            <span className="text-[11px] text-emerald-300 font-bold text-center w-full absolute -top-4">
                               {(stats.month.tonnage / 1000).toFixed(1)}k
                             </span>
                           </div>
-                          <span className="text-[9px] text-emerald-400 font-bold">Attuale</span>
+                          <span className="text-[11px] text-emerald-400 font-bold">Attuale</span>
                         </div>
                       </div>
                     </div>
 
                     {/* Colonna Cardio */}
                     <div className="bg-zinc-900/60 p-2.5 rounded-xl border border-zinc-800/40">
-                      <div className="text-[10px] font-bold text-amber-400 mb-2 flex items-center justify-between">
+                      <div className="text-[11px] font-bold text-amber-400 mb-3 flex items-center justify-between gap-1">
                         <span>🏃 Cardio</span>
-                        <span className="text-[9px] text-zinc-400">
-                          {stats.month.cardioKm > 0 ? `${stats.month.cardioKm.toFixed(1)} km` : `${Math.round(stats.month.cardioMinutes)} min`}
+                        <span className="text-[11px] text-zinc-300">
+                          {stats.month.cardioKm > 0 ? `${stats.month.cardioKm.toFixed(1)}k` : `${Math.round(stats.month.cardioMinutes)}m`}
                         </span>
                       </div>
-                      <div className="flex items-end gap-2 h-20">
+                      <div className="flex items-end gap-2 h-20 pt-2">
                         <div className="flex-1 flex flex-col items-center justify-end gap-1 h-full">
                           <div
                             className="w-full bg-zinc-800 rounded-t-md relative flex flex-col justify-end"
                             style={{ height: `${hCardioPrev}%` }}
                           >
-                            <span className="text-[8px] text-zinc-400 font-bold text-center w-full absolute -top-3.5">
+                            <span className="text-[11px] text-zinc-300 font-bold text-center w-full absolute -top-4">
                               {stats.lastMonth.cardioKm > 0 ? `${stats.lastMonth.cardioKm.toFixed(1)}k` : `${Math.round(stats.lastMonth.cardioMinutes)}m`}
                             </span>
                           </div>
-                          <span className="text-[9px] text-zinc-500 font-medium">Scorso</span>
+                          <span className="text-[11px] text-zinc-400 font-medium">Scorso</span>
                         </div>
                         <div className="flex-1 flex flex-col items-center justify-end gap-1 h-full">
                           <div
                             className="w-full bg-amber-500 rounded-t-md relative flex flex-col justify-end"
                             style={{ height: `${hCardioCur}%` }}
                           >
-                            <span className="text-[8px] text-amber-300 font-bold text-center w-full absolute -top-3.5">
+                            <span className="text-[11px] text-amber-300 font-bold text-center w-full absolute -top-4">
                               {stats.month.cardioKm > 0 ? `${stats.month.cardioKm.toFixed(1)}k` : `${Math.round(stats.month.cardioMinutes)}m`}
                             </span>
                           </div>
-                          <span className="text-[9px] text-amber-400 font-bold">Attuale</span>
+                          <span className="text-[11px] text-amber-400 font-bold">Attuale</span>
                         </div>
                       </div>
                     </div>
                   </div>
 
                   {/* Statistiche Reps & TUT */}
-                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-900 text-[10px]">
-                    <div className="text-zinc-400">
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-900 text-[11px]">
+                    <div className="text-zinc-300">
                       Reps Mese: <span className="text-white font-bold">{stats.month.totalReps.toLocaleString()}</span>
                     </div>
-                    <div className="text-zinc-400 text-right">
+                    <div className="text-zinc-300 text-right">
                       TUT Mese: <span className="text-amber-400 font-bold">{Math.round(stats.month.tutSeconds / 60)} min</span>
                     </div>
                   </div>
@@ -677,12 +773,12 @@ export const SideMenu: React.FC<SideMenuProps> = ({
 
                 {/* Monthly Workout Attendance Calendar */}
                 <div className="bg-zinc-950 p-3 rounded-2xl border border-zinc-800/60">
-                  <div className="text-[10px] uppercase font-bold text-zinc-400 mb-2 flex items-center gap-1.5">
-                    <i className="fa-regular fa-calendar-check text-emerald-500" /> Frequenza Mensile
+                  <div className="text-[11px] uppercase font-bold text-zinc-400 mb-2 flex items-center gap-1.5">
+                    <i className="fa-regular fa-calendar-check text-emerald-500" aria-hidden="true" /> Frequenza Mensile
                   </div>
                   <div className="grid grid-cols-7 gap-1">
                     {['L', 'M', 'M', 'G', 'V', 'S', 'D'].map((day, idx) => (
-                      <div key={idx} className="text-center text-[9px] text-zinc-500 font-bold mb-1">
+                      <div key={idx} className="text-center text-[11px] text-zinc-400 font-bold mb-1">
                         {day}
                       </div>
                     ))}
@@ -698,14 +794,14 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                       return (
                         <div
                           key={dayNum}
-                          className={`aspect-square rounded-full flex items-center justify-center text-[9px] font-bold mx-auto w-5 h-5 ${
+                          className={`aspect-square rounded-full flex items-center justify-center text-[11px] font-bold mx-auto w-7 h-7 ${
                             isWorkout && isToday
                               ? 'bg-emerald-500 text-zinc-950 ring-2 ring-emerald-300'
                               : isWorkout
                               ? 'bg-emerald-500/25 text-emerald-400 border border-emerald-500/30'
                               : isToday
-                              ? 'ring-1 ring-zinc-500 text-white'
-                              : 'text-zinc-600'
+                              ? 'ring-1 ring-zinc-400 text-white'
+                              : 'text-zinc-400'
                           }`}
                         >
                           {dayNum}
@@ -722,13 +818,13 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                     onOpenHistoryModal();
                     onClose();
                   }}
-                  className="w-full bg-zinc-950 border border-zinc-800/60 hover:bg-zinc-800 text-zinc-300 p-3.5 rounded-2xl font-bold transition flex items-center justify-between outline-none text-xs"
+                  className="w-full min-h-11 bg-zinc-950 border border-zinc-800/60 hover:bg-zinc-800 text-zinc-200 p-3.5 rounded-2xl font-bold transition flex items-center justify-between outline-none text-xs"
                 >
                   <div className="flex items-center gap-2">
-                    <i className="fa-solid fa-clock-rotate-left text-zinc-400" />
+                    <i className="fa-solid fa-clock-rotate-left text-zinc-400" aria-hidden="true" />
                     <span>Cronologia Allenamenti ({state.sessionsV2?.length || 0})</span>
                   </div>
-                  <i className="fa-solid fa-chevron-right text-xs text-zinc-600" />
+                  <i className="fa-solid fa-chevron-right text-xs text-zinc-400" aria-hidden="true" />
                 </button>
               </div>
             )}
@@ -739,13 +835,14 @@ export const SideMenu: React.FC<SideMenuProps> = ({
             <button
               type="button"
               onClick={() => setToolsOpen(!toolsOpen)}
-              className="w-full p-4 flex justify-between items-center hover:bg-zinc-800/40 transition text-left outline-none"
+              aria-expanded={toolsOpen}
+              className="w-full min-h-11 p-4 flex justify-between items-center hover:bg-zinc-800/40 transition text-left outline-none"
             >
               <span className="text-xs font-extrabold text-zinc-200 tracking-wide flex items-center gap-2.5">
-                <i className="fa-solid fa-toolbox text-emerald-400 text-sm" />
+                <i className="fa-solid fa-toolbox text-emerald-400 text-sm" aria-hidden="true" />
                 Strumenti & Backup
               </span>
-              <i className={`fa-solid fa-chevron-down text-xs text-zinc-500 transition-transform ${toolsOpen ? 'rotate-180' : ''}`} />
+              <i className={`fa-solid fa-chevron-down text-xs text-zinc-400 transition-transform ${toolsOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
             </button>
 
             {toolsOpen && (
@@ -756,13 +853,13 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                     onOpenPRModal();
                     onClose();
                   }}
-                  className="w-full bg-zinc-950 border border-zinc-800/60 hover:bg-zinc-800 text-zinc-300 p-3.5 rounded-2xl font-bold transition flex justify-between items-center outline-none text-xs"
+                  className="w-full min-h-11 bg-zinc-950 border border-zinc-800/60 hover:bg-zinc-800 text-zinc-200 p-3.5 rounded-2xl font-bold transition flex justify-between items-center outline-none text-xs"
                 >
                   <div className="flex items-center gap-2.5">
-                    <i className="fa-solid fa-trophy text-amber-400" />
+                    <i className="fa-solid fa-trophy text-amber-400" aria-hidden="true" />
                     <span>Record PR ({state.prs.length})</span>
                   </div>
-                  <i className="fa-solid fa-chevron-right text-xs text-zinc-600" />
+                  <i className="fa-solid fa-chevron-right text-xs text-zinc-400" aria-hidden="true" />
                 </button>
 
                 <button
@@ -771,14 +868,312 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                     onOpenSyncModal();
                     onClose();
                   }}
-                  className="w-full bg-zinc-950 border border-zinc-800/60 hover:bg-zinc-800 text-zinc-300 p-3.5 rounded-2xl font-bold transition flex justify-between items-center outline-none text-xs"
+                  className="w-full min-h-11 bg-zinc-950 border border-zinc-800/60 hover:bg-zinc-800 text-zinc-200 p-3.5 rounded-2xl font-bold transition flex justify-between items-center outline-none text-xs"
                 >
                   <div className="flex items-center gap-2.5">
-                    <i className="fa-solid fa-cloud-arrow-up text-emerald-400" />
+                    <i className="fa-solid fa-cloud-arrow-up text-emerald-400" aria-hidden="true" />
                     <span>Sincronizzazione Codice</span>
                   </div>
-                  <i className="fa-solid fa-chevron-right text-xs text-zinc-600" />
+                  <i className="fa-solid fa-chevron-right text-xs text-zinc-400" aria-hidden="true" />
                 </button>
+              </div>
+            )}
+          </div>
+
+          {/* Accordion 4: Account (opzionale) */}
+          <div className="bg-zinc-900/60 rounded-3xl overflow-hidden border border-zinc-800/50">
+            <button
+              type="button"
+              onClick={() => setAccountOpen(!accountOpen)}
+              aria-expanded={accountOpen}
+              className="w-full min-h-11 p-4 flex justify-between items-center hover:bg-zinc-800/40 transition text-left outline-none"
+            >
+              <span className="text-xs font-extrabold text-zinc-200 tracking-wide flex items-center gap-2.5">
+                <i className="fa-solid fa-circle-user text-emerald-400 text-sm" aria-hidden="true" />
+                Account
+                {authUser && (
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" aria-label="Account connesso" />
+                )}
+              </span>
+              <i className={`fa-solid fa-chevron-down text-xs text-zinc-400 transition-transform ${accountOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+            </button>
+
+            {accountOpen && (
+              <div className="p-4 pt-0 space-y-3">
+                {!isAuthAvailable ? (
+                  <div className="bg-zinc-950 border border-zinc-800 p-3 rounded-2xl text-xs text-zinc-300 leading-relaxed">
+                    Servizio account non disponibile al momento. L&apos;app continua a funzionare normalmente in locale.
+                  </div>
+                ) : isAuthLoading ? (
+                  <div className="bg-zinc-950 border border-zinc-800 p-3 rounded-2xl text-xs text-zinc-300 flex items-center gap-2">
+                    <i className="fa-solid fa-spinner fa-spin text-emerald-400" aria-hidden="true" />
+                    <span>Verifica sessione in corso...</span>
+                  </div>
+                ) : authUser ? (
+                  <div className="space-y-3">
+                    <div className="bg-emerald-950/30 border border-emerald-500/30 p-3.5 rounded-2xl space-y-1">
+                      <div className="text-[11px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                        <i className="fa-solid fa-check-circle" aria-hidden="true" /> Stato Account
+                      </div>
+                      <p className="text-xs font-bold text-white leading-snug">
+                        <span className="text-zinc-300 font-semibold block">Connesso come</span>
+                        <span className="block [overflow-wrap:anywhere]">{authUser.email || 'Utente'}</span>
+                      </p>
+                    </div>
+
+                    {/* Stato Sincronizzazione Cloud */}
+                    <div className="bg-zinc-950 border border-zinc-800/80 p-3 rounded-2xl space-y-2">
+                      <div className="flex items-center justify-between gap-2 text-xs">
+                        <span className="text-zinc-300 font-semibold">Cloud:</span>
+                        {cloudSyncStatus === 'syncing' ? (
+                          <span className="text-sky-400 font-bold flex items-center gap-1.5">
+                            <i className="fa-solid fa-spinner fa-spin text-[11px]" aria-hidden="true" /> Sincronizzazione...
+                          </span>
+                        ) : cloudSyncStatus === 'synced' ? (
+                          <span className="text-emerald-400 font-bold flex items-center gap-1.5">
+                            <i className="fa-solid fa-cloud-check text-[11px]" aria-hidden="true" /> Sincronizzato
+                          </span>
+                        ) : cloudSyncStatus === 'offline' ? (
+                          <span className="text-amber-400 font-bold flex items-center gap-1.5">
+                            <i className="fa-solid fa-wifi text-[11px]" aria-hidden="true" /> Offline
+                          </span>
+                        ) : cloudSyncStatus === 'error' ? (
+                          <span className="text-rose-400 font-bold text-right">
+                            Errore: {cloudSyncError || 'sincronizzazione non riuscita'}
+                          </span>
+                        ) : (
+                          <span className="text-zinc-300 font-bold">In attesa</span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2 text-[11px] border-t border-zinc-900 pt-2">
+                        <span className="text-zinc-400 font-semibold">Ultimo salvataggio cloud:</span>
+                        <span className="text-zinc-200 font-bold">{formatCloudTimeShort(lastCloudSavedAt)}</span>
+                      </div>
+                    </div>
+
+                    {cloudActionMsg && (
+                      <div
+                        className={`text-xs font-semibold p-2.5 rounded-xl flex items-start gap-2 border ${
+                          cloudActionMsg.isError
+                            ? 'bg-rose-950/40 border-rose-500/40 text-rose-300'
+                            : 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+                        }`}
+                      >
+                        <i
+                          className={`fa-solid ${
+                            cloudActionMsg.isError ? 'fa-circle-exclamation' : 'fa-circle-check'
+                          } mt-0.5 shrink-0`}
+                          aria-hidden="true"
+                        />
+                        <span>{cloudActionMsg.text}</span>
+                      </div>
+                    )}
+
+                    {/* Pulsanti Sincronizzazione Manuale */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        disabled={cloudSyncStatus === 'syncing' || authSubmitting}
+                        onClick={async () => {
+                          setCloudActionMsg(null);
+                          setConfirmCloudDownload(false);
+                          await onSyncNow();
+                        }}
+                        className="min-h-11 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 px-2.5 py-3 rounded-xl font-black text-[11px] transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                      >
+                        <i className={`fa-solid fa-arrows-rotate ${cloudSyncStatus === 'syncing' ? 'fa-spin' : ''}`} aria-hidden="true" />
+                        <span>Sincronizza ora</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={cloudSyncStatus === 'syncing' || authSubmitting}
+                        onClick={() => {
+                          setCloudActionMsg(null);
+                          setConfirmCloudDownload((prev) => !prev);
+                        }}
+                        className="min-h-11 bg-zinc-950 border border-zinc-800 hover:bg-zinc-800 text-zinc-200 px-2.5 py-3 rounded-xl font-bold text-[11px] transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                      >
+                        <i className="fa-solid fa-cloud-arrow-down text-sky-400" aria-hidden="true" />
+                        <span>Scarica dal cloud</span>
+                      </button>
+                    </div>
+
+                    {confirmCloudDownload && (
+                      <div className="bg-amber-950/30 border border-amber-500/40 p-3 rounded-2xl space-y-2.5">
+                        <p className="text-xs text-amber-200 leading-relaxed font-medium">
+                          Sostituire i dati locali con quelli presenti nel cloud? Verrà creato prima un backup di sicurezza locale.
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            disabled={cloudSyncStatus === 'syncing'}
+                            onClick={async () => {
+                              setConfirmCloudDownload(false);
+                              const res = await onDownloadFromCloud();
+                              if (res.ok) {
+                                setCloudActionMsg({ text: 'Dati ripristinati dal cloud con backup di sicurezza creato.' });
+                              } else {
+                                setCloudActionMsg({ text: res.error || 'Download non riuscito.', isError: true });
+                              }
+                            }}
+                            className="flex-1 min-h-11 bg-amber-500 hover:bg-amber-400 text-zinc-950 py-2.5 rounded-xl font-black text-xs transition disabled:opacity-50"
+                          >
+                            Conferma
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmCloudDownload(false)}
+                            className="flex-1 min-h-11 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 py-2.5 rounded-xl font-bold text-xs border border-zinc-700 transition"
+                          >
+                            Annulla
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {authError && (
+                      <div className="bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs font-semibold p-2.5 rounded-xl flex items-start gap-2">
+                        <i className="fa-solid fa-circle-exclamation mt-0.5 shrink-0" aria-hidden="true" />
+                        <span>{authError}</span>
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConfirmCloudDownload(false);
+                        setCloudActionMsg(null);
+                        handleAuthLogout();
+                      }}
+                      disabled={authSubmitting}
+                      className="w-full min-h-11 bg-zinc-950 border border-zinc-800 hover:bg-rose-950/40 hover:border-rose-500/40 hover:text-rose-300 text-zinc-200 p-3 rounded-2xl font-bold transition flex items-center justify-center gap-2 outline-none text-xs disabled:opacity-50"
+                    >
+                      <i className="fa-solid fa-right-from-bracket" aria-hidden="true" />
+                      <span>{authSubmitting ? 'Uscita in corso...' : 'Esci'}</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="bg-zinc-950 border border-zinc-800/80 px-3 py-2.5 rounded-xl flex items-center justify-between text-xs">
+                      <span className="text-zinc-300 font-semibold">Stato:</span>
+                      <span className="text-zinc-200 font-bold">Non connesso (solo locale)</span>
+                    </div>
+
+                    {/* Switch Accedi / Registrati */}
+                    <div className="flex bg-zinc-950 p-1 rounded-xl border border-zinc-800 text-xs font-black gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthMode('login');
+                          setAuthError(null);
+                          setAuthInfo(null);
+                        }}
+                        aria-pressed={authMode === 'login'}
+                        className={`flex-1 min-h-11 py-1.5 rounded-lg transition-all ${
+                          authMode === 'login'
+                            ? 'bg-emerald-500 text-zinc-950 shadow-sm'
+                            : 'text-zinc-300 hover:text-white'
+                        }`}
+                      >
+                        Accedi
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthMode('register');
+                          setAuthError(null);
+                          setAuthInfo(null);
+                        }}
+                        aria-pressed={authMode === 'register'}
+                        className={`flex-1 min-h-11 py-1.5 rounded-lg transition-all ${
+                          authMode === 'register'
+                            ? 'bg-emerald-500 text-zinc-950 shadow-sm'
+                            : 'text-zinc-300 hover:text-white'
+                        }`}
+                      >
+                        Registrati
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleAuthSubmit} noValidate className="space-y-2.5">
+                      <div>
+                        <label className="text-[11px] font-bold text-zinc-400 block mb-1 uppercase tracking-wider">
+                          Email
+                        </label>
+                        <input
+                          type="email"
+                          autoComplete="email"
+                          value={authEmail}
+                          onChange={(e) => setAuthEmail(e.target.value)}
+                          placeholder="nome@email.com"
+                          aria-label="Indirizzo email"
+                          className="w-full min-h-11 bg-zinc-950 text-white font-bold px-3 py-2.5 rounded-xl outline-none border border-zinc-800 text-base focus:border-emerald-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] font-bold text-zinc-400 block mb-1 uppercase tracking-wider">
+                          Password
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showAuthPassword ? 'text' : 'password'}
+                            autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
+                            value={authPassword}
+                            onChange={(e) => setAuthPassword(e.target.value)}
+                            placeholder="Minimo 6 caratteri"
+                            aria-label="Password"
+                            className="w-full min-h-11 bg-zinc-950 text-white font-bold px-3 py-2.5 pr-12 rounded-xl outline-none border border-zinc-800 text-base focus:border-emerald-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowAuthPassword((prev) => !prev)}
+                            className="absolute right-0 top-1/2 -translate-y-1/2 w-11 h-11 min-w-11 min-h-11 flex items-center justify-center text-zinc-400 hover:text-zinc-200 outline-none"
+                            aria-label={showAuthPassword ? 'Nascondi password' : 'Mostra password'}
+                            aria-pressed={showAuthPassword}
+                          >
+                            <i className={`fa-solid ${showAuthPassword ? 'fa-eye-slash' : 'fa-eye'} text-sm`} aria-hidden="true" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {authError && (
+                        <div className="bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs font-semibold p-2.5 rounded-xl flex items-start gap-2">
+                          <i className="fa-solid fa-circle-exclamation mt-0.5 shrink-0" aria-hidden="true" />
+                          <span>{authError}</span>
+                        </div>
+                      )}
+
+                      {authInfo && (
+                        <div className="bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs font-semibold p-2.5 rounded-xl flex items-start gap-2">
+                          <i className="fa-solid fa-circle-check mt-0.5 shrink-0" aria-hidden="true" />
+                          <span>{authInfo}</span>
+                        </div>
+                      )}
+
+                      <button
+                        type="submit"
+                        disabled={authSubmitting}
+                        className="w-full min-h-11 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black p-3 rounded-xl transition text-xs flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {authSubmitting ? (
+                          <>
+                            <i className="fa-solid fa-spinner fa-spin" aria-hidden="true" />
+                            <span>{authMode === 'login' ? 'Accesso...' : 'Registrazione...'}</span>
+                          </>
+                        ) : (
+                          <span>{authMode === 'login' ? 'Accedi' : 'Crea Account'}</span>
+                        )}
+                      </button>
+                    </form>
+
+                    <p className="text-[11px] text-zinc-400 text-center leading-relaxed">
+                      Opzionale: puoi continuare a usare tutta l&apos;app anche senza account.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
